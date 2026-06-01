@@ -483,7 +483,7 @@ function installSkillDependencies() {
 }
 
 async function beforePack(context) {
-  ensureBundledOpenClawRuntime(context);
+  // ensureBundledOpenClawRuntime(context); // skipped for Intel x64 build
   // Install skill dependencies first (for all platforms)
   installSkillDependencies();
 
