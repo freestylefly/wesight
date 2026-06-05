@@ -1,14 +1,10 @@
+import { CreatorPromptSpecSchemaVersion } from '@shared/creatorStudio/constants';
 import type { CreatorPromptSpecSnapshot } from '@shared/creatorStudio/types';
 
 import type { CreatorPromptSpec } from '../types/creatorStudio';
 import { CreatorPromptSourceMode } from '../types/creatorStudio';
 
-export const CreatorPromptSpecSchemaVersion = {
-  V1: 'creator.prompt.v1',
-} as const;
-
-export type CreatorPromptSpecSchemaVersion =
-  typeof CreatorPromptSpecSchemaVersion[keyof typeof CreatorPromptSpecSchemaVersion];
+export { CreatorPromptSpecSchemaVersion };
 
 export const toCreatorPromptSpecSnapshot = (
   spec: CreatorPromptSpec,

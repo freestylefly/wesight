@@ -42,6 +42,7 @@ export interface CreatorPromptSeed {
   sourceTitle: string;
   referencePrompt?: string;
   templateId?: string;
+  templateUseWhen?: string;
   caseIds?: string[];
   category?: string;
   styles?: string[];

@@ -40,6 +40,13 @@ export const CreatorStudioIpcChannel = {
 export type CreatorStudioIpcChannel =
   typeof CreatorStudioIpcChannel[keyof typeof CreatorStudioIpcChannel];
 
+export const CreatorPromptSpecSchemaVersion = {
+  V1: 'creator.prompt.v1',
+} as const;
+
+export type CreatorPromptSpecSchemaVersion =
+  typeof CreatorPromptSpecSchemaVersion[keyof typeof CreatorPromptSpecSchemaVersion];
+
 export const CreatorProductionAssetKind = {
   Image: 'image',
   Prompt: 'prompt',

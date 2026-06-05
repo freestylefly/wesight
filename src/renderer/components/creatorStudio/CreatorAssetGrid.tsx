@@ -22,6 +22,7 @@ import {
 } from '@shared/creatorStudio/constants';
 import type {
   CreatorProductionAssetRecord,
+  CreatorPromptVersionRecord,
   CreatorWorkspaceSnapshot,
 } from '@shared/creatorStudio/types';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
@@ -260,6 +261,9 @@ export const CreatorAssetGrid: React.FC<CreatorAssetGridProps> = ({
   const [isCreatingProject, setIsCreatingProject] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [promptVersions, setPromptVersions] = useState<CreatorPromptVersionRecord[]>([]);
+  const [promptVersionDiff, setPromptVersionDiff] = useState('');
+  const [isLoadingPromptVersions, setIsLoadingPromptVersions] = useState(false);
 
   const currentCollections = useMemo(
     () => workspace?.collections.filter((collection) => collection.projectId === currentProjectId) ?? [],
@@ -317,12 +321,41 @@ export const CreatorAssetGrid: React.FC<CreatorAssetGridProps> = ({
       setLicenseNoteDraft('');
       setUsageNoteDraft('');
       setCollectionTargetId('');
+      setPromptVersions([]);
+      setPromptVersionDiff('');
       return;
     }
     setTagDraft(selectedAsset.tags.join(', '));
     setLicenseNoteDraft(selectedAsset.licenseNote ?? '');
     setUsageNoteDraft(selectedAsset.usageNote ?? '');
     setCollectionTargetId('');
+    setPromptVersionDiff('');
+  }, [selectedAsset]);
+
+  useEffect(() => {
+    if (!selectedAsset || selectedAsset.kind !== CreatorProductionAssetKind.Prompt) {
+      setPromptVersions([]);
+      return;
+    }
+    let cancelled = false;
+    setIsLoadingPromptVersions(true);
+    void creatorStudioAssetService.listPromptVersions({ promptAssetId: selectedAsset.id })
+      .then((result) => {
+        if (cancelled) return;
+        setPromptVersions(result.versions);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        dispatchToast(i18nService.t('creatorPromptVersionLoadFailed'));
+        setPromptVersions([]);
+      })
+      .finally(() => {
+        if (cancelled) return;
+        setIsLoadingPromptVersions(false);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [selectedAsset]);
 
   const handleCreateProject = async () => {
@@ -477,6 +510,54 @@ export const CreatorAssetGrid: React.FC<CreatorAssetGridProps> = ({
       dispatchToast(i18nService.t('creatorAssetAddedToCollection'));
     } catch {
       dispatchToast(i18nService.t('creatorAssetUpdateFailed'));
+    }
+  };
+
+  const handleDiffPromptVersion = async (
+    version: CreatorPromptVersionRecord,
+    previousVersion: CreatorPromptVersionRecord | undefined
+  ) => {
+    if (!previousVersion) {
+      dispatchToast(i18nService.t('creatorPromptVersionDiffUnavailable'));
+      return;
+    }
+    try {
+      const diff = await creatorStudioAssetService.diffPromptVersions({
+        fromVersionId: previousVersion.id,
+        toVersionId: version.id,
+      });
+      setPromptVersionDiff([
+        `${i18nService.t('creatorPromptVersionDiff')}: v${previousVersion.version} -> v${version.version}`,
+        '',
+        `promptTextChanged: ${diff.promptTextChanged}`,
+        `promptSpecChanged: ${diff.promptSpecChanged}`,
+        '',
+        'Prompt before:',
+        diff.promptTextBefore,
+        '',
+        'Prompt after:',
+        diff.promptTextAfter,
+      ].join('\n'));
+    } catch {
+      dispatchToast(i18nService.t('creatorPromptVersionDiffFailed'));
+    }
+  };
+
+  const handleRollbackPromptVersion = async (version: CreatorPromptVersionRecord) => {
+    if (!selectedAsset) return;
+    try {
+      const title = `${selectedAsset.fileName.replace(/\.prompt\.txt$/i, '')} rollback v${version.version}`;
+      const forked = await creatorStudioAssetService.forkPromptVersion({
+        promptVersionId: version.id,
+        projectId: selectedAsset.projectId,
+        title,
+        changeNote: `Rollback fork from v${version.version}`,
+      });
+      await loadAssets();
+      setSelectedAsset(forked);
+      dispatchToast(i18nService.t('creatorPromptVersionRollbackCreated'));
+    } catch {
+      dispatchToast(i18nService.t('creatorPromptVersionRollbackFailed'));
     }
   };
 
@@ -778,6 +859,10 @@ export const CreatorAssetGrid: React.FC<CreatorAssetGridProps> = ({
               <ProvenanceRow label="sessionId" value={selectedAsset.sessionId || 'none'} />
               <ProvenanceRow label="messageId" value={selectedAsset.messageId || 'none'} />
               <ProvenanceRow label="variantOfAssetId" value={selectedAsset.variantOfAssetId || 'none'} />
+              <ProvenanceRow label="parentPromptAssetId" value={selectedAsset.parentPromptAssetId || 'none'} />
+              <ProvenanceRow label="promptVersionId" value={selectedAsset.promptVersionId || 'none'} />
+              <ProvenanceRow label="recipeId" value={selectedAsset.recipeId || 'none'} />
+              <ProvenanceRow label="selectedDirectionId" value={selectedAsset.selectedDirectionId || 'none'} />
               <button
                 type="button"
                 onClick={() => void handleToggleSelected(selectedAsset)}
@@ -790,6 +875,55 @@ export const CreatorAssetGrid: React.FC<CreatorAssetGridProps> = ({
                 <CheckCircleIcon className="h-4 w-4" />
                 {selectedAsset.selected ? i18nService.t('creatorAssetUnselect') : i18nService.t('creatorAssetSelect')}
               </button>
+
+              {selectedAsset.kind === CreatorProductionAssetKind.Prompt && (
+                <section className="rounded-lg border border-border p-3">
+                  <div className="flex items-center justify-between gap-2">
+                    <h3 className="text-xs font-medium text-secondary">{i18nService.t('creatorPromptVersionHistory')}</h3>
+                    <span className="text-[11px] text-muted">{promptVersions.length}</span>
+                  </div>
+                  <div className="mt-2 space-y-2">
+                    {isLoadingPromptVersions ? (
+                      <div className="text-xs text-muted">{i18nService.t('loading')}</div>
+                    ) : promptVersions.length === 0 ? (
+                      <div className="rounded-lg border border-dashed border-border bg-surface-raised p-3 text-xs text-muted">
+                        {i18nService.t('creatorPromptVersionEmpty')}
+                      </div>
+                    ) : promptVersions.map((version, index) => (
+                      <div key={version.id} className="rounded-lg bg-surface-raised p-3">
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="min-w-0">
+                            <div className="text-xs font-semibold">v{version.version}</div>
+                            <div className="mt-1 text-[11px] text-muted">{new Date(version.createdAt).toLocaleString()}</div>
+                            {version.changeNote && <div className="mt-1 break-words text-[11px] text-secondary">{version.changeNote}</div>}
+                          </div>
+                          <div className="flex shrink-0 gap-1">
+                            <button
+                              type="button"
+                              onClick={() => void handleDiffPromptVersion(version, promptVersions[index + 1])}
+                              className="rounded-md border border-border px-2 py-1 text-[11px] font-medium text-secondary transition-colors hover:bg-background hover:text-foreground"
+                            >
+                              {i18nService.t('creatorPromptVersionDiff')}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => void handleRollbackPromptVersion(version)}
+                              className="rounded-md border border-border px-2 py-1 text-[11px] font-medium text-secondary transition-colors hover:bg-background hover:text-foreground"
+                            >
+                              {i18nService.t('creatorPromptVersionRollback')}
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  {promptVersionDiff && (
+                    <pre className="mt-3 max-h-60 overflow-auto whitespace-pre-wrap rounded-lg bg-background p-3 text-[11px] leading-5 text-secondary">
+                      {promptVersionDiff}
+                    </pre>
+                  )}
+                </section>
+              )}
 
               {selectedAssetCases.length > 0 && (
                 <section className="rounded-lg border border-border p-3">

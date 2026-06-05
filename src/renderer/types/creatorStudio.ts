@@ -129,6 +129,7 @@ export const CreatorPromptSourceMode = {
   Blank: 'blank',
   CaseRemix: 'case-remix',
   TemplateDraft: 'template-draft',
+  RecipeDraft: 'recipe-draft',
   AssetVariant: 'asset-variant',
 } as const;
 

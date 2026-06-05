@@ -4,6 +4,7 @@ import {
   type CreatorBuilderMaterial,
   CreatorMaterialRole,
   CreatorMaterialSource,
+  CreatorPromptSourceMode,
   CreatorStudioSourceType,
   CreatorTemplateFieldKind,
 } from '../types/creatorStudio';
@@ -90,6 +91,26 @@ describe('creator studio prompt utilities', () => {
     expect(prompt).toContain('Template fields');
     expect(prompt).toContain('Headline: NEW DROP');
     expect(prompt).toContain('Avoid generic layouts.');
+  });
+
+  test('preserves recipe draft source mode', () => {
+    const spec = buildPromptSpec({
+      sourceType: CreatorStudioSourceType.Template,
+      sourceMode: CreatorPromptSourceMode.RecipeDraft,
+      sourceId: 'recipe-weekly-launch',
+      sourceTitle: 'Weekly Launch Recipe',
+      templateId: 'poster-system',
+      caseIds: ['case-1'],
+      templateGuidance: ['Reuse the saved launch structure.'],
+    }, createPromptForm({
+      subject: 'Spring launch',
+      aspectRatio: '1:1',
+    }), 'en', 'Blank builder');
+
+    expect(spec.sourceMode).toBe(CreatorPromptSourceMode.RecipeDraft);
+    expect(spec.sourceId).toBe('recipe-weekly-launch');
+    expect(spec.templateId).toBe('poster-system');
+    expect(spec.templateGuidance).toEqual(['Reuse the saved launch structure.']);
   });
 
   test('renders cowork draft with creator studio context block', () => {

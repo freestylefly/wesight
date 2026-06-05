@@ -15,6 +15,7 @@ import {
   CreatorProductionAssetStatus,
   CreatorProductionRunSource,
   CreatorProductionRunStatus,
+  CreatorPromptSpecSchemaVersion,
   CreatorStudioDefaultProjectId,
 } from '../shared/creatorStudio/constants';
 import { CREATOR_CREATIVE_MODEL_CAPABILITIES } from '../shared/creatorStudio/modelCapabilities';
@@ -313,6 +314,118 @@ const parsePromptSpec = (value: string | null | undefined): CreatorPromptSpecSna
   }
 };
 
+const normalizePromptSpecCaseIds = (spec: CreatorPromptSpecSnapshot): string[] => (
+  Array.isArray(spec.caseIds)
+    ? spec.caseIds.filter((item): item is string => typeof item === 'string' && item.trim().length > 0)
+    : []
+);
+
+const normalizePromptSpecStringArray = (value: unknown): string[] => (
+  Array.isArray(value)
+    ? value.filter((item): item is string => typeof item === 'string' && item.trim().length > 0)
+    : []
+);
+
+const ensurePromptSpecV1Snapshot = (
+  input: CreatorPromptSpecSnapshot,
+  fallbackTitle: string
+): CreatorPromptSpecSnapshot => {
+  const constraints = input.constraints && typeof input.constraints === 'object' && !Array.isArray(input.constraints)
+    ? input.constraints
+    : {};
+  const caseIds = normalizePromptSpecCaseIds(input);
+  const language = input.language === 'en' ? 'en' : 'zh';
+  const sourceMode = typeof input.sourceMode === 'string' && input.sourceMode.trim()
+    ? input.sourceMode
+    : typeof input.source?.mode === 'string' && input.source.mode.trim()
+      ? input.source.mode
+      : 'blank';
+  const sourceType = typeof input.sourceType === 'string' && input.sourceType.trim()
+    ? input.sourceType
+    : typeof input.source?.sourceType === 'string' && input.source.sourceType.trim()
+      ? input.source.sourceType
+      : 'template';
+  const sourceId = typeof input.sourceId === 'string' && input.sourceId.trim()
+    ? input.sourceId
+    : typeof input.source?.sourceId === 'string' && input.source.sourceId.trim()
+      ? input.source.sourceId
+      : '';
+  const sourceTitle = typeof input.sourceTitle === 'string' && input.sourceTitle.trim()
+    ? input.sourceTitle
+    : typeof input.source?.sourceTitle === 'string' && input.source.sourceTitle.trim()
+      ? input.source.sourceTitle
+      : fallbackTitle;
+  const templateId = typeof input.templateId === 'string' && input.templateId.trim()
+    ? input.templateId
+    : typeof input.source?.templateId === 'string' && input.source.templateId.trim()
+      ? input.source.templateId
+      : null;
+  const aspectRatio = typeof constraints.aspectRatio === 'string' ? constraints.aspectRatio : '';
+  const requiredText = typeof constraints.requiredText === 'string' ? constraints.requiredText : '';
+  const negativeRequirements = typeof constraints.negativeRequirements === 'string' ? constraints.negativeRequirements : '';
+  const templateFields = Array.isArray(input.templateFields)
+    ? input.templateFields
+    : [];
+  const sourceDefaults = {
+    mode: sourceMode,
+    sourceType,
+    sourceId,
+    sourceTitle,
+    templateId,
+    caseIds,
+    variantOfAssetId: typeof input.variantOfAssetId === 'string' ? input.variantOfAssetId : null,
+    referencePrompt: typeof input.referencePrompt === 'string' ? input.referencePrompt : null,
+    referenceAnalysis: input.referenceAnalysis,
+  };
+  const briefDefaults = {
+    taskType: typeof input.taskType === 'string' ? input.taskType : '',
+    subject: typeof input.subject === 'string' ? input.subject : '',
+    goal: typeof input.subject === 'string' && input.subject.trim() ? input.subject : sourceTitle,
+    platform: typeof input.platform === 'string' ? input.platform : '',
+    audience: typeof input.audience === 'string' ? input.audience : '',
+    language,
+  };
+  const compositionDefaults = {
+    aspectRatio,
+    mainObject: typeof input.mainObject === 'string' ? input.mainObject : '',
+  };
+  const styleDefaults = {
+    visualStyle: typeof input.visualStyle === 'string' ? input.visualStyle : '',
+    styles: normalizePromptSpecStringArray(input.styles),
+    scenes: normalizePromptSpecStringArray(input.scenes),
+    colorPreference: typeof input.colorPreference === 'string' ? input.colorPreference : '',
+  };
+  const textDefaults = {
+    requiredText,
+    negativeRequirements,
+  };
+  const outputDefaults = {
+    count: typeof input.outputCount === 'string' ? input.outputCount : '',
+  };
+  const templateDefaults = {
+    templateId,
+    fields: templateFields,
+  };
+  const provenanceDefaults = {
+    templateId,
+    caseIds,
+    variantOfAssetId: typeof input.variantOfAssetId === 'string' ? input.variantOfAssetId : null,
+  };
+
+  return {
+    ...input,
+    schemaVersion: CreatorPromptSpecSchemaVersion.V1,
+    source: { ...sourceDefaults, ...(input.source ?? {}) },
+    brief: { ...briefDefaults, ...(input.brief ?? {}) },
+    composition: { ...compositionDefaults, ...(input.composition ?? {}) },
+    style: { ...styleDefaults, ...(input.style ?? {}) },
+    text: { ...textDefaults, ...(input.text ?? {}) },
+    output: { ...outputDefaults, ...(input.output ?? {}) },
+    template: { ...templateDefaults, ...(input.template ?? {}) },
+    provenance: { ...provenanceDefaults, ...(input.provenance ?? {}) },
+  };
+};
+
 const parseBatchSummary = (value: string | null | undefined): CreatorBatchRunSummary => {
   if (!value) {
     return {
@@ -573,12 +686,12 @@ export class CreatorAssetStore {
     const tags = normalizeTags(input.tags ?? []);
     const selectedDirectionId = normalizeOptionalText(input.selectedDirectionId)
       ?? (typeof input.promptSpec.selectedCreativeDirectionId === 'string' ? input.promptSpec.selectedCreativeDirectionId : null);
-    const promptSpec = {
+    const promptSpec = ensurePromptSpecV1Snapshot({
       ...input.promptSpec,
       ...(input.parentPromptAssetId ? { parentPromptAssetId: input.parentPromptAssetId } : {}),
       ...(input.recipeId ? { recipeId: input.recipeId } : {}),
       ...(selectedDirectionId ? { selectedDirectionId } : {}),
-    };
+    }, title);
     const promptSpecJson = JSON.stringify(promptSpec);
     const caseIdsJson = JSON.stringify(caseIds);
     this.db.prepare(`
@@ -794,11 +907,11 @@ export class CreatorAssetStore {
     const now = Date.now();
     const id = uuidv4();
     const nextVersion = current.version + 1;
-    const promptSpecJson = JSON.stringify({
+    const promptSpecJson = JSON.stringify(ensurePromptSpecV1Snapshot({
       ...input.promptSpec,
       promptAssetId: asset.id,
       promptVersion: nextVersion,
-    });
+    }, asset.fileName));
     this.db.transaction(() => {
       this.db.prepare(`
         INSERT INTO creator_prompt_versions (

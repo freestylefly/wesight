@@ -452,6 +452,7 @@ const CreatorStudioView: React.FC<CreatorStudioViewProps> = ({
       sourceId: template.id,
       sourceTitle: getText(template.title),
       templateId: template.id,
+      templateUseWhen: getText(template.useWhen),
       caseIds: template.exampleCases.map((sourceCaseId) => `case-${sourceCaseId}`),
       category: template.category,
       styles: template.styles,
@@ -530,7 +531,7 @@ const CreatorStudioView: React.FC<CreatorStudioViewProps> = ({
     const promptSpec = recipe.promptSpec as Partial<CreatorPromptSpec>;
     setBuilderSeed({
       sourceType: CreatorStudioSourceType.Template,
-      sourceMode: CreatorPromptSourceMode.TemplateDraft,
+      sourceMode: CreatorPromptSourceMode.RecipeDraft,
       sourceId: recipe.id,
       sourceTitle: recipe.title,
       templateId: typeof promptSpec.templateId === 'string' ? promptSpec.templateId : undefined,
@@ -543,6 +544,29 @@ const CreatorStudioView: React.FC<CreatorStudioViewProps> = ({
     });
     setBuilderForm(buildFormFromPromptSpec(promptSpec));
     setActiveTab(CreatorStudioTab.Builder);
+  };
+
+  const openBuilderSourceDetail = (seed: CreatorPromptSeed | null) => {
+    if (!seed || !seed.sourceMode || seed.sourceMode === CreatorPromptSourceMode.Blank) return;
+    if (seed.sourceMode === CreatorPromptSourceMode.CaseRemix) {
+      const item = cases.find((caseItem) => caseItem.id === seed.sourceId);
+      if (!item) return;
+      setSelectedTemplate(null);
+      setSelectedCase(item);
+      setActiveTab(CreatorStudioTab.Gallery);
+      return;
+    }
+    if (seed.sourceMode === CreatorPromptSourceMode.TemplateDraft) {
+      const template = styleLibrary.templates.find((item) => item.id === (seed.templateId ?? seed.sourceId));
+      if (!template) return;
+      setSelectedCase(null);
+      setSelectedTemplate(template);
+      setActiveTab(CreatorStudioTab.Templates);
+      return;
+    }
+    if (seed.sourceMode === CreatorPromptSourceMode.AssetVariant) {
+      setActiveTab(CreatorStudioTab.Assets);
+    }
   };
 
   const sendAssetToCowork = async (asset: CreatorProductionAssetRecord) => {
@@ -1029,6 +1053,7 @@ const CreatorStudioView: React.FC<CreatorStudioViewProps> = ({
               setBuilderMaterials([]);
               setBoardContextPack('');
             }}
+            onOpenSourceDetail={() => openBuilderSourceDetail(builderSeed)}
             onSendToCowork={sendToCowork}
             onSavePromptAsset={(promptSpec, promptText) => void savePromptAsset(promptSpec, promptText)}
             brandKit={boardWorkspace?.brandKit ?? null}
@@ -1381,6 +1406,8 @@ const getSourceModeLabel = (mode: CreatorPromptSourceMode): string => {
       return i18nService.t('creatorSourceModeCaseRemix');
     case CreatorPromptSourceMode.TemplateDraft:
       return i18nService.t('creatorSourceModeTemplateDraft');
+    case CreatorPromptSourceMode.RecipeDraft:
+      return i18nService.t('creatorSourceModeRecipeDraft');
     case CreatorPromptSourceMode.AssetVariant:
       return i18nService.t('creatorSourceModeAssetVariant');
     case CreatorPromptSourceMode.Blank:
@@ -1395,6 +1422,8 @@ const getSourceModeHint = (mode: CreatorPromptSourceMode): string => {
       return i18nService.t('creatorSourceModeCaseRemixHint');
     case CreatorPromptSourceMode.TemplateDraft:
       return i18nService.t('creatorSourceModeTemplateDraftHint');
+    case CreatorPromptSourceMode.RecipeDraft:
+      return i18nService.t('creatorSourceModeRecipeDraftHint');
     case CreatorPromptSourceMode.AssetVariant:
       return i18nService.t('creatorSourceModeAssetVariantHint');
     case CreatorPromptSourceMode.Blank:
@@ -1438,6 +1467,7 @@ const PromptBuilder: React.FC<{
   onSaveRecipe: (promptSpec: CreatorPromptSpec) => void;
   onImportRecipe: (recipeJson: string) => void;
   onClearSource: () => void;
+  onOpenSourceDetail: () => void;
   brandKit: CreatorBrandKitRecord | null;
   boardContextPack: string;
   onSendToCowork: (
@@ -1466,6 +1496,7 @@ const PromptBuilder: React.FC<{
   onSaveRecipe,
   onImportRecipe,
   onClearSource,
+  onOpenSourceDetail,
   brandKit,
   boardContextPack,
   onSendToCowork,
@@ -1499,6 +1530,13 @@ const PromptBuilder: React.FC<{
   const seedreamHint = getSeedreamStatusHint(seedreamStatus);
   const sourceMode = promptSpec.sourceMode ?? CreatorPromptSourceMode.Blank;
   const templateFieldSchema = seed?.templateFieldSchema ?? [];
+  const sourceCanOpen = sourceMode === CreatorPromptSourceMode.CaseRemix
+    || sourceMode === CreatorPromptSourceMode.TemplateDraft
+    || sourceMode === CreatorPromptSourceMode.AssetVariant;
+  const templateUseWhen = seed?.templateUseWhen?.trim() ?? '';
+  const templateGuidance = seed?.templateGuidance?.filter((item) => item.trim().length > 0) ?? [];
+  const templatePitfalls = seed?.templatePitfalls?.filter((item) => item.trim().length > 0) ?? [];
+  const hasTemplateMethodNotes = Boolean(templateUseWhen) || templateGuidance.length > 0 || templatePitfalls.length > 0;
 
   useEffect(() => {
     setSelectedDirectionId(null);
@@ -1566,15 +1604,28 @@ const PromptBuilder: React.FC<{
               )}
             </div>
             {sourceMode !== CreatorPromptSourceMode.Blank && (
-              <button
-                type="button"
-                onClick={onClearSource}
-                className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-border text-muted transition-colors hover:bg-surface-raised hover:text-foreground"
-                aria-label={i18nService.t('creatorBuilderClearSource')}
-                title={i18nService.t('creatorBuilderClearSource')}
-              >
-                <XMarkIcon className="h-4 w-4" />
-              </button>
+              <div className="flex shrink-0 gap-1">
+                {sourceCanOpen && (
+                  <button
+                    type="button"
+                    onClick={onOpenSourceDetail}
+                    className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-border text-muted transition-colors hover:bg-surface-raised hover:text-foreground"
+                    aria-label={i18nService.t('creatorBuilderOpenSource')}
+                    title={i18nService.t('creatorBuilderOpenSource')}
+                  >
+                    <ArrowTopRightOnSquareIcon className="h-4 w-4" />
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={onClearSource}
+                  className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-border text-muted transition-colors hover:bg-surface-raised hover:text-foreground"
+                  aria-label={i18nService.t('creatorBuilderClearSource')}
+                  title={i18nService.t('creatorBuilderClearSource')}
+                >
+                  <XMarkIcon className="h-4 w-4" />
+                </button>
+              </div>
             )}
           </div>
         </div>
@@ -1760,9 +1811,24 @@ const PromptBuilder: React.FC<{
             ))}
           </BuilderSection>
         )}
+        {hasTemplateMethodNotes && (
+          <BuilderSection title={i18nService.t('creatorBuilderSectionTemplateMethod')}>
+            {templateUseWhen && (
+              <BuilderNoteList title={i18nService.t('creatorUseWhen')} items={[templateUseWhen]} />
+            )}
+            {templateGuidance.length > 0 && (
+              <BuilderNoteList title={i18nService.t('creatorGuidance')} items={templateGuidance} />
+            )}
+            {templatePitfalls.length > 0 && (
+              <BuilderNoteList title={i18nService.t('creatorPitfalls')} items={templatePitfalls} />
+            )}
+          </BuilderSection>
+        )}
         <BuilderSection title={i18nService.t('creatorBuilderSectionComposition')}>
           <BuilderInput label={i18nService.t('creatorFieldMainObject')} value={form.mainObject} onChange={(value) => updateField('mainObject', value)} />
           <BuilderInput label={i18nService.t('creatorFieldAspectRatio')} value={form.aspectRatio} onChange={(value) => updateField('aspectRatio', value)} />
+        </BuilderSection>
+        <BuilderSection title={i18nService.t('creatorBuilderSectionOutput')}>
           <BuilderInput label={i18nService.t('creatorFieldOutputCount')} value={form.outputCount} onChange={(value) => updateField('outputCount', value)} />
         </BuilderSection>
         <BuilderSection title={i18nService.t('creatorBuilderSectionStyle')}>
@@ -2284,6 +2350,22 @@ const BuilderSection: React.FC<{
     <h3 className="text-xs font-semibold uppercase text-muted">{title}</h3>
     {children}
   </section>
+);
+
+const BuilderNoteList: React.FC<{
+  title: string;
+  items: string[];
+}> = ({ title, items }) => (
+  <div>
+    <div className="text-[11px] font-semibold uppercase text-muted">{title}</div>
+    <ul className="mt-2 space-y-1.5">
+      {items.map((item) => (
+        <li key={item} className="break-words rounded-md bg-surface px-2 py-1.5 text-xs leading-5 text-secondary">
+          {item}
+        </li>
+      ))}
+    </ul>
+  </div>
 );
 
 const ReferenceAnalysisSummary: React.FC<{

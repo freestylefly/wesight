@@ -11,6 +11,7 @@ import {
   CreatorProductionAssetSource,
   CreatorProductionAssetStatus,
   CreatorProductionRunStatus,
+  CreatorPromptSpecSchemaVersion,
   CreatorStudioDefaultProjectId,
 } from '../shared/creatorStudio/constants';
 import { CreatorAssetStore, parseCreatorStudioSourceContext } from './creatorAssetStore';
@@ -385,6 +386,21 @@ describe('CreatorAssetStore', () => {
     expect(promptAsset.status).toBe(CreatorProductionAssetStatus.Ready);
     expect(promptAsset.source).toBe(CreatorProductionAssetSource.CreatorPrompt);
     expect(promptAsset.filePath).toMatch(/^creator:\/\/prompt\//);
+    expect(promptAsset.promptSpec?.schemaVersion).toBe(CreatorPromptSpecSchemaVersion.V1);
+    expect(promptAsset.promptSpec?.source).toEqual(expect.objectContaining({
+      sourceType: 'template',
+      sourceId: 'poster-system',
+      sourceTitle: 'Poster System',
+      templateId: 'poster-system',
+      caseIds: ['case-1'],
+    }));
+    expect(promptAsset.promptSpec?.brief).toBeTruthy();
+    expect(promptAsset.promptSpec?.composition).toBeTruthy();
+    expect(promptAsset.promptSpec?.style).toBeTruthy();
+    expect(promptAsset.promptSpec?.text).toBeTruthy();
+    expect(promptAsset.promptSpec?.output).toBeTruthy();
+    expect(promptAsset.promptSpec?.template).toBeTruthy();
+    expect(promptAsset.promptSpec?.provenance).toBeTruthy();
 
     expect(caseAsset.kind).toBe(CreatorProductionAssetKind.Case);
     expect(caseAsset.status).toBe(CreatorProductionAssetStatus.Ready);
