@@ -116,7 +116,7 @@ export const buildPromptSpec = (
   blankSourceTitle: string,
   materials: CreatorBuilderMaterial[] = []
 ): CreatorPromptSpec => {
-  const promptMaterials = materials.map(toPromptMaterial);
+  const promptMaterials = materials.map((material) => toPromptMaterial(material, language));
   const baseSpec: CreatorPromptSpec = {
     sourceType: seed?.sourceType ?? CreatorStudioSourceType.Template,
     sourceMode: seed?.sourceMode ?? CreatorPromptSourceMode.Blank,
@@ -388,7 +388,45 @@ const hasImageAttachment = (material: CreatorBuilderMaterial): boolean => (
   Boolean(material.dataUrl?.startsWith('data:image/'))
 );
 
-const toPromptMaterial = (material: CreatorBuilderMaterial): CreatorPromptMaterial => ({
+const getCreatorMaterialPriority = (role: CreatorMaterialRole): string => {
+  switch (role) {
+    case CreatorMaterialRole.Reference:
+    case CreatorMaterialRole.Brand:
+      return 'primary';
+    case CreatorMaterialRole.Negative:
+      return 'avoid';
+    case CreatorMaterialRole.Style:
+    case CreatorMaterialRole.Source:
+    default:
+      return 'secondary';
+  }
+};
+
+const getCreatorMaterialUsageInstruction = (
+  role: CreatorMaterialRole,
+  language: 'zh' | 'en'
+): string => {
+  const zh: Record<CreatorMaterialRole, string> = {
+    [CreatorMaterialRole.Reference]: '参考主体、构图或整体方向，但不要强制复制全部细节',
+    [CreatorMaterialRole.Style]: '只参考色彩、质感、光线、时代感和视觉语言',
+    [CreatorMaterialRole.Brand]: '优先保留品牌色、logo、语气和识别特征，不要错误重绘品牌资产',
+    [CreatorMaterialRole.Source]: '只作为事实来源和内容约束，不作为视觉风格来源',
+    [CreatorMaterialRole.Negative]: '只用于避免，不得作为正向视觉参考',
+  };
+  const en: Record<CreatorMaterialRole, string> = {
+    [CreatorMaterialRole.Reference]: 'Use for subject, composition, or overall direction without copying every detail.',
+    [CreatorMaterialRole.Style]: 'Use only for color, texture, lighting, period feel, and visual language.',
+    [CreatorMaterialRole.Brand]: 'Prioritize brand colors, logo, tone, and identity cues; do not redraw brand assets incorrectly.',
+    [CreatorMaterialRole.Source]: 'Use only as factual source material and content constraints, not as visual style.',
+    [CreatorMaterialRole.Negative]: 'Use only as avoidance guidance; never treat it as a positive visual reference.',
+  };
+  return language === 'zh' ? zh[role] : en[role];
+};
+
+const toPromptMaterial = (
+  material: CreatorBuilderMaterial,
+  language: 'zh' | 'en'
+): CreatorPromptMaterial => ({
   id: material.id,
   role: material.role,
   source: material.source,
@@ -397,8 +435,34 @@ const toPromptMaterial = (material: CreatorBuilderMaterial): CreatorPromptMateri
   mimeType: material.mimeType,
   hasImageAttachment: hasImageAttachment(material),
   localPathAvailable: hasUsableLocalPath(material.path),
+  priority: getCreatorMaterialPriority(material.role),
+  usageInstruction: getCreatorMaterialUsageInstruction(material.role, language),
   imageAnalysis: material.imageAnalysis,
 });
+
+const renderCreatorContextPackConflicts = (
+  materials: CreatorPromptMaterial[],
+  language: 'zh' | 'en'
+): string[] => {
+  const roles = new Set(materials.map((material) => material.role));
+  const conflicts: string[] = [];
+  if (roles.has(CreatorMaterialRole.Negative) && (roles.has(CreatorMaterialRole.Reference) || roles.has(CreatorMaterialRole.Style))) {
+    conflicts.push(language === 'zh'
+      ? '冲突提醒：negative 素材只用于避免，不得混入 reference/style 的正向参考。'
+      : 'Conflict note: negative materials are avoidance constraints and must not be blended into positive reference/style guidance.');
+  }
+  if (roles.has(CreatorMaterialRole.Brand) && roles.has(CreatorMaterialRole.Style)) {
+    conflicts.push(language === 'zh'
+      ? '优先级提醒：brand 素材优先于 style 素材，若两者冲突，以品牌识别为准。'
+      : 'Priority note: brand materials override style materials when they conflict; preserve brand identity first.');
+  }
+  if (roles.has(CreatorMaterialRole.Source) && (roles.has(CreatorMaterialRole.Reference) || roles.has(CreatorMaterialRole.Style))) {
+    conflicts.push(language === 'zh'
+      ? '来源提醒：source 素材只约束事实内容，不要把事实来源当成视觉风格。'
+      : 'Source note: source materials constrain factual content only; do not treat them as visual style.');
+  }
+  return conflicts;
+};
 
 export const renderCreatorContextPack = (
   materials: CreatorPromptMaterial[],
@@ -411,11 +475,14 @@ export const renderCreatorContextPack = (
   const header = language === 'zh'
     ? '以下素材用于约束和增强生成结果。请严格按 role 理解，不要把负向约束当作参考。'
     : 'Use the following materials to constrain and improve the output. Treat each role literally; do not use negative constraints as positive references.';
+  const conflicts = renderCreatorContextPackConflicts(materials, language);
   return [
     header,
     ...materials.map((material, index) => {
       const attachment = material.hasImageAttachment ? 'base64' : 'none';
       const localPath = material.localPathAvailable ? 'available' : 'unavailable';
+      const priority = material.priority ?? getCreatorMaterialPriority(material.role);
+      const usageInstruction = material.usageInstruction ?? getCreatorMaterialUsageInstruction(material.role, language);
       const imageSummary = material.imageAnalysis
         ? (
           language === 'zh'
@@ -431,9 +498,10 @@ export const renderCreatorContextPack = (
         )
         : '';
       return language === 'zh'
-        ? `${index + 1}. role=${material.role}（${roleText(material.role)}）；name=${material.name}；path=${material.path}；mime=${material.mimeType}；attachment=${attachment}；localPath=${localPath}${imageSummary}${fallbackNote}`
-        : `${index + 1}. role=${material.role} (${roleText(material.role)}); name=${material.name}; path=${material.path}; mime=${material.mimeType}; attachment=${attachment}; localPath=${localPath}${imageSummary}${fallbackNote}`;
+        ? `${index + 1}. role=${material.role}（${roleText(material.role)}）；priority=${priority}；usage=${usageInstruction}；name=${material.name}；path=${material.path}；mime=${material.mimeType}；attachment=${attachment}；localPath=${localPath}${imageSummary}${fallbackNote}`
+        : `${index + 1}. role=${material.role} (${roleText(material.role)}); priority=${priority}; usage=${usageInstruction}; name=${material.name}; path=${material.path}; mime=${material.mimeType}; attachment=${attachment}; localPath=${localPath}${imageSummary}${fallbackNote}`;
     }),
+    ...conflicts,
   ].join('\n');
 };
 

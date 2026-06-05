@@ -204,6 +204,8 @@ export interface CreatorPromptMaterial {
   mimeType: string;
   hasImageAttachment: boolean;
   localPathAvailable: boolean;
+  priority?: string;
+  usageInstruction?: string;
   imageAnalysis?: CreatorMaterialImageAnalysis;
 }
 

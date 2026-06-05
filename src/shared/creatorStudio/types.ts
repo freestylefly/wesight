@@ -48,6 +48,8 @@ export interface CreatorPromptSpecSnapshot {
     mimeType: string;
     hasImageAttachment?: boolean;
     localPathAvailable?: boolean;
+    priority?: string;
+    usageInstruction?: string;
     imageAnalysis?: {
       width: number;
       height: number;
