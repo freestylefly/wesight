@@ -867,12 +867,9 @@ const CreatorStudioView: React.FC<CreatorStudioViewProps> = ({
     }
   };
 
-  const scheduleRecipeAutomation = async (recipe: CreatorRecipeRecord) => {
-    const cronExpression = window.prompt(
-      i18nService.t('creatorRecipeSchedulePrompt'),
-      CreatorRecipeAutomationDefaultCron
-    )?.trim();
-    if (!cronExpression) return;
+  const scheduleRecipeAutomation = async (recipe: CreatorRecipeRecord, cronExpression: string) => {
+    const normalizedCronExpression = cronExpression.trim();
+    if (!normalizedCronExpression) return;
     if (!window.electron?.scheduledTasks) {
       dispatchToast(i18nService.t('creatorRecipeAutomationFailed'));
       return;
@@ -884,7 +881,7 @@ const CreatorStudioView: React.FC<CreatorStudioViewProps> = ({
         enabled: true,
         schedule: {
           kind: ScheduleKind.Cron,
-          expr: cronExpression,
+          expr: normalizedCronExpression,
         },
         sessionTarget: SessionTarget.Isolated,
         wakeMode: WakeMode.Now,
@@ -1249,7 +1246,7 @@ const CreatorStudioView: React.FC<CreatorStudioViewProps> = ({
             onUseRecipe={useRecipeInBuilder}
             onSaveRecipe={(promptSpec) => void saveRecipe(promptSpec)}
             onImportRecipe={(recipeJson) => void importRecipe(recipeJson)}
-            onScheduleRecipe={(recipe) => void scheduleRecipeAutomation(recipe)}
+            onScheduleRecipe={(recipe, cronExpression) => void scheduleRecipeAutomation(recipe, cronExpression)}
             onExportProductionPackage={() => void exportProductionPackage()}
             onClearSource={() => {
               setBuilderSeed(null);
@@ -1695,7 +1692,7 @@ const PromptBuilder: React.FC<{
   onUseRecipe: (recipe: CreatorRecipeRecord) => void;
   onSaveRecipe: (promptSpec: CreatorPromptSpec) => void;
   onImportRecipe: (recipeJson: string) => void;
-  onScheduleRecipe: (recipe: CreatorRecipeRecord) => void;
+  onScheduleRecipe: (recipe: CreatorRecipeRecord, cronExpression: string) => Promise<void> | void;
   onExportProductionPackage: () => void;
   onClearSource: () => void;
   onOpenSourceDetail: () => void;
@@ -1745,6 +1742,9 @@ const PromptBuilder: React.FC<{
   const [briefAutofillMessage, setBriefAutofillMessage] = useState('');
   const [recipeImportText, setRecipeImportText] = useState('');
   const [isRecipeImportOpen, setIsRecipeImportOpen] = useState(false);
+  const [recipeScheduleId, setRecipeScheduleId] = useState<string | null>(null);
+  const [recipeScheduleCron, setRecipeScheduleCron] = useState(CreatorRecipeAutomationDefaultCron);
+  const [isSchedulingRecipe, setIsSchedulingRecipe] = useState(false);
   const promptLanguage = normalizePromptLanguage(i18nService.getLanguage(), form);
   const rawPromptSpec: CreatorPromptSpec = buildPromptSpec(seed, form, promptLanguage, i18nService.t('creatorBlankBuilder'), materials);
   const basePromptSpec = applyBoardAndBrandKit(rawPromptSpec, brandKit, boardContextPack);
@@ -1809,6 +1809,27 @@ const PromptBuilder: React.FC<{
       setIsProjectFormOpen(false);
     } finally {
       setIsCreatingProject(false);
+    }
+  };
+
+  const openRecipeScheduleForm = (recipe: CreatorRecipeRecord) => {
+    setRecipeScheduleId(recipe.id);
+    setRecipeScheduleCron(CreatorRecipeAutomationDefaultCron);
+  };
+
+  const closeRecipeScheduleForm = () => {
+    setRecipeScheduleId(null);
+    setRecipeScheduleCron(CreatorRecipeAutomationDefaultCron);
+  };
+
+  const submitRecipeSchedule = async (recipe: CreatorRecipeRecord) => {
+    if (!recipeScheduleCron.trim()) return;
+    setIsSchedulingRecipe(true);
+    try {
+      await onScheduleRecipe(recipe, recipeScheduleCron);
+      closeRecipeScheduleForm();
+    } finally {
+      setIsSchedulingRecipe(false);
     }
   };
 
@@ -2003,7 +2024,7 @@ const PromptBuilder: React.FC<{
                     </button>
                     <button
                       type="button"
-                      onClick={() => onScheduleRecipe(recipe)}
+                      onClick={() => openRecipeScheduleForm(recipe)}
                       className="rounded-md border border-border px-2 py-1 text-[11px] font-medium text-secondary transition-colors hover:bg-background hover:text-foreground"
                     >
                       {i18nService.t('creatorRecipeSchedule')}
@@ -2017,6 +2038,58 @@ const PromptBuilder: React.FC<{
                     </button>
                   </div>
                 </div>
+                {recipeScheduleId === recipe.id && (
+                  <div className="mt-3 space-y-2 rounded-lg border border-border bg-background p-3">
+                    <div>
+                      <label className="text-[11px] font-medium text-secondary" htmlFor={`recipe-schedule-${recipe.id}`}>
+                        {i18nService.t('creatorRecipeScheduleCronLabel')}
+                      </label>
+                      <input
+                        id={`recipe-schedule-${recipe.id}`}
+                        value={recipeScheduleCron}
+                        onChange={(event) => setRecipeScheduleCron(event.target.value)}
+                        onKeyDown={(event) => {
+                          if (event.key === 'Enter') void submitRecipeSchedule(recipe);
+                          if (event.key === 'Escape') closeRecipeScheduleForm();
+                        }}
+                        placeholder={CreatorRecipeAutomationDefaultCron}
+                        className="mt-1 h-9 w-full rounded-lg border border-border bg-surface px-2 text-xs outline-none focus:border-primary"
+                      />
+                      <p className="mt-1 text-[11px] leading-4 text-muted">
+                        {i18nService.t('creatorRecipeScheduleCronHelp')}
+                      </p>
+                    </div>
+                    <div className="space-y-1 rounded-md bg-surface px-2 py-2 text-[11px] text-muted">
+                      <div className="break-words">
+                        <span className="font-medium text-secondary">{i18nService.t('creatorRecipeScheduleTaskName')}</span>
+                        {' '}
+                        {i18nService.t('creatorRecipeAutomationTaskName').replace('{title}', recipe.title)}
+                      </div>
+                      <div className="break-words">
+                        <span className="font-medium text-secondary">{i18nService.t('creatorRecipeScheduleTaskDescription')}</span>
+                        {' '}
+                        {i18nService.t('creatorRecipeAutomationTaskDescription').replace('{id}', recipe.id)}
+                      </div>
+                    </div>
+                    <div className="flex justify-end gap-2">
+                      <button
+                        type="button"
+                        onClick={closeRecipeScheduleForm}
+                        className="rounded-lg border border-border px-3 py-1.5 text-xs font-medium text-secondary transition-colors hover:bg-surface-raised hover:text-foreground"
+                      >
+                        {i18nService.t('cancel')}
+                      </button>
+                      <button
+                        type="button"
+                        disabled={!recipeScheduleCron.trim() || isSchedulingRecipe}
+                        onClick={() => void submitRecipeSchedule(recipe)}
+                        className="rounded-lg bg-primary px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-primary-hover disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        {i18nService.t('creatorRecipeScheduleCreate')}
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
             ))}
           </div>
