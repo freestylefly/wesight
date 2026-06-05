@@ -47,7 +47,9 @@ import type {
   CreatorStudioTemplate,
 } from '../../types/creatorStudio';
 import { CreatorMaterialRole, CreatorMaterialSource, CreatorPromptSourceMode, CreatorStudioSourceType } from '../../types/creatorStudio';
+import { compileCreatorPrompt, CreatorPromptCompileTarget } from '../../utils/creatorPromptCompiler';
 import { CreatorPromptLintSeverity, lintCreatorPromptSpec } from '../../utils/creatorPromptLint';
+import { toCreatorPromptSpecSnapshot } from '../../utils/creatorPromptSpecAdapter';
 import {
   buildPromptSpec,
   CREATOR_MATERIAL_ROLE_LABELS,
@@ -57,7 +59,6 @@ import {
   CreatorStudioRecommendedSkillId,
   hasSeedreamApiConfig,
   normalizePromptLanguage,
-  renderCreatorCoworkDraft,
   renderCreatorPrompt,
   selectCreatorCreativeDirection,
 } from '../../utils/creatorStudio';
@@ -521,21 +522,20 @@ const CreatorStudioView: React.FC<CreatorStudioViewProps> = ({
     setIsSendingToCowork(true);
     try {
       dispatch(setActiveSkillIds(installedRecommendedSkillIds));
-      await onSendToCowork(renderCreatorCoworkDraft({
-        promptSpec,
-        promptText,
-        installedSkillIds: installedRecommendedSkillIds,
-        missingSkillIds: missingRecommendedSkillIds,
-        requestImageGeneration,
-      }), {
+      const compiled = compileCreatorPrompt({
+        spec: promptSpec,
+        target: CreatorPromptCompileTarget.CoworkDraft,
+        materials,
+        runtime: {
+          installedSkillIds: installedRecommendedSkillIds,
+          missingSkillIds: missingRecommendedSkillIds,
+          requestImageGeneration,
+        },
+      });
+      await onSendToCowork(compiled.draftText ?? promptText, {
         activeSkillIds: installedRecommendedSkillIds,
         preferCreativeProducer: true,
-        attachments: materials.filter((material) => material.dataUrl?.startsWith('data:image/')).map((material) => ({
-          path: material.path,
-          name: material.name,
-          isImage: true,
-          dataUrl: material.dataUrl,
-        })),
+        attachments: compiled.attachments,
       });
     } catch {
       dispatchToast(i18nService.t('creatorSendToCoworkFailed'));
@@ -578,7 +578,7 @@ const CreatorStudioView: React.FC<CreatorStudioViewProps> = ({
         projectId,
         title,
         promptText,
-        promptSpec: { ...promptSpec },
+        promptSpec: toCreatorPromptSpecSnapshot(promptSpec),
         templateId: promptSpec.templateId ?? null,
         caseIds: promptSpec.caseIds,
         tags: [
@@ -1295,8 +1295,12 @@ const PromptBuilder: React.FC<{
   const rawPromptSpec: CreatorPromptSpec = buildPromptSpec(seed, form, promptLanguage, i18nService.t('creatorBlankBuilder'), materials);
   const basePromptSpec = applyBoardAndBrandKit(rawPromptSpec, brandKit, boardContextPack);
   const promptSpec = selectCreatorCreativeDirection(basePromptSpec, selectedDirectionId);
-  const prompt = renderCreatorPrompt(promptSpec);
-  const promptSpecJson = JSON.stringify(promptSpec, null, 2);
+  const compiledPrompt = compileCreatorPrompt({
+    spec: promptSpec,
+    target: CreatorPromptCompileTarget.CopyText,
+  });
+  const prompt = compiledPrompt.promptText;
+  const promptSpecJson = JSON.stringify(compiledPrompt.promptSpec, null, 2);
   const lintResult = lintCreatorPromptSpec(promptSpec);
   const lintErrorCount = lintResult.issues.filter((issue) => issue.severity === CreatorPromptLintSeverity.Error).length;
   const lintWarningCount = lintResult.issues.filter((issue) => issue.severity === CreatorPromptLintSeverity.Warning).length;

@@ -14,7 +14,6 @@ import type {
   CreatorBatchRunRecord,
   CreatorBatchTaskRecord,
   CreatorCreativeModelCapability,
-  CreatorPromptSpecSnapshot,
 } from '@shared/creatorStudio/types';
 import React, { useEffect, useMemo, useState } from 'react';
 
@@ -23,10 +22,8 @@ import type {
   CreatorPromptSpec,
   CreatorStudioTemplate,
 } from '../../types/creatorStudio';
-import {
-  renderCreatorPrompt,
-  selectCreatorCreativeDirection,
-} from '../../utils/creatorStudio';
+import { compileCreatorDirectionPrompt } from '../../utils/creatorPromptCompiler';
+import { toCreatorPromptSpecSnapshot } from '../../utils/creatorPromptSpecAdapter';
 
 const getText = (value: { zh: string; en: string }) => value[i18nService.getLanguage()];
 
@@ -65,8 +62,6 @@ const outputKindLabel = (kind: CreatorCreativeModelOutputKind): string => {
 };
 
 const uniqueValues = (values: string[]): string[] => [...new Set(values.filter(Boolean))];
-
-const toPromptSpecSnapshot = (spec: CreatorPromptSpec): CreatorPromptSpecSnapshot => ({ ...spec });
 
 export const CreatorBatchPanel: React.FC<{
   projectId: string;
@@ -165,14 +160,14 @@ export const CreatorBatchPanel: React.FC<{
     onCreateBatchRun({
       projectId,
       briefTitle: promptSpec.subject || promptSpec.sourceTitle || i18nService.t('creatorBatchDefaultTitle'),
-      promptSpec: toPromptSpecSnapshot(promptSpec),
+      promptSpec: toCreatorPromptSpecSnapshot(promptSpec),
       promptText,
       directions: selectedDirections.map((direction) => {
-        const directionSpec = selectCreatorCreativeDirection(promptSpec, direction.id);
+        const compiledDirection = compileCreatorDirectionPrompt(promptSpec, direction.id);
         return {
           ...direction,
-          promptSpec: toPromptSpecSnapshot(directionSpec),
-          promptText: renderCreatorPrompt(directionSpec),
+          promptSpec: compiledDirection.promptSpec,
+          promptText: compiledDirection.promptText,
         };
       }),
       modelIds: selectedModels.map((model) => model.id),
