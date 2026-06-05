@@ -3,6 +3,8 @@ import { afterEach, beforeEach, describe, expect, test } from 'vitest';
 
 import {
   CreatorAssetAdoptionStatus,
+  CreatorBatchRunStatus,
+  CreatorBatchTaskStatus,
   CreatorBoardCardKind,
   CreatorBoardMoveDirection,
   CreatorProductionAssetKind,
@@ -461,5 +463,106 @@ describe('CreatorAssetStore', () => {
 
     expect(() => store.buildBoardContextPack({ boardId: boardWorkspace.currentBoardId }))
       .toThrow('Board selection is empty');
+  });
+
+  test('creates batch run matrix from directions, models, templates, and sizes', () => {
+    const workspace = store.createProject({ name: 'Batch Project' });
+    const projectId = workspace.currentProjectId;
+    const capabilities = store.listCreativeModelCapabilities();
+    expect(capabilities.some((model) => model.supportsBatch)).toBe(true);
+
+    const batchRun = store.createBatchRun({
+      projectId,
+      briefTitle: 'Launch visual batch',
+      promptSpec: {
+        sourceTitle: 'Launch visual',
+        subject: 'New product launch',
+        templateId: 'poster-system',
+        caseIds: ['case-1'],
+        constraints: { aspectRatio: '1:1' },
+      },
+      promptText: 'Generate a launch visual.',
+      directions: [
+        {
+          id: 'bold',
+          title: 'Bold route',
+          template: 'Poster',
+          style: 'High contrast',
+          reason: 'Awareness',
+          promptFocus: 'Use a large headline.',
+          promptText: 'Generate a bold launch visual.',
+          promptSpec: { sourceTitle: 'Bold route', constraints: { aspectRatio: '1:1' } },
+        },
+        {
+          id: 'detail',
+          title: 'Detail route',
+          template: 'Product detail',
+          style: 'Macro',
+          reason: 'Consideration',
+          promptFocus: 'Emphasize product texture.',
+          promptText: 'Generate a detail launch visual.',
+          promptSpec: { sourceTitle: 'Detail route', constraints: { aspectRatio: '1:1' } },
+        },
+      ],
+      modelIds: ['seedream-image', 'prompt-only-review'],
+      templateIds: ['poster-system', 'product-card'],
+      sizes: ['1:1', '16:9'],
+    });
+
+    expect(batchRun.status).toBe(CreatorBatchRunStatus.Running);
+    expect(batchRun.summary.taskCount).toBe(16);
+    expect(batchRun.summary.modelIds).toEqual(['seedream-image', 'prompt-only-review']);
+    expect(batchRun.summary.templateIds).toEqual(['poster-system', 'product-card']);
+    expect(batchRun.summary.sizes).toEqual(['1:1', '16:9']);
+    expect(batchRun.tasks).toHaveLength(16);
+    expect(batchRun.tasks[0].status).toBe(CreatorBatchTaskStatus.Pending);
+    expect(batchRun.tasks[0].promptText).toContain('Batch execution constraints');
+    expect(batchRun.tasks[0].promptSpec.batch).toMatchObject({
+      batchRunId: batchRun.id,
+      modelId: batchRun.tasks[0].modelId,
+    });
+
+    const listed = store.listBatchRuns({ projectId });
+    expect(listed.total).toBe(1);
+    expect(listed.runs[0].tasks).toHaveLength(16);
+  });
+
+  test('skips and retries individual batch tasks without blocking the run', () => {
+    const workspace = store.createProject({ name: 'Batch Recovery Project' });
+    const batchRun = store.createBatchRun({
+      projectId: workspace.currentProjectId,
+      briefTitle: 'Recovery batch',
+      promptSpec: { sourceTitle: 'Recovery batch', constraints: { aspectRatio: '1:1' } },
+      promptText: 'Generate a recovery visual.',
+      directions: [{
+        id: 'route-a',
+        title: 'Route A',
+        template: 'Poster',
+        style: 'Clean',
+        reason: 'Baseline',
+        promptFocus: 'Simple layout.',
+        promptText: 'Generate route A.',
+        promptSpec: { sourceTitle: 'Route A', constraints: { aspectRatio: '1:1' } },
+      }],
+      modelIds: ['seedream-image'],
+      templateIds: ['poster-system'],
+      sizes: ['1:1', '16:9'],
+    });
+    const [firstTask, secondTask] = batchRun.tasks;
+
+    const afterSkip = store.skipBatchTask(firstTask.id);
+    expect(afterSkip?.tasks.find((task) => task.id === firstTask.id)?.status).toBe(CreatorBatchTaskStatus.Skipped);
+    expect(afterSkip?.tasks.find((task) => task.id === secondTask.id)?.status).toBe(CreatorBatchTaskStatus.Pending);
+    expect(afterSkip?.status).toBe(CreatorBatchRunStatus.Running);
+
+    db.prepare('UPDATE creator_batch_tasks SET status = ?, completed_at = ? WHERE id = ?')
+      .run(CreatorBatchTaskStatus.Completed, Date.now(), secondTask.id);
+    store.skipBatchTask(firstTask.id);
+    const partial = store.getBatchRun(batchRun.id);
+    expect(partial?.status).toBe(CreatorBatchRunStatus.PartialFailed);
+
+    const retried = store.retryBatchTask(firstTask.id);
+    expect(retried?.status).toBe(CreatorBatchRunStatus.Running);
+    expect(retried?.tasks.find((task) => task.id === firstTask.id)?.status).toBe(CreatorBatchTaskStatus.Pending);
   });
 });

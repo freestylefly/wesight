@@ -2,6 +2,10 @@ import type {
   CreatorAssetCollectionAddInput,
   CreatorAssetCollectionCreateInput,
   CreatorAssetUpdateInput,
+  CreatorBatchRunCreateInput,
+  CreatorBatchRunListInput,
+  CreatorBatchRunListResult,
+  CreatorBatchRunRecord,
   CreatorBoardCardCreateInput,
   CreatorBoardCardMoveInput,
   CreatorBoardCardRecord,
@@ -13,6 +17,7 @@ import type {
   CreatorBoardWorkspaceSnapshot,
   CreatorBrandKitUpdateInput,
   CreatorCaseAssetCreateInput,
+  CreatorCreativeModelCapability,
   CreatorProductionAssetListInput,
   CreatorProductionAssetListResult,
   CreatorProductionAssetRecord,
@@ -199,6 +204,57 @@ class CreatorStudioAssetService {
       throw new Error(result.error || 'Failed to update creator brand kit');
     }
     return result.workspace;
+  }
+
+  async listModelCapabilities(): Promise<CreatorCreativeModelCapability[]> {
+    const result = await window.electron.creatorStudio.listModelCapabilities();
+    if (!result.success) {
+      throw new Error(result.error || 'Failed to list creative model capabilities');
+    }
+    return result.capabilities ?? [];
+  }
+
+  async createBatchRun(input: CreatorBatchRunCreateInput): Promise<CreatorBatchRunRecord> {
+    const result = await window.electron.creatorStudio.createBatchRun(input);
+    if (!result.success || !result.batchRun) {
+      throw new Error(result.error || 'Failed to create creator batch run');
+    }
+    return result.batchRun;
+  }
+
+  async listBatchRuns(input: CreatorBatchRunListInput = {}): Promise<CreatorBatchRunListResult> {
+    const result = await window.electron.creatorStudio.listBatchRuns(input);
+    if (!result.success) {
+      throw new Error(result.error || 'Failed to list creator batch runs');
+    }
+    return {
+      runs: result.runs ?? [],
+      total: result.total ?? 0,
+    };
+  }
+
+  async getBatchRun(batchRunId: string): Promise<CreatorBatchRunRecord | null> {
+    const result = await window.electron.creatorStudio.getBatchRun(batchRunId);
+    if (!result.success) {
+      throw new Error(result.error || 'Failed to get creator batch run');
+    }
+    return result.batchRun ?? null;
+  }
+
+  async retryBatchTask(taskId: string): Promise<CreatorBatchRunRecord | null> {
+    const result = await window.electron.creatorStudio.retryBatchTask(taskId);
+    if (!result.success) {
+      throw new Error(result.error || 'Failed to retry creator batch task');
+    }
+    return result.batchRun ?? null;
+  }
+
+  async skipBatchTask(taskId: string): Promise<CreatorBatchRunRecord | null> {
+    const result = await window.electron.creatorStudio.skipBatchTask(taskId);
+    if (!result.success) {
+      throw new Error(result.error || 'Failed to skip creator batch task');
+    }
+    return result.batchRun ?? null;
   }
 }
 

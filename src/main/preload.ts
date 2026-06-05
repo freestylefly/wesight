@@ -578,6 +578,18 @@ contextBridge.exposeInMainWorld('electron', {
       ipcRenderer.invoke(CreatorStudioIpcChannel.BoardBuildContextPack, input),
     updateBrandKit: (input: Record<string, unknown>) =>
       ipcRenderer.invoke(CreatorStudioIpcChannel.BrandKitUpdate, input),
+    listModelCapabilities: () =>
+      ipcRenderer.invoke(CreatorStudioIpcChannel.ModelCapabilityList),
+    createBatchRun: (input: Record<string, unknown>) =>
+      ipcRenderer.invoke(CreatorStudioIpcChannel.BatchRunCreate, input),
+    listBatchRuns: (input?: Record<string, unknown>) =>
+      ipcRenderer.invoke(CreatorStudioIpcChannel.BatchRunList, input),
+    getBatchRun: (batchRunId: string) =>
+      ipcRenderer.invoke(CreatorStudioIpcChannel.BatchRunGet, batchRunId),
+    retryBatchTask: (taskId: string) =>
+      ipcRenderer.invoke(CreatorStudioIpcChannel.BatchTaskRetry, taskId),
+    skipBatchTask: (taskId: string) =>
+      ipcRenderer.invoke(CreatorStudioIpcChannel.BatchTaskSkip, taskId),
   },
   dialog: {
     selectDirectory: () => ipcRenderer.invoke('dialog:selectDirectory'),

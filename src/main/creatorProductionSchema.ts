@@ -149,6 +149,59 @@ export const ensureCreatorProductionSchema = (db: Database.Database): void => {
   `);
 
   db.exec(`
+    CREATE TABLE IF NOT EXISTS creator_batch_runs (
+      id TEXT PRIMARY KEY,
+      project_id TEXT NOT NULL,
+      status TEXT NOT NULL,
+      brief_title TEXT NOT NULL,
+      prompt_spec_json TEXT NOT NULL,
+      prompt_text TEXT NOT NULL,
+      summary_json TEXT NOT NULL,
+      created_at INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL,
+      completed_at INTEGER
+    );
+  `);
+
+  db.exec(`
+    CREATE INDEX IF NOT EXISTS idx_creator_batch_runs_project_created
+    ON creator_batch_runs(project_id, created_at DESC);
+  `);
+
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS creator_batch_tasks (
+      id TEXT PRIMARY KEY,
+      batch_run_id TEXT NOT NULL,
+      project_id TEXT NOT NULL,
+      status TEXT NOT NULL,
+      direction_id TEXT NOT NULL,
+      direction_title TEXT NOT NULL,
+      model_id TEXT NOT NULL,
+      model_name TEXT NOT NULL,
+      template_id TEXT NOT NULL,
+      size TEXT NOT NULL,
+      prompt_spec_json TEXT NOT NULL,
+      prompt_text TEXT NOT NULL,
+      asset_ids_json TEXT NOT NULL DEFAULT '[]',
+      error TEXT,
+      cost_estimate_text TEXT NOT NULL DEFAULT '',
+      created_at INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL,
+      completed_at INTEGER
+    );
+  `);
+
+  db.exec(`
+    CREATE INDEX IF NOT EXISTS idx_creator_batch_tasks_run_position
+    ON creator_batch_tasks(batch_run_id, direction_id, model_id, template_id, size);
+  `);
+
+  db.exec(`
+    CREATE INDEX IF NOT EXISTS idx_creator_batch_tasks_status
+    ON creator_batch_tasks(status);
+  `);
+
+  db.exec(`
     CREATE TABLE IF NOT EXISTS production_runs (
       id TEXT PRIMARY KEY,
       source TEXT NOT NULL,

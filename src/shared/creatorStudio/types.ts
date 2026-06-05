@@ -1,7 +1,10 @@
 import type {
   CreatorAssetAdoptionStatus,
+  CreatorBatchRunStatus,
+  CreatorBatchTaskStatus,
   CreatorBoardCardKind,
   CreatorBoardMoveDirection,
+  CreatorCreativeModelOutputKind,
   CreatorProductionAssetKind,
   CreatorProductionAssetSource,
   CreatorProductionAssetStatus,
@@ -329,4 +332,97 @@ export interface CreatorBrandKitUpdateInput {
   bannedWords?: string[];
   tone?: string;
   visualPreferences?: string;
+}
+
+export interface CreatorCreativeModelCapability {
+  id: string;
+  providerId: string;
+  displayName: string;
+  outputKinds: CreatorCreativeModelOutputKind[];
+  supportsVision: boolean;
+  supportsReferenceImages: boolean;
+  supportsBatch: boolean;
+  recommendedFor: string[];
+  sizes: string[];
+  maxBatchTasks: number;
+  costUnitLabel: string;
+  costUnitEstimate: number;
+}
+
+export interface CreatorBatchDirectionInput {
+  id: string;
+  title: string;
+  template: string;
+  style: string;
+  reason: string;
+  promptFocus: string;
+  promptText: string;
+  promptSpec: CreatorPromptSpecSnapshot;
+}
+
+export interface CreatorBatchRunSummary {
+  taskCount: number;
+  modelIds: string[];
+  modelNames: string[];
+  templateIds: string[];
+  sizes: string[];
+  estimatedCostUnits: number;
+  costUnitLabel: string;
+}
+
+export interface CreatorBatchRunCreateInput {
+  projectId: string;
+  briefTitle: string;
+  promptSpec: CreatorPromptSpecSnapshot;
+  promptText: string;
+  directions: CreatorBatchDirectionInput[];
+  modelIds: string[];
+  templateIds: string[];
+  sizes: string[];
+}
+
+export interface CreatorBatchRunListInput {
+  projectId?: string;
+  limit?: number;
+  offset?: number;
+}
+
+export interface CreatorBatchTaskRecord {
+  id: string;
+  batchRunId: string;
+  projectId: string;
+  status: CreatorBatchTaskStatus;
+  directionId: string;
+  directionTitle: string;
+  modelId: string;
+  modelName: string;
+  templateId: string;
+  size: string;
+  promptSpec: CreatorPromptSpecSnapshot;
+  promptText: string;
+  assetIds: string[];
+  error: string | null;
+  costEstimateText: string;
+  createdAt: number;
+  updatedAt: number;
+  completedAt: number | null;
+}
+
+export interface CreatorBatchRunRecord {
+  id: string;
+  projectId: string;
+  status: CreatorBatchRunStatus;
+  briefTitle: string;
+  promptSpec: CreatorPromptSpecSnapshot;
+  promptText: string;
+  summary: CreatorBatchRunSummary;
+  createdAt: number;
+  updatedAt: number;
+  completedAt: number | null;
+  tasks: CreatorBatchTaskRecord[];
+}
+
+export interface CreatorBatchRunListResult {
+  runs: CreatorBatchRunRecord[];
+  total: number;
 }

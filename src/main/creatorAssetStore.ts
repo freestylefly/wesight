@@ -6,6 +6,8 @@ import { v4 as uuidv4 } from 'uuid';
 import {
   CreatorAssetAdoptionStatus,
   CreatorAssetSelectionStatus,
+  CreatorBatchRunStatus,
+  CreatorBatchTaskStatus,
   CreatorBoardCardKind,
   CreatorBoardMoveDirection,
   CreatorProductionAssetKind,
@@ -15,11 +17,19 @@ import {
   CreatorProductionRunStatus,
   CreatorStudioDefaultProjectId,
 } from '../shared/creatorStudio/constants';
+import { CREATOR_CREATIVE_MODEL_CAPABILITIES } from '../shared/creatorStudio/modelCapabilities';
 import type {
   CreatorAssetCollectionAddInput,
   CreatorAssetCollectionCreateInput,
   CreatorAssetCollectionRecord,
   CreatorAssetUpdateInput,
+  CreatorBatchDirectionInput,
+  CreatorBatchRunCreateInput,
+  CreatorBatchRunListInput,
+  CreatorBatchRunListResult,
+  CreatorBatchRunRecord,
+  CreatorBatchRunSummary,
+  CreatorBatchTaskRecord,
   CreatorBoardCardCreateInput,
   CreatorBoardCardMoveInput,
   CreatorBoardCardRecord,
@@ -162,6 +172,40 @@ interface BrandKitRow {
   updated_at: number;
 }
 
+interface BatchRunRow {
+  id: string;
+  project_id: string;
+  status: string;
+  brief_title: string;
+  prompt_spec_json: string;
+  prompt_text: string;
+  summary_json: string;
+  created_at: number;
+  updated_at: number;
+  completed_at: number | null;
+}
+
+interface BatchTaskRow {
+  id: string;
+  batch_run_id: string;
+  project_id: string;
+  status: string;
+  direction_id: string;
+  direction_title: string;
+  model_id: string;
+  model_name: string;
+  template_id: string;
+  size: string;
+  prompt_spec_json: string;
+  prompt_text: string;
+  asset_ids_json: string | null;
+  error: string | null;
+  cost_estimate_text: string;
+  created_at: number;
+  updated_at: number;
+  completed_at: number | null;
+}
+
 const CREATOR_STUDIO_MARKER = '[Creator Studio]';
 const CreatorWorkspaceStateKey = {
   CurrentProjectId: 'current_project_id',
@@ -210,6 +254,42 @@ const parsePromptSpec = (value: string | null | undefined): CreatorPromptSpecSna
       : null;
   } catch {
     return null;
+  }
+};
+
+const parseBatchSummary = (value: string | null | undefined): CreatorBatchRunSummary => {
+  if (!value) {
+    return {
+      taskCount: 0,
+      modelIds: [],
+      modelNames: [],
+      templateIds: [],
+      sizes: [],
+      estimatedCostUnits: 0,
+      costUnitLabel: 'task',
+    };
+  }
+  try {
+    const parsed = JSON.parse(value) as Partial<CreatorBatchRunSummary> | null;
+    return {
+      taskCount: typeof parsed?.taskCount === 'number' ? parsed.taskCount : 0,
+      modelIds: Array.isArray(parsed?.modelIds) ? parsed.modelIds.filter((item): item is string => typeof item === 'string') : [],
+      modelNames: Array.isArray(parsed?.modelNames) ? parsed.modelNames.filter((item): item is string => typeof item === 'string') : [],
+      templateIds: Array.isArray(parsed?.templateIds) ? parsed.templateIds.filter((item): item is string => typeof item === 'string') : [],
+      sizes: Array.isArray(parsed?.sizes) ? parsed.sizes.filter((item): item is string => typeof item === 'string') : [],
+      estimatedCostUnits: typeof parsed?.estimatedCostUnits === 'number' ? parsed.estimatedCostUnits : 0,
+      costUnitLabel: typeof parsed?.costUnitLabel === 'string' ? parsed.costUnitLabel : 'task',
+    };
+  } catch {
+    return {
+      taskCount: 0,
+      modelIds: [],
+      modelNames: [],
+      templateIds: [],
+      sizes: [],
+      estimatedCostUnits: 0,
+      costUnitLabel: 'task',
+    };
   }
 };
 
@@ -899,6 +979,189 @@ export class CreatorAssetStore {
     return this.getBoardWorkspace(projectId);
   }
 
+  listCreativeModelCapabilities() {
+    return CREATOR_CREATIVE_MODEL_CAPABILITIES;
+  }
+
+  createBatchRun(input: CreatorBatchRunCreateInput): CreatorBatchRunRecord {
+    const projectId = input.projectId.trim() || this.getCurrentProjectId();
+    this.ensureProjectExists(projectId);
+    const directions = this.normalizeBatchDirections(input.directions);
+    if (directions.length === 0) {
+      throw new Error('At least one direction is required');
+    }
+    const capabilityById = new Map(CREATOR_CREATIVE_MODEL_CAPABILITIES.map((model) => [model.id, model]));
+    const models = normalizeTags(input.modelIds)
+      .map((modelId) => capabilityById.get(modelId))
+      .filter((model): model is typeof CREATOR_CREATIVE_MODEL_CAPABILITIES[number] => Boolean(model));
+    if (models.length === 0) {
+      throw new Error('At least one creative model is required');
+    }
+    const templateIds = normalizeTags(input.templateIds).length > 0
+      ? normalizeTags(input.templateIds)
+      : normalizeTags([input.promptSpec.templateId ?? 'default-template']);
+    const sizes = normalizeTags(input.sizes).length > 0
+      ? normalizeTags(input.sizes)
+      : normalizeTags([String(input.promptSpec.constraints?.aspectRatio ?? '1:1')]);
+    const now = Date.now();
+    const id = uuidv4();
+    const briefTitle = input.briefTitle.trim().slice(0, 120) || 'Creator Batch Run';
+    const taskCount = directions.length * models.length * templateIds.length * sizes.length;
+    const estimatedCostUnits = directions.reduce((total) => total + models.reduce((modelTotal, model) => (
+      modelTotal + (model.costUnitEstimate * templateIds.length * sizes.length)
+    ), 0), 0);
+    const summary: CreatorBatchRunSummary = {
+      taskCount,
+      modelIds: models.map((model) => model.id),
+      modelNames: models.map((model) => model.displayName),
+      templateIds,
+      sizes,
+      estimatedCostUnits,
+      costUnitLabel: 'estimated units',
+    };
+    const insertTask = this.db.prepare(`
+      INSERT INTO creator_batch_tasks (
+        id, batch_run_id, project_id, status, direction_id, direction_title,
+        model_id, model_name, template_id, size, prompt_spec_json, prompt_text,
+        asset_ids_json, error, cost_estimate_text, created_at, updated_at, completed_at
+      )
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?, ?, NULL)
+    `);
+    this.db.transaction(() => {
+      this.db.prepare(`
+        INSERT INTO creator_batch_runs (
+          id, project_id, status, brief_title, prompt_spec_json, prompt_text,
+          summary_json, created_at, updated_at, completed_at
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)
+      `).run(
+        id,
+        projectId,
+        CreatorBatchRunStatus.Running,
+        briefTitle,
+        JSON.stringify(input.promptSpec),
+        input.promptText.trim(),
+        JSON.stringify(summary),
+        now,
+        now
+      );
+      for (const direction of directions) {
+        for (const model of models) {
+          for (const templateId of templateIds) {
+            for (const size of sizes) {
+              const promptSpec = {
+                ...direction.promptSpec,
+                selectedCreativeDirectionId: direction.id,
+                selectedCreativeDirection: {
+                  id: direction.id,
+                  title: direction.title,
+                  template: direction.template,
+                  style: direction.style,
+                  reason: direction.reason,
+                  promptFocus: direction.promptFocus,
+                },
+                templateId,
+                constraints: {
+                  ...(direction.promptSpec.constraints ?? {}),
+                  aspectRatio: size,
+                },
+                batch: {
+                  batchRunId: id,
+                  modelId: model.id,
+                  modelName: model.displayName,
+                  outputKinds: model.outputKinds,
+                },
+              };
+              insertTask.run(
+                uuidv4(),
+                id,
+                projectId,
+                CreatorBatchTaskStatus.Pending,
+                direction.id,
+                direction.title,
+                model.id,
+                model.displayName,
+                templateId,
+                size,
+                JSON.stringify(promptSpec),
+                this.renderBatchTaskPrompt(direction.promptText, model.displayName, templateId, size),
+                '[]',
+                `${model.costUnitEstimate} ${model.costUnitLabel}`,
+                now,
+                now
+              );
+            }
+          }
+        }
+      }
+    })();
+    return this.getBatchRun(id)!;
+  }
+
+  listBatchRuns(input: CreatorBatchRunListInput = {}): CreatorBatchRunListResult {
+    const projectId = input.projectId?.trim() || this.getCurrentProjectId();
+    const limit = Math.max(1, Math.min(Math.floor(input.limit ?? 20), 100));
+    const offset = Math.max(0, Math.floor(input.offset ?? 0));
+    const rows = this.db.prepare(`
+      SELECT id, project_id, status, brief_title, prompt_spec_json, prompt_text,
+        summary_json, created_at, updated_at, completed_at
+      FROM creator_batch_runs
+      WHERE project_id = ?
+      ORDER BY created_at DESC
+      LIMIT ? OFFSET ?
+    `).all(projectId, limit, offset) as BatchRunRow[];
+    const totalRow = this.db.prepare(`
+      SELECT COUNT(*) AS count
+      FROM creator_batch_runs
+      WHERE project_id = ?
+    `).get(projectId) as { count: number };
+    return {
+      runs: rows.map((row) => this.mapBatchRunRow(row)),
+      total: totalRow.count,
+    };
+  }
+
+  getBatchRun(id: string): CreatorBatchRunRecord | null {
+    const row = this.db.prepare(`
+      SELECT id, project_id, status, brief_title, prompt_spec_json, prompt_text,
+        summary_json, created_at, updated_at, completed_at
+      FROM creator_batch_runs
+      WHERE id = ?
+    `).get(id) as BatchRunRow | undefined;
+    return row ? this.mapBatchRunRow(row) : null;
+  }
+
+  retryBatchTask(taskId: string): CreatorBatchRunRecord | null {
+    const task = this.getBatchTaskRow(taskId);
+    if (!task) return null;
+    const now = Date.now();
+    this.db.prepare(`
+      UPDATE creator_batch_tasks
+      SET status = ?,
+        error = NULL,
+        updated_at = ?,
+        completed_at = NULL
+      WHERE id = ?
+    `).run(CreatorBatchTaskStatus.Pending, now, task.id);
+    this.updateBatchRunStatus(task.batch_run_id);
+    return this.getBatchRun(task.batch_run_id);
+  }
+
+  skipBatchTask(taskId: string): CreatorBatchRunRecord | null {
+    const task = this.getBatchTaskRow(taskId);
+    if (!task) return null;
+    const now = Date.now();
+    this.db.prepare(`
+      UPDATE creator_batch_tasks
+      SET status = ?,
+        updated_at = ?,
+        completed_at = COALESCE(completed_at, ?)
+      WHERE id = ?
+    `).run(CreatorBatchTaskStatus.Skipped, now, now, task.id);
+    this.updateBatchRunStatus(task.batch_run_id);
+    return this.getBatchRun(task.batch_run_id);
+  }
+
   private ingestGeneratedImages(sessionId: string, message: CoworkMessage): void {
     const images = getGeneratedImages(message.metadata);
     if (images.length === 0) return;
@@ -1369,6 +1632,133 @@ export class CreatorAssetStore {
       WHERE project_id = ? AND asset_id = ?
     `).get(projectId, assetId) as { status: string } | undefined;
     return row?.status === CreatorAssetSelectionStatus.Selected;
+  }
+
+  private normalizeBatchDirections(directions: CreatorBatchDirectionInput[]): CreatorBatchDirectionInput[] {
+    if (!Array.isArray(directions)) return [];
+    const normalized: CreatorBatchDirectionInput[] = [];
+    for (const direction of directions) {
+      const id = direction.id?.trim();
+      const title = direction.title?.trim();
+      const promptText = direction.promptText?.trim();
+      if (!id || !title || !promptText || !direction.promptSpec) continue;
+      normalized.push({
+        id: id.slice(0, 80),
+        title: title.slice(0, 120),
+        template: (direction.template ?? '').trim().slice(0, 240),
+        style: (direction.style ?? '').trim().slice(0, 240),
+        reason: (direction.reason ?? '').trim().slice(0, 500),
+        promptFocus: (direction.promptFocus ?? '').trim().slice(0, 500),
+        promptText,
+        promptSpec: direction.promptSpec,
+      });
+    }
+    return normalized.slice(0, 6);
+  }
+
+  private renderBatchTaskPrompt(
+    promptText: string,
+    modelName: string,
+    templateId: string,
+    size: string
+  ): string {
+    return [
+      promptText.trim(),
+      '',
+      'Batch execution constraints:',
+      `model=${modelName}`,
+      `templateId=${templateId}`,
+      `size=${size}`,
+    ].join('\n');
+  }
+
+  private getBatchTaskRow(taskId: string): BatchTaskRow | null {
+    const row = this.db.prepare(`
+      SELECT id, batch_run_id, project_id, status, direction_id, direction_title,
+        model_id, model_name, template_id, size, prompt_spec_json, prompt_text,
+        asset_ids_json, error, cost_estimate_text, created_at, updated_at, completed_at
+      FROM creator_batch_tasks
+      WHERE id = ?
+    `).get(taskId) as BatchTaskRow | undefined;
+    return row ?? null;
+  }
+
+  private listBatchTasks(batchRunId: string): CreatorBatchTaskRecord[] {
+    const rows = this.db.prepare(`
+      SELECT id, batch_run_id, project_id, status, direction_id, direction_title,
+        model_id, model_name, template_id, size, prompt_spec_json, prompt_text,
+        asset_ids_json, error, cost_estimate_text, created_at, updated_at, completed_at
+      FROM creator_batch_tasks
+      WHERE batch_run_id = ?
+      ORDER BY direction_id ASC, model_name ASC, template_id ASC, size ASC, created_at ASC
+    `).all(batchRunId) as BatchTaskRow[];
+    return rows.map((row) => this.mapBatchTaskRow(row));
+  }
+
+  private updateBatchRunStatus(batchRunId: string): void {
+    const tasks = this.listBatchTasks(batchRunId);
+    if (tasks.length === 0) return;
+    const hasActive = tasks.some((task) => (
+      task.status === CreatorBatchTaskStatus.Pending
+      || task.status === CreatorBatchTaskStatus.Running
+    ));
+    const hasFailed = tasks.some((task) => task.status === CreatorBatchTaskStatus.Failed);
+    const hasSkipped = tasks.some((task) => task.status === CreatorBatchTaskStatus.Skipped);
+    const hasCompleted = tasks.some((task) => task.status === CreatorBatchTaskStatus.Completed);
+    const nextStatus = hasActive
+      ? CreatorBatchRunStatus.Running
+      : hasFailed || hasSkipped
+        ? hasCompleted
+          ? CreatorBatchRunStatus.PartialFailed
+          : CreatorBatchRunStatus.Failed
+        : CreatorBatchRunStatus.Completed;
+    const now = Date.now();
+    this.db.prepare(`
+      UPDATE creator_batch_runs
+      SET status = ?,
+        updated_at = ?,
+        completed_at = CASE WHEN ? = 1 THEN COALESCE(completed_at, ?) ELSE NULL END
+      WHERE id = ?
+    `).run(nextStatus, now, hasActive ? 0 : 1, now, batchRunId);
+  }
+
+  private mapBatchRunRow(row: BatchRunRow): CreatorBatchRunRecord {
+    return {
+      id: row.id,
+      projectId: row.project_id,
+      status: row.status as CreatorBatchRunStatus,
+      briefTitle: row.brief_title,
+      promptSpec: parsePromptSpec(row.prompt_spec_json) ?? {},
+      promptText: row.prompt_text,
+      summary: parseBatchSummary(row.summary_json),
+      createdAt: row.created_at,
+      updatedAt: row.updated_at,
+      completedAt: row.completed_at,
+      tasks: this.listBatchTasks(row.id),
+    };
+  }
+
+  private mapBatchTaskRow(row: BatchTaskRow): CreatorBatchTaskRecord {
+    return {
+      id: row.id,
+      batchRunId: row.batch_run_id,
+      projectId: row.project_id,
+      status: row.status as CreatorBatchTaskStatus,
+      directionId: row.direction_id,
+      directionTitle: row.direction_title,
+      modelId: row.model_id,
+      modelName: row.model_name,
+      templateId: row.template_id,
+      size: row.size,
+      promptSpec: parsePromptSpec(row.prompt_spec_json) ?? {},
+      promptText: row.prompt_text,
+      assetIds: parseJsonArray(row.asset_ids_json),
+      error: row.error,
+      costEstimateText: row.cost_estimate_text,
+      createdAt: row.created_at,
+      updatedAt: row.updated_at,
+      completedAt: row.completed_at,
+    };
   }
 
   private mapRunRow(row: ProductionRunRow): CreatorProductionRunRecord {

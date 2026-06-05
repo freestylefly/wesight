@@ -19,6 +19,10 @@ import type {
   CreatorAssetCollectionAddInput,
   CreatorAssetCollectionCreateInput,
   CreatorAssetUpdateInput,
+  CreatorBatchRunCreateInput,
+  CreatorBatchRunListInput,
+  CreatorBatchRunListResult,
+  CreatorBatchRunRecord,
   CreatorBoardCardCreateInput,
   CreatorBoardCardMoveInput,
   CreatorBoardCardRecord,
@@ -30,6 +34,7 @@ import type {
   CreatorBoardWorkspaceSnapshot,
   CreatorBrandKitUpdateInput,
   CreatorCaseAssetCreateInput,
+  CreatorCreativeModelCapability,
   CreatorProductionAssetListInput,
   CreatorProductionAssetListResult,
   CreatorProductionAssetRecord,
@@ -894,6 +899,37 @@ interface IElectronAPI {
     updateBrandKit: (input: CreatorBrandKitUpdateInput) => Promise<{
       success: boolean;
       workspace?: CreatorBoardWorkspaceSnapshot;
+      error?: string;
+    }>;
+    listModelCapabilities: () => Promise<{
+      success: boolean;
+      capabilities?: CreatorCreativeModelCapability[];
+      error?: string;
+    }>;
+    createBatchRun: (input: CreatorBatchRunCreateInput) => Promise<{
+      success: boolean;
+      batchRun?: CreatorBatchRunRecord;
+      error?: string;
+    }>;
+    listBatchRuns: (input?: CreatorBatchRunListInput) => Promise<{
+      success: boolean;
+      runs?: CreatorBatchRunListResult['runs'];
+      total?: number;
+      error?: string;
+    }>;
+    getBatchRun: (batchRunId: string) => Promise<{
+      success: boolean;
+      batchRun?: CreatorBatchRunRecord;
+      error?: string;
+    }>;
+    retryBatchTask: (taskId: string) => Promise<{
+      success: boolean;
+      batchRun?: CreatorBatchRunRecord;
+      error?: string;
+    }>;
+    skipBatchTask: (taskId: string) => Promise<{
+      success: boolean;
+      batchRun?: CreatorBatchRunRecord;
       error?: string;
     }>;
   };

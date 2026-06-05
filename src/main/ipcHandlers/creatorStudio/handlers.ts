@@ -64,6 +64,31 @@ const normalizeDirection = (value: unknown) => {
   };
 };
 
+const normalizeBatchDirection = (value: unknown) => {
+  const record = normalizeObject(value);
+  const id = toTrimmedString(record?.id);
+  const title = toTrimmedString(record?.title);
+  const promptText = toTrimmedString(record?.promptText);
+  const promptSpec = normalizeObject(record?.promptSpec);
+  if (!record || !id || !title || !promptText || !promptSpec) return null;
+  return {
+    id,
+    title,
+    template: toTrimmedString(record.template) ?? '',
+    style: toTrimmedString(record.style) ?? '',
+    reason: toTrimmedString(record.reason) ?? '',
+    promptFocus: toTrimmedString(record.promptFocus) ?? '',
+    promptText,
+    promptSpec,
+  };
+};
+
+const normalizeBatchDirections = (value: unknown) => (
+  Array.isArray(value)
+    ? value.map(normalizeBatchDirection).filter((item): item is NonNullable<ReturnType<typeof normalizeBatchDirection>> => Boolean(item))
+    : []
+);
+
 export const registerCreatorStudioIpcHandlers = (
   ipcMain: IpcMain,
   getCreatorAssetStore: () => CreatorAssetStore
@@ -529,6 +554,130 @@ export const registerCreatorStudioIpcHandlers = (
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Failed to update creator brand kit',
+      };
+    }
+  });
+
+  ipcMain.handle(CreatorStudioIpcChannel.ModelCapabilityList, async () => {
+    try {
+      return { success: true, capabilities: getCreatorAssetStore().listCreativeModelCapabilities() };
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to list creative model capabilities',
+      };
+    }
+  });
+
+  ipcMain.handle(CreatorStudioIpcChannel.BatchRunCreate, async (_event, input: unknown) => {
+    try {
+      const record = normalizeObject(input) ?? {};
+      const projectId = toTrimmedString(record.projectId);
+      const briefTitle = toTrimmedString(record.briefTitle);
+      const promptSpec = normalizeObject(record.promptSpec);
+      const promptText = toTrimmedString(record.promptText);
+      const directions = normalizeBatchDirections(record.directions);
+      const modelIds = normalizeStringArray(record.modelIds) ?? [];
+      const templateIds = normalizeStringArray(record.templateIds) ?? [];
+      const sizes = normalizeStringArray(record.sizes) ?? [];
+      if (!projectId || !briefTitle || !promptSpec || !promptText || directions.length === 0 || modelIds.length === 0) {
+        return { success: false, error: 'projectId, briefTitle, promptSpec, promptText, directions, and modelIds are required' };
+      }
+      return {
+        success: true,
+        batchRun: getCreatorAssetStore().createBatchRun({
+          projectId,
+          briefTitle,
+          promptSpec,
+          promptText,
+          directions,
+          modelIds,
+          templateIds,
+          sizes,
+        }),
+      };
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to create creator batch run',
+      };
+    }
+  });
+
+  ipcMain.handle(CreatorStudioIpcChannel.BatchRunList, async (_event, input: unknown) => {
+    try {
+      const record = normalizeObject(input) ?? {};
+      const rawLimit = typeof record.limit === 'number' ? record.limit : undefined;
+      const rawOffset = typeof record.offset === 'number' ? record.offset : undefined;
+      return {
+        success: true,
+        ...getCreatorAssetStore().listBatchRuns({
+          ...(toTrimmedString(record.projectId) ? { projectId: toTrimmedString(record.projectId)! } : {}),
+          ...(rawLimit === undefined ? {} : { limit: rawLimit }),
+          ...(rawOffset === undefined ? {} : { offset: rawOffset }),
+        }),
+      };
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to list creator batch runs',
+      };
+    }
+  });
+
+  ipcMain.handle(CreatorStudioIpcChannel.BatchRunGet, async (_event, input: unknown) => {
+    try {
+      const batchRunId = toTrimmedString(input);
+      if (!batchRunId) {
+        return { success: false, error: 'batchRunId is required' };
+      }
+      const batchRun = getCreatorAssetStore().getBatchRun(batchRunId);
+      if (!batchRun) {
+        return { success: false, error: 'Batch run not found' };
+      }
+      return { success: true, batchRun };
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to get creator batch run',
+      };
+    }
+  });
+
+  ipcMain.handle(CreatorStudioIpcChannel.BatchTaskRetry, async (_event, input: unknown) => {
+    try {
+      const taskId = toTrimmedString(input);
+      if (!taskId) {
+        return { success: false, error: 'taskId is required' };
+      }
+      const batchRun = getCreatorAssetStore().retryBatchTask(taskId);
+      if (!batchRun) {
+        return { success: false, error: 'Batch task not found' };
+      }
+      return { success: true, batchRun };
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to retry creator batch task',
+      };
+    }
+  });
+
+  ipcMain.handle(CreatorStudioIpcChannel.BatchTaskSkip, async (_event, input: unknown) => {
+    try {
+      const taskId = toTrimmedString(input);
+      if (!taskId) {
+        return { success: false, error: 'taskId is required' };
+      }
+      const batchRun = getCreatorAssetStore().skipBatchTask(taskId);
+      if (!batchRun) {
+        return { success: false, error: 'Batch task not found' };
+      }
+      return { success: true, batchRun };
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to skip creator batch task',
       };
     }
   });

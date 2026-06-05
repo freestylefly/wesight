@@ -17,8 +17,12 @@ import {
   CreatorStudioDefaultProjectId,
 } from '@shared/creatorStudio/constants';
 import type {
+  CreatorBatchRunCreateInput,
+  CreatorBatchRunRecord,
+  CreatorBatchTaskRecord,
   CreatorBoardWorkspaceSnapshot,
   CreatorBrandKitRecord,
+  CreatorCreativeModelCapability,
   CreatorProductionAssetRecord,
   CreatorWorkspaceSnapshot,
 } from '@shared/creatorStudio/types';
@@ -56,6 +60,7 @@ import {
   selectCreatorCreativeDirection,
 } from '../../utils/creatorStudio';
 import { CreatorAssetGrid } from './CreatorAssetGrid';
+import { CreatorBatchPanel } from './CreatorBatchPanel';
 import { CreatorBoard } from './CreatorBoard';
 
 const cases = casesData as CreatorStudioCase[];
@@ -68,6 +73,7 @@ const CreatorStudioTab = {
   Builder: 'builder',
   Assets: 'assets',
   Board: 'board',
+  Batch: 'batch',
 } as const;
 
 type CreatorStudioTab = typeof CreatorStudioTab[keyof typeof CreatorStudioTab];
@@ -180,6 +186,10 @@ const CreatorStudioView: React.FC<CreatorStudioViewProps> = ({
   const [currentProjectId, setCurrentProjectId] = useState('');
   const [boardWorkspace, setBoardWorkspace] = useState<CreatorBoardWorkspaceSnapshot | null>(null);
   const [boardContextPack, setBoardContextPack] = useState('');
+  const [modelCapabilities, setModelCapabilities] = useState<CreatorCreativeModelCapability[]>([]);
+  const [batchRuns, setBatchRuns] = useState<CreatorBatchRunRecord[]>([]);
+  const [activeBatchRun, setActiveBatchRun] = useState<CreatorBatchRunRecord | null>(null);
+  const [isCreatingBatchRun, setIsCreatingBatchRun] = useState(false);
 
   useEffect(() => {
     void skillService.loadSkills().then((loadedSkills) => {
@@ -199,6 +209,15 @@ const CreatorStudioView: React.FC<CreatorStudioViewProps> = ({
     return nextWorkspace;
   }, []);
 
+  const loadBatchRuns = useCallback(async (projectId: string) => {
+    const result = await creatorStudioAssetService.listBatchRuns({ projectId, limit: 20 });
+    setBatchRuns(result.runs);
+    setActiveBatchRun((current) => {
+      if (!current) return result.runs[0] ?? null;
+      return result.runs.find((run) => run.id === current.id) ?? result.runs[0] ?? null;
+    });
+  }, []);
+
   useEffect(() => {
     void loadWorkspace().catch(() => {
       dispatchToast(i18nService.t('creatorWorkspaceLoadFailed'));
@@ -211,6 +230,21 @@ const CreatorStudioView: React.FC<CreatorStudioViewProps> = ({
       dispatchToast(i18nService.t('creatorBoardLoadFailed'));
     });
   }, [currentProjectId, loadBoardWorkspace]);
+
+  useEffect(() => {
+    void creatorStudioAssetService.listModelCapabilities()
+      .then(setModelCapabilities)
+      .catch(() => {
+        dispatchToast(i18nService.t('creatorBatchModelLoadFailed'));
+      });
+  }, []);
+
+  useEffect(() => {
+    if (!currentProjectId) return;
+    void loadBatchRuns(currentProjectId).catch(() => {
+      dispatchToast(i18nService.t('creatorBatchLoadFailed'));
+    });
+  }, [currentProjectId, loadBatchRuns]);
 
   const searchableLabels = useMemo(() => {
     const labels = new Map<string, string[]>();
@@ -272,6 +306,11 @@ const CreatorStudioView: React.FC<CreatorStudioViewProps> = ({
     [builderForm, builderMaterials, builderPromptLanguage, builderSeed]
   );
   const boardPromptText = useMemo(() => renderCreatorPrompt(boardPromptSpec), [boardPromptSpec]);
+  const batchPromptSpec = useMemo(
+    () => applyBoardAndBrandKit(boardPromptSpec, boardWorkspace?.brandKit ?? null, boardContextPack),
+    [boardContextPack, boardPromptSpec, boardWorkspace?.brandKit]
+  );
+  const batchPromptText = useMemo(() => renderCreatorPrompt(batchPromptSpec), [batchPromptSpec]);
 
   useEffect(() => {
     let cancelled = false;
@@ -540,6 +579,81 @@ const CreatorStudioView: React.FC<CreatorStudioViewProps> = ({
     }
   };
 
+  const createBatchRun = async (input: CreatorBatchRunCreateInput) => {
+    setIsCreatingBatchRun(true);
+    try {
+      const batchRun = await creatorStudioAssetService.createBatchRun(input);
+      setActiveBatchRun(batchRun);
+      await loadBatchRuns(input.projectId);
+      dispatchToast(i18nService.t('creatorBatchCreated'));
+    } catch (error) {
+      dispatchToast(error instanceof Error ? error.message : i18nService.t('creatorBatchCreateFailed'));
+    } finally {
+      setIsCreatingBatchRun(false);
+    }
+  };
+
+  const retryBatchTask = async (taskId: string) => {
+    try {
+      const batchRun = await creatorStudioAssetService.retryBatchTask(taskId);
+      if (batchRun) {
+        setActiveBatchRun(batchRun);
+        await loadBatchRuns(batchRun.projectId);
+      }
+    } catch (error) {
+      dispatchToast(error instanceof Error ? error.message : i18nService.t('creatorBatchRetryFailed'));
+    }
+  };
+
+  const skipBatchTask = async (taskId: string) => {
+    try {
+      const batchRun = await creatorStudioAssetService.skipBatchTask(taskId);
+      if (batchRun) {
+        setActiveBatchRun(batchRun);
+        await loadBatchRuns(batchRun.projectId);
+      }
+    } catch (error) {
+      dispatchToast(error instanceof Error ? error.message : i18nService.t('creatorBatchSkipFailed'));
+    }
+  };
+
+  const sendBatchTaskToCowork = async (task: CreatorBatchTaskRecord) => {
+    setIsSendingToCowork(true);
+    try {
+      dispatch(setActiveSkillIds(installedRecommendedSkillIds));
+      await onSendToCowork([
+        '[Creator Studio]',
+        '',
+        i18nService.t('creatorBatchCoworkDraftIntro'),
+        '',
+        `batchRunId: ${task.batchRunId}`,
+        `batchTaskId: ${task.id}`,
+        `directionId: ${task.directionId}`,
+        `modelId: ${task.modelId}`,
+        `modelName: ${task.modelName}`,
+        `templateId: ${task.templateId}`,
+        `size: ${task.size}`,
+        '',
+        'PromptSpec:',
+        '```json',
+        JSON.stringify(task.promptSpec, null, 2),
+        '```',
+        '',
+        'Prompt:',
+        '```text',
+        task.promptText,
+        '```',
+      ].join('\n'), {
+        activeSkillIds: installedRecommendedSkillIds,
+        preferCreativeProducer: true,
+      });
+    } catch {
+      dispatchToast(i18nService.t('creatorSendToCoworkFailed'));
+    } finally {
+      setIsSendingToCowork(false);
+    }
+  };
+
   return (
     <div className="flex h-full min-h-0 flex-col bg-background text-foreground">
       <header className="flex shrink-0 items-center gap-3 border-b border-border px-4 py-3">
@@ -579,6 +693,9 @@ const CreatorStudioView: React.FC<CreatorStudioViewProps> = ({
         </TabButton>
         <TabButton active={activeTab === CreatorStudioTab.Board} onClick={() => setActiveTab(CreatorStudioTab.Board)}>
           {i18nService.t('creatorBoardTab')}
+        </TabButton>
+        <TabButton active={activeTab === CreatorStudioTab.Batch} onClick={() => setActiveTab(CreatorStudioTab.Batch)}>
+          {i18nService.t('creatorBatchTab')}
         </TabButton>
       </div>
 
@@ -664,6 +781,26 @@ const CreatorStudioView: React.FC<CreatorStudioViewProps> = ({
               }));
               setActiveTab(CreatorStudioTab.Builder);
             }}
+          />
+        )}
+        {activeTab === CreatorStudioTab.Batch && (
+          <CreatorBatchPanel
+            projectId={currentProjectId}
+            promptSpec={batchPromptSpec}
+            promptText={batchPromptText}
+            templates={styleLibrary.templates}
+            modelCapabilities={modelCapabilities}
+            batchRuns={batchRuns}
+            activeBatchRun={activeBatchRun}
+            isCreating={isCreatingBatchRun}
+            onCreateBatchRun={(input) => void createBatchRun(input)}
+            onSelectBatchRun={setActiveBatchRun}
+            onRefresh={() => {
+              if (currentProjectId) void loadBatchRuns(currentProjectId);
+            }}
+            onRetryTask={(taskId) => void retryBatchTask(taskId)}
+            onSkipTask={(taskId) => void skipBatchTask(taskId)}
+            onSendTaskToCowork={(task) => void sendBatchTaskToCowork(task)}
           />
         )}
       </main>

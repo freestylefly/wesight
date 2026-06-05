@@ -21,6 +21,12 @@ export const CreatorStudioIpcChannel = {
   BoardCardSelect: 'creatorStudio:board:card:select',
   BoardBuildContextPack: 'creatorStudio:board:contextPack:build',
   BrandKitUpdate: 'creatorStudio:brandKit:update',
+  ModelCapabilityList: 'creatorStudio:modelCapability:list',
+  BatchRunCreate: 'creatorStudio:batchRun:create',
+  BatchRunList: 'creatorStudio:batchRun:list',
+  BatchRunGet: 'creatorStudio:batchRun:get',
+  BatchTaskRetry: 'creatorStudio:batchTask:retry',
+  BatchTaskSkip: 'creatorStudio:batchTask:skip',
 } as const;
 
 export type CreatorStudioIpcChannel =
@@ -157,6 +163,57 @@ export const CreatorBoardMoveDirectionValues = [
   CreatorBoardMoveDirection.Down,
 ] as const;
 
+export const CreatorCreativeModelOutputKind = {
+  Image: 'image',
+  Video: 'video',
+  Text: 'text',
+} as const;
+
+export type CreatorCreativeModelOutputKind =
+  typeof CreatorCreativeModelOutputKind[keyof typeof CreatorCreativeModelOutputKind];
+
+export const CreatorCreativeModelOutputKindValues = [
+  CreatorCreativeModelOutputKind.Image,
+  CreatorCreativeModelOutputKind.Video,
+  CreatorCreativeModelOutputKind.Text,
+] as const;
+
+export const CreatorBatchRunStatus = {
+  Running: 'running',
+  Completed: 'completed',
+  PartialFailed: 'partial_failed',
+  Failed: 'failed',
+} as const;
+
+export type CreatorBatchRunStatus =
+  typeof CreatorBatchRunStatus[keyof typeof CreatorBatchRunStatus];
+
+export const CreatorBatchRunStatusValues = [
+  CreatorBatchRunStatus.Running,
+  CreatorBatchRunStatus.Completed,
+  CreatorBatchRunStatus.PartialFailed,
+  CreatorBatchRunStatus.Failed,
+] as const;
+
+export const CreatorBatchTaskStatus = {
+  Pending: 'pending',
+  Running: 'running',
+  Completed: 'completed',
+  Failed: 'failed',
+  Skipped: 'skipped',
+} as const;
+
+export type CreatorBatchTaskStatus =
+  typeof CreatorBatchTaskStatus[keyof typeof CreatorBatchTaskStatus];
+
+export const CreatorBatchTaskStatusValues = [
+  CreatorBatchTaskStatus.Pending,
+  CreatorBatchTaskStatus.Running,
+  CreatorBatchTaskStatus.Completed,
+  CreatorBatchTaskStatus.Failed,
+  CreatorBatchTaskStatus.Skipped,
+] as const;
+
 export const CreatorStudioDefaultProjectId = 'creator-project-default';
 
 export const CreatorStudioAssetListDefaultLimit = 60;
@@ -205,4 +262,19 @@ export const isCreatorBoardCardKind = (value: unknown): value is CreatorBoardCar
 export const isCreatorBoardMoveDirection = (value: unknown): value is CreatorBoardMoveDirection => (
   typeof value === 'string'
   && CreatorBoardMoveDirectionValues.includes(value as CreatorBoardMoveDirection)
+);
+
+export const isCreatorCreativeModelOutputKind = (value: unknown): value is CreatorCreativeModelOutputKind => (
+  typeof value === 'string'
+  && CreatorCreativeModelOutputKindValues.includes(value as CreatorCreativeModelOutputKind)
+);
+
+export const isCreatorBatchRunStatus = (value: unknown): value is CreatorBatchRunStatus => (
+  typeof value === 'string'
+  && CreatorBatchRunStatusValues.includes(value as CreatorBatchRunStatus)
+);
+
+export const isCreatorBatchTaskStatus = (value: unknown): value is CreatorBatchTaskStatus => (
+  typeof value === 'string'
+  && CreatorBatchTaskStatusValues.includes(value as CreatorBatchTaskStatus)
 );
