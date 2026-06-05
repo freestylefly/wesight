@@ -255,6 +255,9 @@ export const CreatorAssetGrid: React.FC<CreatorAssetGridProps> = ({
   const [licenseNoteDraft, setLicenseNoteDraft] = useState('');
   const [usageNoteDraft, setUsageNoteDraft] = useState('');
   const [collectionTargetId, setCollectionTargetId] = useState('');
+  const [projectNameDraft, setProjectNameDraft] = useState('');
+  const [isProjectFormOpen, setIsProjectFormOpen] = useState(false);
+  const [isCreatingProject, setIsCreatingProject] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -323,15 +326,19 @@ export const CreatorAssetGrid: React.FC<CreatorAssetGridProps> = ({
   }, [selectedAsset]);
 
   const handleCreateProject = async () => {
-    const name = window.prompt(i18nService.t('creatorProjectNamePrompt'));
-    if (!name?.trim()) return;
+    if (!projectNameDraft.trim()) return;
+    setIsCreatingProject(true);
     try {
-      const nextWorkspace = await creatorStudioAssetService.createProject({ name: name.trim() });
+      const nextWorkspace = await creatorStudioAssetService.createProject({ name: projectNameDraft.trim() });
       setWorkspace(nextWorkspace);
       setCurrentProjectId(nextWorkspace.currentProjectId);
       setCollectionId('');
+      setProjectNameDraft('');
+      setIsProjectFormOpen(false);
     } catch (createError) {
       dispatchToast(createError instanceof Error ? createError.message : i18nService.t('creatorProjectCreateFailed'));
+    } finally {
+      setIsCreatingProject(false);
     }
   };
 
@@ -502,7 +509,7 @@ export const CreatorAssetGrid: React.FC<CreatorAssetGridProps> = ({
             <div className="flex flex-wrap gap-2">
               <button
                 type="button"
-                onClick={() => void handleCreateProject()}
+                onClick={() => setIsProjectFormOpen(true)}
                 className="inline-flex items-center gap-2 rounded-lg border border-border px-3 py-2 text-sm font-medium text-secondary transition-colors hover:bg-surface-raised hover:text-foreground"
               >
                 <PlusIcon className="h-4 w-4" />
@@ -525,6 +532,39 @@ export const CreatorAssetGrid: React.FC<CreatorAssetGridProps> = ({
               </button>
             </div>
           </div>
+          {isProjectFormOpen && (
+            <div className="mt-4 flex flex-wrap gap-2">
+              <input
+                value={projectNameDraft}
+                onChange={(event) => setProjectNameDraft(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter') void handleCreateProject();
+                  if (event.key === 'Escape') setIsProjectFormOpen(false);
+                }}
+                autoFocus
+                placeholder={i18nService.t('projectNamePlaceholder')}
+                className="h-10 min-w-[220px] flex-1 rounded-lg border border-border bg-background px-3 text-sm outline-none focus:border-primary"
+              />
+              <button
+                type="button"
+                disabled={!projectNameDraft.trim() || isCreatingProject}
+                onClick={() => void handleCreateProject()}
+                className="h-10 rounded-lg bg-primary px-3 text-sm font-medium text-white transition-colors hover:bg-primary-hover disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {i18nService.t('create')}
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setProjectNameDraft('');
+                  setIsProjectFormOpen(false);
+                }}
+                className="h-10 rounded-lg border border-border px-3 text-sm font-medium text-secondary transition-colors hover:bg-surface-raised hover:text-foreground"
+              >
+                {i18nService.t('cancel')}
+              </button>
+            </div>
+          )}
 
           <div className="mt-4 grid gap-2 lg:grid-cols-[180px_170px_160px_1fr_1fr_150px_auto]">
             <select

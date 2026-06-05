@@ -525,15 +525,15 @@ const CreatorStudioView: React.FC<CreatorStudioViewProps> = ({
     }
   };
 
-  const createProject = async () => {
-    const name = window.prompt(i18nService.t('creatorProjectNamePrompt'));
-    if (!name?.trim()) return;
+  const createProject = async (name: string) => {
+    if (!name.trim()) return;
     try {
       const nextWorkspace = await creatorStudioAssetService.createProject({ name: name.trim() });
       setWorkspace(nextWorkspace);
       setCurrentProjectId(nextWorkspace.currentProjectId);
     } catch (error) {
       dispatchToast(error instanceof Error ? error.message : i18nService.t('creatorProjectCreateFailed'));
+      throw error;
     }
   };
 
@@ -827,7 +827,7 @@ const CreatorStudioView: React.FC<CreatorStudioViewProps> = ({
             workspace={workspace}
             currentProjectId={currentProjectId}
             onProjectChange={(projectId) => void switchProject(projectId)}
-            onCreateProject={() => void createProject()}
+            onCreateProject={createProject}
             onSendToCowork={sendToCowork}
             onSavePromptAsset={(promptSpec, promptText) => void savePromptAsset(promptSpec, promptText)}
             brandKit={boardWorkspace?.brandKit ?? null}
@@ -965,8 +965,8 @@ const Gallery: React.FC<{
 
   return (
     <section className="space-y-4 p-4">
-      <div className="grid gap-3 lg:grid-cols-[minmax(220px,1fr)_180px_160px_160px_auto]">
-        <label className="relative block">
+      <div className="flex flex-wrap items-center gap-3">
+        <label className="relative block w-full sm:w-80">
           <MagnifyingGlassIcon className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted" />
           <input
             value={query}
@@ -975,34 +975,22 @@ const Gallery: React.FC<{
             className="h-10 w-full rounded-lg border border-border bg-surface px-9 text-sm outline-none focus:border-primary"
           />
         </label>
-        <FilterSelect value={category} onChange={onCategoryChange} label={i18nService.t('creatorFilterCategory')}>
+        <FilterSelect className="w-full sm:w-44" value={category} onChange={onCategoryChange} label={i18nService.t('creatorFilterCategory')}>
           {styleLibrary.categories.map((item) => (
             <option key={item.id} value={item.value}>{getText(item.title)}</option>
           ))}
         </FilterSelect>
-        <FilterSelect value={style} onChange={onStyleChange} label={i18nService.t('creatorFilterStyle')}>
+        <FilterSelect className="w-full sm:w-40" value={style} onChange={onStyleChange} label={i18nService.t('creatorFilterStyle')}>
           {styleLibrary.styles.map((item) => (
             <option key={item.id} value={item.value}>{getText(item.title)}</option>
           ))}
         </FilterSelect>
-        <FilterSelect value={scene} onChange={onSceneChange} label={i18nService.t('creatorFilterScene')}>
+        <FilterSelect className="w-full sm:w-40" value={scene} onChange={onSceneChange} label={i18nService.t('creatorFilterScene')}>
           {styleLibrary.scenes.map((item) => (
             <option key={item.id} value={item.value}>{getText(item.title)}</option>
           ))}
         </FilterSelect>
-        <button
-          type="button"
-          onClick={onClearFilters}
-          className="h-10 rounded-lg border border-border px-3 text-sm font-medium text-secondary transition-colors hover:bg-surface-raised hover:text-foreground"
-        >
-          {i18nService.t('creatorClearFilters')}
-        </button>
-      </div>
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="text-xs text-muted">
-          {i18nService.t('creatorResultCount').replace('{count}', String(totalCount))}
-        </div>
-        <label className="flex items-center gap-2 rounded-lg border border-border bg-surface px-3 py-2 text-xs text-secondary">
+        <label className="flex h-10 items-center gap-2 rounded-lg border border-border bg-surface px-3 text-xs text-secondary">
           <span>{i18nService.t('creatorThumbnailSize')}</span>
           <input
             type="range"
@@ -1016,6 +1004,16 @@ const Gallery: React.FC<{
           />
           <span className="w-12 text-right tabular-nums">{thumbnailSize}px</span>
         </label>
+        <button
+          type="button"
+          onClick={onClearFilters}
+          className="h-10 rounded-lg border border-border px-3 text-sm font-medium text-secondary transition-colors hover:bg-surface-raised hover:text-foreground"
+        >
+          {i18nService.t('creatorClearFilters')}
+        </button>
+      </div>
+      <div className="text-xs text-muted">
+        {i18nService.t('creatorResultCount').replace('{count}', String(totalCount))}
       </div>
       {totalCount === 0 ? (
         <div className="flex min-h-[220px] flex-col items-center justify-center rounded-lg border border-dashed border-border bg-surface text-center">
@@ -1061,12 +1059,13 @@ const FilterSelect: React.FC<{
   onChange: (value: string) => void;
   label: string;
   children: React.ReactNode;
-}> = ({ value, onChange, label, children }) => (
+  className?: string;
+}> = ({ value, onChange, label, children, className = '' }) => (
   <select
     value={value}
     onChange={(event) => onChange(event.target.value)}
     aria-label={label}
-    className="h-10 rounded-lg border border-border bg-surface px-3 text-sm text-foreground outline-none focus:border-primary"
+    className={`h-10 rounded-lg border border-border bg-surface px-3 text-sm text-foreground outline-none focus:border-primary ${className}`}
   >
     <option value="">{label}</option>
     {children}
@@ -1121,18 +1120,18 @@ const TemplateLibrary: React.FC<{
   onSelectTemplate: (template: CreatorStudioTemplate) => void;
   onUseTemplate: (template: CreatorStudioTemplate) => void;
 }> = ({ templates, templateCasesById, onSelectTemplate, onUseTemplate }) => (
-  <section className="grid grid-cols-1 gap-3 p-4 lg:grid-cols-2 2xl:grid-cols-3">
+  <section className="grid grid-cols-1 gap-4 p-4 xl:grid-cols-2">
     {templates.map((template) => {
       const exampleCases = template.exampleCases
         .map((sourceCaseId) => templateCasesById.get(sourceCaseId))
         .filter((item): item is CreatorStudioCase => Boolean(item));
       return (
-        <article key={template.id} className="rounded-lg border border-border bg-surface p-4">
-          <div className="flex gap-3">
-            <PlaceholderImage src={template.cover} alt={getText(template.title)} className="h-20 w-20 shrink-0 rounded-lg" />
+        <article key={template.id} className="rounded-lg border border-border bg-surface p-5">
+          <div className="flex gap-4">
+            <PlaceholderImage src={template.cover} alt={getText(template.title)} className="h-32 w-32 shrink-0 rounded-lg" />
             <div className="min-w-0 flex-1">
-              <h2 className="line-clamp-2 text-sm font-semibold">{getText(template.title)}</h2>
-              <p className="mt-1 line-clamp-2 text-xs text-secondary">{getText(template.description)}</p>
+              <h2 className="line-clamp-2 text-base font-semibold">{getText(template.title)}</h2>
+              <p className="mt-2 line-clamp-3 text-sm leading-5 text-secondary">{getText(template.description)}</p>
               <div className="mt-2 flex flex-wrap gap-1.5">
                 {template.tags.slice(0, 4).map((tag) => (
                   <span key={tag} className="rounded-md bg-surface-raised px-2 py-0.5 text-[11px] text-secondary">
@@ -1145,18 +1144,18 @@ const TemplateLibrary: React.FC<{
           <div className="mt-3 text-xs text-muted">
             {i18nService.t('creatorExampleCases').replace('{count}', String(exampleCases.length))}
           </div>
-          <div className="mt-3 flex gap-2">
+          <div className="mt-3 flex justify-end gap-2">
             <button
               type="button"
               onClick={() => onSelectTemplate(template)}
-              className="flex-1 rounded-lg border border-border px-3 py-2 text-sm font-medium text-secondary transition-colors hover:bg-surface-raised hover:text-foreground"
+              className="rounded-lg border border-border px-2.5 py-1.5 text-xs font-medium text-secondary transition-colors hover:bg-surface-raised hover:text-foreground"
             >
               {i18nService.t('creatorDetails')}
             </button>
             <button
               type="button"
               onClick={() => onUseTemplate(template)}
-              className="flex-1 rounded-lg bg-primary px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-primary-hover"
+              className="rounded-lg bg-primary px-2.5 py-1.5 text-xs font-medium text-white transition-colors hover:bg-primary-hover"
             >
               {i18nService.t('creatorUseTemplate')}
             </button>
@@ -1180,7 +1179,7 @@ const PromptBuilder: React.FC<{
   workspace: CreatorWorkspaceSnapshot | null;
   currentProjectId: string;
   onProjectChange: (projectId: string) => void;
-  onCreateProject: () => void;
+  onCreateProject: (name: string) => Promise<void> | void;
   brandKit: CreatorBrandKitRecord | null;
   boardContextPack: string;
   onSendToCowork: (
@@ -1210,6 +1209,9 @@ const PromptBuilder: React.FC<{
   onSavePromptAsset,
 }) => {
   const [selectedDirectionId, setSelectedDirectionId] = useState<string | null>(null);
+  const [projectNameDraft, setProjectNameDraft] = useState('');
+  const [isProjectFormOpen, setIsProjectFormOpen] = useState(false);
+  const [isCreatingProject, setIsCreatingProject] = useState(false);
   const promptLanguage = normalizePromptLanguage(i18nService.getLanguage(), form);
   const rawPromptSpec: CreatorPromptSpec = buildPromptSpec(seed, form, promptLanguage, i18nService.t('creatorBlankBuilder'), materials);
   const basePromptSpec = applyBoardAndBrandKit(rawPromptSpec, brandKit, boardContextPack);
@@ -1224,6 +1226,18 @@ const PromptBuilder: React.FC<{
 
   const updateField = (field: keyof CreatorPromptForm, value: string) => {
     onFormChange({ ...form, [field]: value });
+  };
+
+  const submitProject = async () => {
+    if (!projectNameDraft.trim()) return;
+    setIsCreatingProject(true);
+    try {
+      await onCreateProject(projectNameDraft);
+      setProjectNameDraft('');
+      setIsProjectFormOpen(false);
+    } finally {
+      setIsCreatingProject(false);
+    }
   };
 
   return (
@@ -1251,12 +1265,45 @@ const PromptBuilder: React.FC<{
             </select>
             <button
               type="button"
-              onClick={onCreateProject}
+              onClick={() => setIsProjectFormOpen(true)}
               className="rounded-lg border border-border px-3 text-xs font-medium text-secondary transition-colors hover:bg-surface-raised hover:text-foreground"
             >
               {i18nService.t('creatorProjectCreate')}
             </button>
           </div>
+          {isProjectFormOpen && (
+            <div className="mt-2 flex gap-2">
+              <input
+                value={projectNameDraft}
+                onChange={(event) => setProjectNameDraft(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter') void submitProject();
+                  if (event.key === 'Escape') setIsProjectFormOpen(false);
+                }}
+                autoFocus
+                placeholder={i18nService.t('projectNamePlaceholder')}
+                className="h-9 min-w-0 flex-1 rounded-lg border border-border bg-surface px-2 text-xs outline-none focus:border-primary"
+              />
+              <button
+                type="button"
+                disabled={!projectNameDraft.trim() || isCreatingProject}
+                onClick={() => void submitProject()}
+                className="rounded-lg bg-primary px-3 text-xs font-medium text-white transition-colors hover:bg-primary-hover disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {i18nService.t('create')}
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setProjectNameDraft('');
+                  setIsProjectFormOpen(false);
+                }}
+                className="rounded-lg border border-border px-3 text-xs font-medium text-secondary transition-colors hover:bg-surface-raised hover:text-foreground"
+              >
+                {i18nService.t('cancel')}
+              </button>
+            </div>
+          )}
         </div>
         <BuilderInput label={i18nService.t('creatorFieldSubject')} value={form.subject} onChange={(value) => updateField('subject', value)} />
         <BuilderInput label={i18nService.t('creatorFieldPlatform')} value={form.platform} onChange={(value) => updateField('platform', value)} />
@@ -1812,8 +1859,11 @@ const Drawer: React.FC<{
   onClose: () => void;
   children: React.ReactNode;
 }> = ({ title, onClose, children }) => (
-  <div className="absolute inset-0 z-30 flex justify-end bg-black/30">
-    <aside className="h-full w-full max-w-xl overflow-y-auto border-l border-border bg-background shadow-xl">
+  <div className="absolute inset-0 z-30 flex justify-end bg-black/30" onMouseDown={onClose}>
+    <aside
+      className="h-full w-full max-w-xl overflow-y-auto border-l border-border bg-background shadow-xl"
+      onMouseDown={(event) => event.stopPropagation()}
+    >
       <div className="sticky top-0 z-10 flex items-center gap-3 border-b border-border bg-background px-4 py-3">
         <h2 className="min-w-0 flex-1 truncate text-base font-semibold">{title}</h2>
         <button
