@@ -11,6 +11,12 @@ import {
   isCreatorBoardMoveDirection,
   isCreatorProductionAssetSource,
 } from '../../../shared/creatorStudio/constants';
+import type {
+  CreatorAssetUpdateInput,
+  CreatorBoardCardCreateInput,
+  CreatorBoardCardUpdateInput,
+  CreatorBrandKitUpdateInput,
+} from '../../../shared/creatorStudio/types';
 import type { CreatorAssetStore } from '../../creatorAssetStore';
 
 type CreatorStudioIpcResponse<T> = {
@@ -153,16 +159,27 @@ export const registerCreatorStudioIpcHandlers = (
       if (!assetId) {
         return { success: false, error: 'assetId is required' };
       }
-      const asset = getCreatorAssetStore().updateAsset({
+      const licenseNote = record.licenseNote === null
+        ? null
+        : typeof record.licenseNote === 'string'
+          ? record.licenseNote
+          : undefined;
+      const usageNote = record.usageNote === null
+        ? null
+        : typeof record.usageNote === 'string'
+          ? record.usageNote
+          : undefined;
+      const updateInput: CreatorAssetUpdateInput = {
         assetId,
         ...(toTrimmedString(record.projectId) ? { projectId: toTrimmedString(record.projectId)! } : {}),
         ...(typeof record.favorite === 'boolean' ? { favorite: record.favorite } : {}),
         ...(isCreatorAssetAdoptionStatus(record.adoptionStatus) ? { adoptionStatus: record.adoptionStatus } : {}),
         ...(normalizeStringArray(record.tags) ? { tags: normalizeStringArray(record.tags)! } : {}),
-        ...(record.licenseNote === null || typeof record.licenseNote === 'string' ? { licenseNote: record.licenseNote } : {}),
-        ...(record.usageNote === null || typeof record.usageNote === 'string' ? { usageNote: record.usageNote } : {}),
+        ...(licenseNote !== undefined ? { licenseNote } : {}),
+        ...(usageNote !== undefined ? { usageNote } : {}),
         ...(typeof record.selected === 'boolean' ? { selected: record.selected } : {}),
-      });
+      };
+      const asset = getCreatorAssetStore().updateAsset(updateInput);
       if (!asset) {
         return { success: false, error: 'Asset not found' };
       }
@@ -413,18 +430,31 @@ export const registerCreatorStudioIpcHandlers = (
       if (!boardId || !title || !isCreatorBoardCardKind(record.kind)) {
         return { success: false, error: 'boardId, kind, and title are required' };
       }
-      const card = getCreatorAssetStore().addBoardCard({
+      const groupName = record.groupName === null
+        ? null
+        : typeof record.groupName === 'string'
+          ? record.groupName
+          : undefined;
+      const notes = record.notes === null
+        ? null
+        : typeof record.notes === 'string'
+          ? record.notes
+          : undefined;
+      const promptSpec = normalizeObject(record.promptSpec);
+      const direction = normalizeDirection(record.direction);
+      const createInput: CreatorBoardCardCreateInput = {
         boardId,
         kind: record.kind,
         title,
         ...(toTrimmedString(record.assetId) ? { assetId: toTrimmedString(record.assetId)! } : {}),
         ...(toTrimmedString(record.caseId) ? { caseId: toTrimmedString(record.caseId)! } : {}),
         ...(typeof record.promptText === 'string' ? { promptText: record.promptText } : {}),
-        ...(normalizeObject(record.promptSpec) ? { promptSpec: normalizeObject(record.promptSpec)! } : {}),
-        ...(normalizeDirection(record.direction) ? { direction: normalizeDirection(record.direction)! } : {}),
-        ...(record.groupName === null || typeof record.groupName === 'string' ? { groupName: record.groupName } : {}),
-        ...(record.notes === null || typeof record.notes === 'string' ? { notes: record.notes } : {}),
-      });
+        ...(promptSpec ? { promptSpec } : {}),
+        ...(direction ? { direction } : {}),
+        ...(groupName !== undefined ? { groupName } : {}),
+        ...(notes !== undefined ? { notes } : {}),
+      };
+      const card = getCreatorAssetStore().addBoardCard(createInput);
       return { success: true, card };
     } catch (error) {
       return {
@@ -441,13 +471,25 @@ export const registerCreatorStudioIpcHandlers = (
       if (!cardId) {
         return { success: false, error: 'cardId is required' };
       }
-      const card = getCreatorAssetStore().updateBoardCard({
+      const groupName = record.groupName === null
+        ? null
+        : typeof record.groupName === 'string'
+          ? record.groupName
+          : undefined;
+      const notes = record.notes === null
+        ? null
+        : typeof record.notes === 'string'
+          ? record.notes
+          : undefined;
+      const direction = normalizeDirection(record.direction);
+      const updateInput: CreatorBoardCardUpdateInput = {
         cardId,
         ...(typeof record.title === 'string' ? { title: record.title } : {}),
-        ...(record.groupName === null || typeof record.groupName === 'string' ? { groupName: record.groupName } : {}),
-        ...(record.notes === null || typeof record.notes === 'string' ? { notes: record.notes } : {}),
-        ...(normalizeDirection(record.direction) ? { direction: normalizeDirection(record.direction)! } : {}),
-      });
+        ...(groupName !== undefined ? { groupName } : {}),
+        ...(notes !== undefined ? { notes } : {}),
+        ...(direction ? { direction } : {}),
+      };
+      const card = getCreatorAssetStore().updateBoardCard(updateInput);
       if (!card) return { success: false, error: 'Card not found' };
       return { success: true, card };
     } catch (error) {
@@ -543,12 +585,12 @@ export const registerCreatorStudioIpcHandlers = (
         workspace: getCreatorAssetStore().updateBrandKit({
           projectId,
           ...(normalizeStringArray(record.colors) ? { colors: normalizeStringArray(record.colors)! } : {}),
-          ...(record.logoAssetId === null || typeof record.logoAssetId === 'string' ? { logoAssetId: record.logoAssetId } : {}),
-          ...(record.logoPath === null || typeof record.logoPath === 'string' ? { logoPath: record.logoPath } : {}),
+          ...(record.logoAssetId === null ? { logoAssetId: null } : typeof record.logoAssetId === 'string' ? { logoAssetId: record.logoAssetId } : {}),
+          ...(record.logoPath === null ? { logoPath: null } : typeof record.logoPath === 'string' ? { logoPath: record.logoPath } : {}),
           ...(normalizeStringArray(record.bannedWords) ? { bannedWords: normalizeStringArray(record.bannedWords)! } : {}),
           ...(typeof record.tone === 'string' ? { tone: record.tone } : {}),
           ...(typeof record.visualPreferences === 'string' ? { visualPreferences: record.visualPreferences } : {}),
-        }),
+        } satisfies CreatorBrandKitUpdateInput),
       };
     } catch (error) {
       return {
