@@ -1,4 +1,10 @@
-import type { CreatorBuilderMaterial, CreatorCreativeDirection, CreatorPromptMaterial, CreatorPromptSpec } from '../types/creatorStudio';
+import type {
+  CreatorBuilderMaterial,
+  CreatorCreativeDirection,
+  CreatorPromptMaterial,
+  CreatorPromptSpec,
+  CreatorTemplateFieldSchema,
+} from '../types/creatorStudio';
 import { CreatorMaterialRole } from '../types/creatorStudio';
 import { CreatorPromptSourceMode } from '../types/creatorStudio';
 import { CreatorStudioSourceType } from '../types/creatorStudio';
@@ -41,6 +47,7 @@ export interface CreatorPromptSeed {
   scenes?: string[];
   templateGuidance?: string[];
   templatePitfalls?: string[];
+  templateFieldSchema?: CreatorTemplateFieldSchema[];
   variantOfAssetId?: string;
 }
 
@@ -64,6 +71,7 @@ export interface CreatorPromptForm {
   aspectRatio: string;
   outputCount: string;
   negativeRequirements: string;
+  templateFieldValues: Record<string, string>;
 }
 
 export const CREATOR_MATERIAL_ROLE_LABELS: Record<CreatorMaterialRole, { zh: string; en: string }> = {
@@ -81,7 +89,21 @@ export const normalizePromptLanguage = (
   if (uiLanguage === 'zh') {
     return 'zh';
   }
-  return Object.values(form).some((value) => /[\u3400-\u9fff]/.test(value)) ? 'zh' : 'en';
+  const values = [
+    form.taskType,
+    form.subject,
+    form.platform,
+    form.audience,
+    form.mainObject,
+    form.requiredText,
+    form.visualStyle,
+    form.colorPreference,
+    form.aspectRatio,
+    form.outputCount,
+    form.negativeRequirements,
+    ...Object.values(form.templateFieldValues),
+  ];
+  return values.some((value) => /[\u3400-\u9fff]/.test(value)) ? 'zh' : 'en';
 };
 
 export const buildPromptSpec = (
@@ -117,6 +139,8 @@ export const buildPromptSpec = (
     },
     templateGuidance: seed?.templateGuidance ?? [],
     templatePitfalls: seed?.templatePitfalls ?? [],
+    templateFieldValues: form.templateFieldValues,
+    templateFieldSchema: seed?.templateFieldSchema,
     referencePrompt: seed?.referencePrompt,
     templateId: seed?.templateId,
     variantOfAssetId: seed?.variantOfAssetId,
@@ -172,6 +196,7 @@ const renderChinesePrompt = (spec: CreatorPromptSpec): string[] => [
   spec.outputCount ? `输出数量：${spec.outputCount}` : '',
   spec.templateGuidance.length > 0 ? `模板建议：\n${spec.templateGuidance.map((item) => `- ${item}`).join('\n')}` : '',
   spec.templatePitfalls.length > 0 ? `避免问题：\n${spec.templatePitfalls.map((item) => `- ${item}`).join('\n')}` : '',
+  renderTemplateFieldLines(spec),
   spec.constraints.negativeRequirements ? `负向要求：${spec.constraints.negativeRequirements}` : '',
   spec.contextPack ? `Context Pack：\n${spec.contextPack}` : '',
   spec.selectedCreativeDirection ? `已选择创意方向：\n${renderSelectedDirection(spec.selectedCreativeDirection, spec.language)}` : '',
@@ -337,6 +362,7 @@ const renderEnglishPrompt = (spec: CreatorPromptSpec): string[] => [
   spec.outputCount ? `Output count: ${spec.outputCount}` : '',
   spec.templateGuidance.length > 0 ? `Template guidance:\n${spec.templateGuidance.map((item) => `- ${item}`).join('\n')}` : '',
   spec.templatePitfalls.length > 0 ? `Avoid:\n${spec.templatePitfalls.map((item) => `- ${item}`).join('\n')}` : '',
+  renderTemplateFieldLines(spec),
   spec.constraints.negativeRequirements ? `Negative requirements: ${spec.constraints.negativeRequirements}` : '',
   spec.contextPack ? `Context Pack:\n${spec.contextPack}` : '',
   spec.selectedCreativeDirection ? `Selected creative direction:\n${renderSelectedDirection(spec.selectedCreativeDirection, spec.language)}` : '',
@@ -483,6 +509,23 @@ const renderDirectionLines = (directions: CreatorCreativeDirection[]): string =>
     `   promptFocus: ${direction.promptFocus}`,
   ].join('\n')).join('\n')
 );
+
+const renderTemplateFieldLines = (spec: CreatorPromptSpec): string => {
+  const fieldSchema = spec.templateFieldSchema ?? [];
+  const values = fieldSchema
+    .map((field) => ({
+      label: field.label[spec.language],
+      value: spec.templateFieldValues[field.id]?.trim() ?? '',
+    }))
+    .filter((item) => item.value.length > 0);
+  if (values.length === 0) {
+    return '';
+  }
+  const body = values.map((item) => `- ${item.label}: ${item.value}`).join('\n');
+  return spec.language === 'zh'
+    ? `模板动态字段：\n${body}`
+    : `Template fields:\n${body}`;
+};
 
 const renderSelectedDirection = (
   direction: CreatorCreativeDirection,

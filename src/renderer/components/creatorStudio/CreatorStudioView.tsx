@@ -45,8 +45,9 @@ import type {
   CreatorStudioManifest,
   CreatorStudioStyleLibrary,
   CreatorStudioTemplate,
+  CreatorTemplateFieldSchema,
 } from '../../types/creatorStudio';
-import { CreatorMaterialRole, CreatorMaterialSource, CreatorPromptSourceMode, CreatorStudioSourceType } from '../../types/creatorStudio';
+import { CreatorMaterialRole, CreatorMaterialSource, CreatorPromptSourceMode, CreatorStudioSourceType, CreatorTemplateFieldKind } from '../../types/creatorStudio';
 import { compileCreatorPrompt, CreatorPromptCompileTarget } from '../../utils/creatorPromptCompiler';
 import { CreatorPromptLintSeverity, lintCreatorPromptSpec } from '../../utils/creatorPromptLint';
 import { toCreatorPromptSpecSnapshot } from '../../utils/creatorPromptSpecAdapter';
@@ -62,6 +63,7 @@ import {
   renderCreatorPrompt,
   selectCreatorCreativeDirection,
 } from '../../utils/creatorStudio';
+import { getCreatorTemplateFieldSchema } from '../../utils/creatorTemplateFields';
 import { CreatorAssetGrid } from './CreatorAssetGrid';
 import { CreatorBatchPanel } from './CreatorBatchPanel';
 import { CreatorBoard } from './CreatorBoard';
@@ -136,6 +138,7 @@ const defaultBuilderForm: CreatorPromptForm = {
   aspectRatio: '1:1',
   outputCount: '1',
   negativeRequirements: '',
+  templateFieldValues: {},
 };
 
 const dispatchToast = (message: string) => {
@@ -409,6 +412,7 @@ const CreatorStudioView: React.FC<CreatorStudioViewProps> = ({
       scenes: template.scenes,
       templateGuidance: template.guidance[i18nService.getLanguage()],
       templatePitfalls: template.pitfalls[i18nService.getLanguage()],
+      templateFieldSchema: getCreatorTemplateFieldSchema(template),
     });
     setBuilderForm({
       ...defaultBuilderForm,
@@ -453,6 +457,12 @@ const CreatorStudioView: React.FC<CreatorStudioViewProps> = ({
       aspectRatio: asset.promptSpec?.constraints?.aspectRatio ?? '1:1',
       outputCount: typeof asset.promptSpec?.outputCount === 'string' ? asset.promptSpec.outputCount : '1',
       negativeRequirements: asset.promptSpec?.constraints?.negativeRequirements ?? '',
+      templateFieldValues: typeof asset.promptSpec?.templateFieldValues === 'object' && asset.promptSpec.templateFieldValues
+        ? Object.fromEntries(
+          Object.entries(asset.promptSpec.templateFieldValues)
+            .filter(([, value]) => typeof value === 'string')
+        ) as Record<string, string>
+        : {},
     });
     if (asset.kind === CreatorProductionAssetKind.Image) {
       setBuilderMaterials((items) => [{
@@ -1309,6 +1319,7 @@ const PromptBuilder: React.FC<{
   const seedreamReady = seedreamStatus === SeedreamStatus.Configured;
   const seedreamHint = getSeedreamStatusHint(seedreamStatus);
   const sourceMode = promptSpec.sourceMode ?? CreatorPromptSourceMode.Blank;
+  const templateFieldSchema = seed?.templateFieldSchema ?? [];
 
   useEffect(() => {
     setSelectedDirectionId(null);
@@ -1316,6 +1327,16 @@ const PromptBuilder: React.FC<{
 
   const updateField = (field: keyof CreatorPromptForm, value: string) => {
     onFormChange({ ...form, [field]: value });
+  };
+
+  const updateTemplateField = (fieldId: string, value: string) => {
+    onFormChange({
+      ...form,
+      templateFieldValues: {
+        ...form.templateFieldValues,
+        [fieldId]: value,
+      },
+    });
   };
 
   const submitProject = async () => {
@@ -1424,6 +1445,19 @@ const PromptBuilder: React.FC<{
           <BuilderInput label={i18nService.t('creatorFieldPlatform')} value={form.platform} onChange={(value) => updateField('platform', value)} />
           <BuilderInput label={i18nService.t('creatorFieldAudience')} value={form.audience} onChange={(value) => updateField('audience', value)} />
         </BuilderSection>
+        {templateFieldSchema.length > 0 && (
+          <BuilderSection title={i18nService.t('creatorBuilderSectionTemplateFields')}>
+            <p className="text-xs leading-5 text-muted">{i18nService.t('creatorBuilderTemplateFieldsHint')}</p>
+            {templateFieldSchema.map((field) => (
+              <TemplateFieldInput
+                key={field.id}
+                field={field}
+                value={form.templateFieldValues[field.id] ?? ''}
+                onChange={(value) => updateTemplateField(field.id, value)}
+              />
+            ))}
+          </BuilderSection>
+        )}
         <BuilderSection title={i18nService.t('creatorBuilderSectionComposition')}>
           <BuilderInput label={i18nService.t('creatorFieldMainObject')} value={form.mainObject} onChange={(value) => updateField('mainObject', value)} />
           <BuilderInput label={i18nService.t('creatorFieldAspectRatio')} value={form.aspectRatio} onChange={(value) => updateField('aspectRatio', value)} />
@@ -1893,6 +1927,64 @@ const BuilderTextarea: React.FC<{
     />
   </label>
 );
+
+const TemplateFieldInput: React.FC<{
+  field: CreatorTemplateFieldSchema;
+  value: string;
+  onChange: (value: string) => void;
+}> = ({ field, value, onChange }) => {
+  const language = i18nService.getLanguage();
+  const label = field.label[language];
+  const placeholder = field.placeholder?.[language] ?? '';
+  const help = field.help?.[language] ?? '';
+  if (field.kind === CreatorTemplateFieldKind.Textarea) {
+    return (
+      <label className="block">
+        <span className="text-xs font-medium text-secondary">{label}</span>
+        {help && <span className="mt-1 block text-[11px] leading-4 text-muted">{help}</span>}
+        <textarea
+          value={value}
+          onChange={(event) => onChange(event.target.value)}
+          placeholder={placeholder}
+          rows={3}
+          className="mt-1 w-full resize-none rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none focus:border-primary"
+        />
+      </label>
+    );
+  }
+  if (field.kind === CreatorTemplateFieldKind.Select) {
+    return (
+      <label className="block">
+        <span className="text-xs font-medium text-secondary">{label}</span>
+        {help && <span className="mt-1 block text-[11px] leading-4 text-muted">{help}</span>}
+        <select
+          value={value}
+          onChange={(event) => onChange(event.target.value)}
+          className="mt-1 h-10 w-full rounded-lg border border-border bg-background px-3 text-sm outline-none focus:border-primary"
+        >
+          <option value="">{i18nService.t('creatorTemplateFieldEmpty')}</option>
+          {(field.options ?? []).map((option) => (
+            <option key={option.value} value={option.value}>
+              {option.label[language]}
+            </option>
+          ))}
+        </select>
+      </label>
+    );
+  }
+  return (
+    <label className="block">
+      <span className="text-xs font-medium text-secondary">{label}</span>
+      {help && <span className="mt-1 block text-[11px] leading-4 text-muted">{help}</span>}
+      <input
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        placeholder={placeholder}
+        className="mt-1 h-10 w-full rounded-lg border border-border bg-background px-3 text-sm outline-none focus:border-primary"
+      />
+    </label>
+  );
+};
 
 const CaseDrawer: React.FC<{
   item: CreatorStudioCase;

@@ -69,6 +69,7 @@ export interface CreatorStudioTemplate {
   guidance: Record<'en' | 'zh', string[]>;
   pitfalls: Record<'en' | 'zh', string[]>;
   exampleCases: number[];
+  fieldSchema?: CreatorTemplateFieldSchema[];
 }
 
 export interface CreatorStudioStyleLibrary {
@@ -150,6 +151,29 @@ export const CreatorMaterialSource = {
 
 export type CreatorMaterialSource = typeof CreatorMaterialSource[keyof typeof CreatorMaterialSource];
 
+export const CreatorTemplateFieldKind = {
+  Text: 'text',
+  Textarea: 'textarea',
+  Select: 'select',
+} as const;
+
+export type CreatorTemplateFieldKind =
+  typeof CreatorTemplateFieldKind[keyof typeof CreatorTemplateFieldKind];
+
+export interface CreatorTemplateFieldOption {
+  value: string;
+  label: LocalizedText;
+}
+
+export interface CreatorTemplateFieldSchema {
+  id: string;
+  kind: CreatorTemplateFieldKind;
+  label: LocalizedText;
+  help?: LocalizedText;
+  placeholder?: LocalizedText;
+  options?: CreatorTemplateFieldOption[];
+}
+
 export interface CreatorBuilderMaterial {
   id: string;
   role: CreatorMaterialRole;
@@ -208,6 +232,8 @@ export interface CreatorPromptSpec {
   };
   templateGuidance: string[];
   templatePitfalls: string[];
+  templateFieldValues: Record<string, string>;
+  templateFieldSchema?: CreatorTemplateFieldSchema[];
   referencePrompt?: string;
   templateId?: string;
   materials?: CreatorPromptMaterial[];

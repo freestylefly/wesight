@@ -34,6 +34,8 @@ export interface CreatorPromptSpecSnapshot {
   constraints?: Record<string, string | undefined>;
   templateGuidance?: string[];
   templatePitfalls?: string[];
+  templateFieldValues?: Record<string, string>;
+  templateFields?: CreatorPromptSpecTemplateFieldSnapshot[];
   referencePrompt?: string;
   templateId?: string;
   materials?: Array<{
@@ -72,6 +74,7 @@ export interface CreatorPromptSpecSnapshot {
   text?: CreatorPromptSpecTextV1;
   output?: CreatorPromptSpecOutputV1;
   runtime?: CreatorPromptSpecRuntimeV1;
+  template?: CreatorPromptSpecTemplateV1;
   provenance?: CreatorPromptSpecProvenanceV1;
   [key: string]: unknown;
 }
@@ -121,6 +124,20 @@ export interface CreatorPromptSpecRuntimeV1 {
   activeSkillIds?: string[];
   missingSkillIds?: string[];
   requestImageGeneration?: boolean;
+}
+
+export interface CreatorPromptSpecTemplateFieldSnapshot {
+  id: string;
+  label: {
+    zh: string;
+    en: string;
+  };
+  value: string;
+}
+
+export interface CreatorPromptSpecTemplateV1 {
+  templateId: string | null;
+  fields: CreatorPromptSpecTemplateFieldSnapshot[];
 }
 
 export interface CreatorPromptSpecProvenanceV1 {

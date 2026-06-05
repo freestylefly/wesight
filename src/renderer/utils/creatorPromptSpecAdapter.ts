@@ -22,9 +22,17 @@ export const toCreatorPromptSpecSnapshot = (
   const aspectRatio = spec.constraints.aspectRatio ?? '';
   const requiredText = spec.constraints.requiredText ?? '';
   const negativeRequirements = spec.constraints.negativeRequirements ?? '';
+  const templateFields = (spec.templateFieldSchema ?? [])
+    .map((field) => ({
+      id: field.id,
+      label: field.label,
+      value: spec.templateFieldValues[field.id]?.trim() ?? '',
+    }))
+    .filter((field) => field.value.length > 0);
   return {
     ...spec,
     schemaVersion: CreatorPromptSpecSchemaVersion.V1,
+    templateFields,
     source: {
       mode: sourceMode,
       sourceType: spec.sourceType,
@@ -61,6 +69,10 @@ export const toCreatorPromptSpecSnapshot = (
       count: spec.outputCount,
     },
     runtime,
+    template: {
+      templateId: spec.templateId ?? null,
+      fields: templateFields,
+    },
     provenance: {
       templateId: spec.templateId ?? null,
       caseIds: spec.caseIds,

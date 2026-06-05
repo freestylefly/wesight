@@ -1,6 +1,12 @@
 import { describe, expect, test } from 'vitest';
 
-import { type CreatorBuilderMaterial, CreatorMaterialRole, CreatorMaterialSource, CreatorStudioSourceType } from '../types/creatorStudio';
+import {
+  type CreatorBuilderMaterial,
+  CreatorMaterialRole,
+  CreatorMaterialSource,
+  CreatorStudioSourceType,
+  CreatorTemplateFieldKind,
+} from '../types/creatorStudio';
 import {
   buildPromptSpec,
   type CreatorPromptForm,
@@ -22,6 +28,7 @@ const createPromptForm = (overrides: Partial<CreatorPromptForm> = {}): CreatorPr
   aspectRatio: '',
   outputCount: '1',
   negativeRequirements: '',
+  templateFieldValues: {},
   ...overrides,
 });
 
@@ -51,6 +58,11 @@ describe('creator studio prompt utilities', () => {
       scenes: ['Campaign'],
       templateGuidance: ['Lock hierarchy and readable text.'],
       templatePitfalls: ['Avoid generic layouts.'],
+      templateFieldSchema: [{
+        id: 'headline',
+        kind: CreatorTemplateFieldKind.Text,
+        label: { en: 'Headline', zh: '主标题' },
+      }],
     }, createPromptForm({
       subject: 'Spring launch',
       platform: 'Xiaohongshu cover',
@@ -58,6 +70,9 @@ describe('creator studio prompt utilities', () => {
       visualStyle: 'Bold editorial poster',
       aspectRatio: '3:4',
       negativeRequirements: 'No unreadable text',
+      templateFieldValues: {
+        headline: 'NEW DROP',
+      },
     }), 'en', 'Blank builder');
 
     expect(spec.templateId).toBe('poster-system');
@@ -72,6 +87,8 @@ describe('creator studio prompt utilities', () => {
 
     const prompt = renderCreatorPrompt(spec);
     expect(prompt).toContain('Template guidance');
+    expect(prompt).toContain('Template fields');
+    expect(prompt).toContain('Headline: NEW DROP');
     expect(prompt).toContain('Avoid generic layouts.');
   });
 

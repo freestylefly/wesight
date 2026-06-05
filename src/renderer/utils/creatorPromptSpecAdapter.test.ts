@@ -4,6 +4,7 @@ import {
   CreatorPromptSourceMode,
   type CreatorPromptSpec,
   CreatorStudioSourceType,
+  CreatorTemplateFieldKind,
 } from '../types/creatorStudio';
 import { CreatorPromptSpecSchemaVersion, toCreatorPromptSpecSnapshot } from './creatorPromptSpecAdapter';
 
@@ -32,6 +33,14 @@ const createPromptSpec = (overrides: Partial<CreatorPromptSpec> = {}): CreatorPr
   },
   templateGuidance: ['Keep text readable.'],
   templatePitfalls: ['Avoid generic layouts.'],
+  templateFieldValues: {
+    headline: 'NEW DROP',
+  },
+  templateFieldSchema: [{
+    id: 'headline',
+    kind: CreatorTemplateFieldKind.Text,
+    label: { en: 'Headline', zh: '主标题' },
+  }],
   templateId: 'poster-system',
   ...overrides,
 });
@@ -66,6 +75,14 @@ describe('creator prompt spec adapter', () => {
     expect(snapshot.text).toMatchObject({
       requiredText: 'NEW DROP',
       negativeRequirements: 'No unreadable text',
+    });
+    expect(snapshot.template).toMatchObject({
+      templateId: 'poster-system',
+      fields: [{
+        id: 'headline',
+        label: { en: 'Headline', zh: '主标题' },
+        value: 'NEW DROP',
+      }],
     });
   });
 });

@@ -26,6 +26,7 @@ const createPromptSpec = (overrides: Partial<CreatorPromptSpec> = {}): CreatorPr
   },
   templateGuidance: [],
   templatePitfalls: [],
+  templateFieldValues: {},
   ...overrides,
 });
 

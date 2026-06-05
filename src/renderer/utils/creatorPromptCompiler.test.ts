@@ -6,6 +6,7 @@ import {
   CreatorMaterialSource,
   CreatorPromptSourceMode,
   CreatorStudioSourceType,
+  CreatorTemplateFieldKind,
 } from '../types/creatorStudio';
 import {
   compileCreatorDirectionPrompt,
@@ -27,6 +28,9 @@ const createPromptForm = (overrides: Partial<CreatorPromptForm> = {}): CreatorPr
   aspectRatio: '4:5',
   outputCount: '2',
   negativeRequirements: 'No unreadable text',
+  templateFieldValues: {
+    headline: 'NEW DROP',
+  },
   ...overrides,
 });
 
@@ -41,6 +45,11 @@ const createPromptSpec = () => buildPromptSpec({
   scenes: ['Campaign'],
   templateGuidance: ['Keep text readable.'],
   templatePitfalls: ['Avoid generic layouts.'],
+  templateFieldSchema: [{
+    id: 'headline',
+    kind: CreatorTemplateFieldKind.Text,
+    label: { en: 'Headline', zh: '主标题' },
+  }],
 }, createPromptForm(), 'en', 'Blank builder');
 
 describe('creator prompt compiler', () => {
@@ -53,6 +62,8 @@ describe('creator prompt compiler', () => {
     expect(compiled.target).toBe(CreatorPromptCompileTarget.CopyText);
     expect(compiled.promptText).toContain('Generate a professional visual image.');
     expect(compiled.promptText).toContain('Task type: Campaign image');
+    expect(compiled.promptText).toContain('Template fields');
+    expect(compiled.promptText).toContain('Headline: NEW DROP');
     expect(compiled.promptSpec.schemaVersion).toBe(CreatorPromptSpecSchemaVersion.V1);
     expect(compiled.promptSpec.templateId).toBe('poster-system');
     expect(compiled.promptSpec.source).toMatchObject({
