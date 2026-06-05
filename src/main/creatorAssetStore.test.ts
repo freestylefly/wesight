@@ -84,6 +84,34 @@ Prompt:
 Generate a product card.
 \`\`\``;
 
+const creatorBatchDraft = `General intro
+
+[Creator Studio]
+
+batchRunId: batch-run-1
+batchTaskId: batch-task-1
+templateId: poster-system
+caseIds: case-1
+
+PromptSpec:
+\`\`\`json
+{
+  "templateId": "poster-system",
+  "caseIds": ["case-1"],
+  "sourceTitle": "Batch Task",
+  "batch": {
+    "batchRunId": "batch-run-1",
+    "batchTaskId": "batch-task-1",
+    "modelId": "seedream-image"
+  }
+}
+\`\`\`
+
+Prompt:
+\`\`\`text
+Generate a batch visual.
+\`\`\``;
+
 beforeEach(() => {
   db = new Database(':memory:');
   createCoworkTables();
@@ -104,6 +132,13 @@ describe('CreatorAssetStore', () => {
     expect(context?.promptText).toBe('Generate a poster.');
     expect(context?.promptSpec?.sourceTitle).toBe('Poster System');
     expect(context?.variantOfAssetId).toBe('asset-parent');
+  });
+
+  test('parses creator batch ids from cowork draft', () => {
+    const context = parseCreatorStudioSourceContext(creatorBatchDraft);
+
+    expect(context?.batchRunId).toBe('batch-run-1');
+    expect(context?.batchTaskId).toBe('batch-task-1');
   });
 
   test('creates run from creator draft and ingests generated image asset', () => {
@@ -564,5 +599,123 @@ describe('CreatorAssetStore', () => {
     const retried = store.retryBatchTask(firstTask.id);
     expect(retried?.status).toBe(CreatorBatchRunStatus.Running);
     expect(retried?.tasks.find((task) => task.id === firstTask.id)?.status).toBe(CreatorBatchTaskStatus.Pending);
+  });
+
+  test('rejects unsupported or oversized batch model plans', () => {
+    const workspace = store.createProject({ name: 'Batch Guard Project' });
+    const baseInput = {
+      projectId: workspace.currentProjectId,
+      briefTitle: 'Guard batch',
+      promptSpec: { sourceTitle: 'Guard batch', constraints: { aspectRatio: '1:1' } },
+      promptText: 'Generate a guarded visual.',
+      directions: [{
+        id: 'route-a',
+        title: 'Route A',
+        template: 'Poster',
+        style: 'Clean',
+        reason: 'Baseline',
+        promptFocus: 'Simple layout.',
+        promptText: 'Generate route A.',
+        promptSpec: { sourceTitle: 'Route A', constraints: { aspectRatio: '1:1' } },
+      }],
+      templateIds: ['poster-system'],
+      sizes: ['1:1'],
+    };
+
+    expect(() => store.createBatchRun({
+      ...baseInput,
+      modelIds: ['seedance-video'],
+    })).toThrow('Model does not support batch');
+
+    expect(() => store.createBatchRun({
+      ...baseInput,
+      directions: Array.from({ length: 6 }, (_, index) => ({
+        ...baseInput.directions[0],
+        id: `route-${index}`,
+        title: `Route ${index}`,
+      })),
+      modelIds: ['seedream-image'],
+      templateIds: ['poster-system', 'product-card', 'campaign-poster'],
+      sizes: ['1:1', '4:5', '16:9', '3:2', '9:16'],
+    })).toThrow('Batch task count exceeds model limit');
+  });
+
+  test('marks batch tasks completed from generated images and failed from store API', () => {
+    db.prepare('INSERT INTO cowork_sessions (id, title, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?)')
+      .run('session-1', 'Creative Producer', 'running', 1, 1);
+
+    const workspace = store.createProject({ name: 'Batch Completion Project' });
+    const batchRun = store.createBatchRun({
+      projectId: workspace.currentProjectId,
+      briefTitle: 'Completion batch',
+      promptSpec: { sourceTitle: 'Completion batch', constraints: { aspectRatio: '1:1' } },
+      promptText: 'Generate a completion visual.',
+      directions: [{
+        id: 'route-a',
+        title: 'Route A',
+        template: 'Poster',
+        style: 'Clean',
+        reason: 'Baseline',
+        promptFocus: 'Simple layout.',
+        promptText: 'Generate route A.',
+        promptSpec: { sourceTitle: 'Route A', constraints: { aspectRatio: '1:1' } },
+      }],
+      modelIds: ['seedream-image'],
+      templateIds: ['poster-system'],
+      sizes: ['1:1', '16:9'],
+    });
+    const [firstTask, secondTask] = batchRun.tasks;
+
+    store.handleCoworkMessageInserted({
+      sessionId: 'session-1',
+      message: {
+        id: 'message-user',
+        type: 'user',
+        content: [
+          '[Creator Studio]',
+          '',
+          `batchRunId: ${batchRun.id}`,
+          `batchTaskId: ${firstTask.id}`,
+          `templateId: ${firstTask.templateId}`,
+          '',
+          'PromptSpec:',
+          '```json',
+          JSON.stringify(firstTask.promptSpec, null, 2),
+          '```',
+          '',
+          'Prompt:',
+          '```text',
+          firstTask.promptText,
+          '```',
+        ].join('\n'),
+        timestamp: 10,
+        sequence: 1,
+      },
+    });
+    store.handleCoworkMessageInserted({
+      sessionId: 'session-1',
+      message: {
+        id: 'message-assistant',
+        type: 'assistant',
+        content: 'Generated image',
+        timestamp: 20,
+        sequence: 2,
+        metadata: {
+          generatedImages: [{ path: '/tmp/generated-batch.png' }],
+        },
+      },
+    });
+
+    const completed = store.getBatchRun(batchRun.id);
+    const completedTask = completed?.tasks.find((task) => task.id === firstTask.id);
+    expect(completedTask?.status).toBe(CreatorBatchTaskStatus.Completed);
+    expect(completedTask?.assetIds).toHaveLength(1);
+    expect(completed?.status).toBe(CreatorBatchRunStatus.Running);
+
+    const failed = store.failBatchTask({ taskId: secondTask.id, error: 'Provider timeout' });
+    const failedTask = failed?.tasks.find((task) => task.id === secondTask.id);
+    expect(failedTask?.status).toBe(CreatorBatchTaskStatus.Failed);
+    expect(failedTask?.error).toBe('Provider timeout');
+    expect(failed?.status).toBe(CreatorBatchRunStatus.PartialFailed);
   });
 });

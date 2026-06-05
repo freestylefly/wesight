@@ -590,6 +590,8 @@ contextBridge.exposeInMainWorld('electron', {
       ipcRenderer.invoke(CreatorStudioIpcChannel.BatchTaskRetry, taskId),
     skipBatchTask: (taskId: string) =>
       ipcRenderer.invoke(CreatorStudioIpcChannel.BatchTaskSkip, taskId),
+    failBatchTask: (input: Record<string, unknown>) =>
+      ipcRenderer.invoke(CreatorStudioIpcChannel.BatchTaskFail, input),
   },
   dialog: {
     selectDirectory: () => ipcRenderer.invoke('dialog:selectDirectory'),

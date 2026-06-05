@@ -23,6 +23,7 @@ import type {
   CreatorBatchRunListInput,
   CreatorBatchRunListResult,
   CreatorBatchRunRecord,
+  CreatorBatchTaskFailInput,
   CreatorBoardCardCreateInput,
   CreatorBoardCardMoveInput,
   CreatorBoardCardRecord,
@@ -928,6 +929,11 @@ interface IElectronAPI {
       error?: string;
     }>;
     skipBatchTask: (taskId: string) => Promise<{
+      success: boolean;
+      batchRun?: CreatorBatchRunRecord;
+      error?: string;
+    }>;
+    failBatchTask: (input: CreatorBatchTaskFailInput) => Promise<{
       success: boolean;
       batchRun?: CreatorBatchRunRecord;
       error?: string;

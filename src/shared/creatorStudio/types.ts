@@ -69,6 +69,8 @@ export interface CreatorStudioSourceContext {
   promptText: string;
   sourceTitle: string | null;
   variantOfAssetId: string | null;
+  batchRunId: string | null;
+  batchTaskId: string | null;
 }
 
 export interface CreatorProductionRunRecord {
@@ -379,6 +381,11 @@ export interface CreatorBatchRunCreateInput {
   modelIds: string[];
   templateIds: string[];
   sizes: string[];
+}
+
+export interface CreatorBatchTaskFailInput {
+  taskId: string;
+  error: string;
 }
 
 export interface CreatorBatchRunListInput {

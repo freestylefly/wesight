@@ -44,6 +44,13 @@ const createStore = () => ({
   selectBoardCard: vi.fn(),
   buildBoardContextPack: vi.fn(() => ({ boardId: 'board-1', cardIds: [], contextPack: '' })),
   updateBrandKit: vi.fn(() => ({ projectId: 'project-1', currentBoardId: 'board-1', boards: [], cards: [], selectedCardIds: [], brandKit: null })),
+  listCreativeModelCapabilities: vi.fn(() => []),
+  createBatchRun: vi.fn(() => ({ id: 'batch-1', projectId: 'project-1', tasks: [] })),
+  listBatchRuns: vi.fn(() => ({ runs: [], total: 0 })),
+  getBatchRun: vi.fn(() => ({ id: 'batch-1', projectId: 'project-1', tasks: [] })),
+  retryBatchTask: vi.fn(() => ({ id: 'batch-1', projectId: 'project-1', tasks: [] })),
+  skipBatchTask: vi.fn(() => ({ id: 'batch-1', projectId: 'project-1', tasks: [] })),
+  failBatchTask: vi.fn(() => ({ id: 'batch-1', projectId: 'project-1', tasks: [] })),
 }) as unknown as CreatorAssetStore;
 
 beforeEach(() => {
@@ -76,6 +83,13 @@ test('registers creator studio asset IPC handlers with constant channels', () =>
   expect(ipcMain.handle).toHaveBeenCalledWith(CreatorStudioIpcChannel.BoardCardSelect, expect.any(Function));
   expect(ipcMain.handle).toHaveBeenCalledWith(CreatorStudioIpcChannel.BoardBuildContextPack, expect.any(Function));
   expect(ipcMain.handle).toHaveBeenCalledWith(CreatorStudioIpcChannel.BrandKitUpdate, expect.any(Function));
+  expect(ipcMain.handle).toHaveBeenCalledWith(CreatorStudioIpcChannel.ModelCapabilityList, expect.any(Function));
+  expect(ipcMain.handle).toHaveBeenCalledWith(CreatorStudioIpcChannel.BatchRunCreate, expect.any(Function));
+  expect(ipcMain.handle).toHaveBeenCalledWith(CreatorStudioIpcChannel.BatchRunList, expect.any(Function));
+  expect(ipcMain.handle).toHaveBeenCalledWith(CreatorStudioIpcChannel.BatchRunGet, expect.any(Function));
+  expect(ipcMain.handle).toHaveBeenCalledWith(CreatorStudioIpcChannel.BatchTaskRetry, expect.any(Function));
+  expect(ipcMain.handle).toHaveBeenCalledWith(CreatorStudioIpcChannel.BatchTaskSkip, expect.any(Function));
+  expect(ipcMain.handle).toHaveBeenCalledWith(CreatorStudioIpcChannel.BatchTaskFail, expect.any(Function));
 });
 
 test('clamps asset list parameters before reaching the store', async () => {
@@ -100,4 +114,58 @@ test('rejects asset reveal requests without an asset id', async () => {
   const result = await handler?.(null, { filePath: '/tmp/generated.png' });
 
   expect(result).toEqual({ success: false, error: 'assetId is required' });
+});
+
+test('normalizes creator batch run creation before reaching the store', async () => {
+  const store = createStore();
+  registerCreatorStudioIpcHandlers(ipcMain, () => store);
+
+  const handler = handlers.get(CreatorStudioIpcChannel.BatchRunCreate);
+  expect(handler).toBeDefined();
+  const result = await handler?.(null, {
+    projectId: ' project-1 ',
+    briefTitle: ' Launch ',
+    promptSpec: { sourceTitle: 'Launch' },
+    promptText: ' Generate a launch visual. ',
+    directions: [{
+      id: ' route-a ',
+      title: ' Route A ',
+      promptText: ' Generate route A. ',
+      promptSpec: { sourceTitle: 'Route A' },
+    }],
+    modelIds: ['seedream-image'],
+    templateIds: ['poster-system'],
+    sizes: ['1:1'],
+  });
+
+  expect(result).toMatchObject({ success: true });
+  expect(store.createBatchRun).toHaveBeenCalledWith({
+    projectId: 'project-1',
+    briefTitle: 'Launch',
+    promptSpec: { sourceTitle: 'Launch' },
+    promptText: 'Generate a launch visual.',
+    directions: [{
+      id: 'route-a',
+      title: 'Route A',
+      template: '',
+      style: '',
+      reason: '',
+      promptFocus: '',
+      promptText: 'Generate route A.',
+      promptSpec: { sourceTitle: 'Route A' },
+    }],
+    modelIds: ['seedream-image'],
+    templateIds: ['poster-system'],
+    sizes: ['1:1'],
+  });
+});
+
+test('rejects invalid creator batch fail requests', async () => {
+  registerCreatorStudioIpcHandlers(ipcMain, createStore);
+
+  const handler = handlers.get(CreatorStudioIpcChannel.BatchTaskFail);
+  expect(handler).toBeDefined();
+  const result = await handler?.(null, { taskId: 'task-1' });
+
+  expect(result).toEqual({ success: false, error: 'taskId and error are required' });
 });

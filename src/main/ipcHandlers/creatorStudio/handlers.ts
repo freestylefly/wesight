@@ -681,6 +681,27 @@ export const registerCreatorStudioIpcHandlers = (
       };
     }
   });
+
+  ipcMain.handle(CreatorStudioIpcChannel.BatchTaskFail, async (_event, input: unknown) => {
+    try {
+      const record = normalizeObject(input) ?? {};
+      const taskId = toTrimmedString(record.taskId);
+      const errorMessage = toTrimmedString(record.error);
+      if (!taskId || !errorMessage) {
+        return { success: false, error: 'taskId and error are required' };
+      }
+      const batchRun = getCreatorAssetStore().failBatchTask({ taskId, error: errorMessage });
+      if (!batchRun) {
+        return { success: false, error: 'Batch task not found' };
+      }
+      return { success: true, batchRun };
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to mark creator batch task failed',
+      };
+    }
+  });
 };
 
 export type CreatorStudioIpcListAssetsResult = CreatorStudioIpcResponse<ReturnType<CreatorAssetStore['listAssets']>>;

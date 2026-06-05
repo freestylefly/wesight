@@ -82,7 +82,9 @@ export const CreatorBatchPanel: React.FC<{
   onRefresh: () => void;
   onRetryTask: (taskId: string) => void;
   onSkipTask: (taskId: string) => void;
+  onFailTask: (taskId: string) => void;
   onSendTaskToCowork: (task: CreatorBatchTaskRecord) => void;
+  onSendBatchToCowork: (batchRun: CreatorBatchRunRecord) => void;
 }> = ({
   projectId,
   promptSpec,
@@ -97,7 +99,9 @@ export const CreatorBatchPanel: React.FC<{
   onRefresh,
   onRetryTask,
   onSkipTask,
+  onFailTask,
   onSendTaskToCowork,
+  onSendBatchToCowork,
 }) => {
   const directions = useMemo(() => (promptSpec.creativeDirections ?? []).slice(0, 6), [promptSpec]);
   const defaultTemplateId = promptSpec.templateId || templates[0]?.id || 'default-template';
@@ -253,7 +257,7 @@ export const CreatorBatchPanel: React.FC<{
         </SelectionPanel>
 
         <SelectionPanel title={i18nService.t('creatorBatchTemplates')}>
-          {templates.slice(0, 12).map((template) => (
+          {templates.map((template) => (
             <CheckRow
               key={template.id}
               checked={selectedTemplateIds.includes(template.id)}
@@ -320,8 +324,18 @@ export const CreatorBatchPanel: React.FC<{
                   {activeBatchRun
                     ? `${activeBatchRun.summary.taskCount} ${i18nService.t('creatorBatchSummaryTasks')}`
                     : i18nService.t('creatorBatchComparisonEmpty')}
-                </p>
+                  </p>
               </div>
+              {activeBatchRun && (
+                <button
+                  type="button"
+                  onClick={() => onSendBatchToCowork(activeBatchRun)}
+                  className="inline-flex items-center gap-2 rounded-lg border border-primary bg-primary/10 px-3 py-2 text-xs font-medium text-primary transition-colors hover:bg-primary/15"
+                >
+                  <RocketLaunchIcon className="h-4 w-4" />
+                  {i18nService.t('creatorBatchSendPending')}
+                </button>
+              )}
               <div className="flex flex-wrap gap-2">
                 <GridFilter value={directionFilter} onChange={setDirectionFilter} label={i18nService.t('creatorBatchFilterDirection')} values={uniqueValues((activeBatchRun?.tasks ?? []).map((task) => task.directionId))} />
                 <GridFilter value={modelFilter} onChange={setModelFilter} label={i18nService.t('creatorBatchFilterModel')} values={uniqueValues((activeBatchRun?.tasks ?? []).map((task) => task.modelId))} />
@@ -375,6 +389,11 @@ export const CreatorBatchPanel: React.FC<{
                           )}
                           {task.status !== CreatorBatchTaskStatus.Completed && task.status !== CreatorBatchTaskStatus.Skipped && (
                             <IconButton title={i18nService.t('creatorBatchSkip')} onClick={() => onSkipTask(task.id)}>
+                              <XMarkIcon className="h-4 w-4" />
+                            </IconButton>
+                          )}
+                          {task.status !== CreatorBatchTaskStatus.Completed && task.status !== CreatorBatchTaskStatus.Failed && task.status !== CreatorBatchTaskStatus.Skipped && (
+                            <IconButton title={i18nService.t('creatorBatchMarkFailed')} onClick={() => onFailTask(task.id)}>
                               <XMarkIcon className="h-4 w-4" />
                             </IconButton>
                           )}

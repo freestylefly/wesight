@@ -27,6 +27,7 @@ export const CreatorStudioIpcChannel = {
   BatchRunGet: 'creatorStudio:batchRun:get',
   BatchTaskRetry: 'creatorStudio:batchTask:retry',
   BatchTaskSkip: 'creatorStudio:batchTask:skip',
+  BatchTaskFail: 'creatorStudio:batchTask:fail',
 } as const;
 
 export type CreatorStudioIpcChannel =

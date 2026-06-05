@@ -13,6 +13,7 @@ import {
   XMarkIcon,
 } from '@heroicons/react/24/outline';
 import {
+  CreatorBatchTaskStatus,
   CreatorProductionAssetKind,
   CreatorStudioDefaultProjectId,
 } from '@shared/creatorStudio/constants';
@@ -617,6 +618,20 @@ const CreatorStudioView: React.FC<CreatorStudioViewProps> = ({
     }
   };
 
+  const failBatchTask = async (taskId: string) => {
+    const errorMessage = window.prompt(i18nService.t('creatorBatchFailReasonPrompt'));
+    if (!errorMessage?.trim()) return;
+    try {
+      const batchRun = await creatorStudioAssetService.failBatchTask({ taskId, error: errorMessage.trim() });
+      if (batchRun) {
+        setActiveBatchRun(batchRun);
+        await loadBatchRuns(batchRun.projectId);
+      }
+    } catch (error) {
+      dispatchToast(error instanceof Error ? error.message : i18nService.t('creatorBatchFailFailed'));
+    }
+  };
+
   const sendBatchTaskToCowork = async (task: CreatorBatchTaskRecord) => {
     setIsSendingToCowork(true);
     try {
@@ -642,6 +657,52 @@ const CreatorStudioView: React.FC<CreatorStudioViewProps> = ({
         'Prompt:',
         '```text',
         task.promptText,
+        '```',
+      ].join('\n'), {
+        activeSkillIds: installedRecommendedSkillIds,
+        preferCreativeProducer: true,
+      });
+    } catch {
+      dispatchToast(i18nService.t('creatorSendToCoworkFailed'));
+    } finally {
+      setIsSendingToCowork(false);
+    }
+  };
+
+  const sendBatchRunToCowork = async (batchRun: CreatorBatchRunRecord) => {
+    const pendingTasks = batchRun.tasks.filter((task) => task.status === CreatorBatchTaskStatus.Pending);
+    if (pendingTasks.length === 0) {
+      dispatchToast(i18nService.t('creatorBatchNoPendingTasks'));
+      return;
+    }
+    setIsSendingToCowork(true);
+    try {
+      dispatch(setActiveSkillIds(installedRecommendedSkillIds));
+      await onSendToCowork([
+        '[Creator Studio]',
+        '',
+        i18nService.t('creatorBatchRunCoworkDraftIntro'),
+        '',
+        `batchRunId: ${batchRun.id}`,
+        `briefTitle: ${batchRun.briefTitle}`,
+        `taskCount: ${pendingTasks.length}`,
+        `models: ${batchRun.summary.modelNames.join(', ')}`,
+        `sizes: ${batchRun.summary.sizes.join(', ')}`,
+        `costField: ${batchRun.summary.estimatedCostUnits} ${batchRun.summary.costUnitLabel}`,
+        '',
+        'Batch Tasks:',
+        '```json',
+        JSON.stringify(pendingTasks.map((task) => ({
+          batchTaskId: task.id,
+          directionId: task.directionId,
+          directionTitle: task.directionTitle,
+          modelId: task.modelId,
+          modelName: task.modelName,
+          templateId: task.templateId,
+          size: task.size,
+          promptSpec: task.promptSpec,
+          prompt: task.promptText,
+        })), null, 2),
         '```',
       ].join('\n'), {
         activeSkillIds: installedRecommendedSkillIds,
@@ -800,7 +861,9 @@ const CreatorStudioView: React.FC<CreatorStudioViewProps> = ({
             }}
             onRetryTask={(taskId) => void retryBatchTask(taskId)}
             onSkipTask={(taskId) => void skipBatchTask(taskId)}
+            onFailTask={(taskId) => void failBatchTask(taskId)}
             onSendTaskToCowork={(task) => void sendBatchTaskToCowork(task)}
+            onSendBatchToCowork={(batchRun) => void sendBatchRunToCowork(batchRun)}
           />
         )}
       </main>

@@ -6,6 +6,7 @@ import type {
   CreatorBatchRunListInput,
   CreatorBatchRunListResult,
   CreatorBatchRunRecord,
+  CreatorBatchTaskFailInput,
   CreatorBoardCardCreateInput,
   CreatorBoardCardMoveInput,
   CreatorBoardCardRecord,
@@ -253,6 +254,14 @@ class CreatorStudioAssetService {
     const result = await window.electron.creatorStudio.skipBatchTask(taskId);
     if (!result.success) {
       throw new Error(result.error || 'Failed to skip creator batch task');
+    }
+    return result.batchRun ?? null;
+  }
+
+  async failBatchTask(input: CreatorBatchTaskFailInput): Promise<CreatorBatchRunRecord | null> {
+    const result = await window.electron.creatorStudio.failBatchTask(input);
+    if (!result.success) {
+      throw new Error(result.error || 'Failed to mark creator batch task failed');
     }
     return result.batchRun ?? null;
   }

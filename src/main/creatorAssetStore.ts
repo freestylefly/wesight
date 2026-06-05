@@ -29,6 +29,7 @@ import type {
   CreatorBatchRunListResult,
   CreatorBatchRunRecord,
   CreatorBatchRunSummary,
+  CreatorBatchTaskFailInput,
   CreatorBatchTaskRecord,
   CreatorBoardCardCreateInput,
   CreatorBoardCardMoveInput,
@@ -320,6 +321,13 @@ const firstNonEmptyString = (...values: unknown[]): string | null => {
   return null;
 };
 
+const getPromptSpecBatchString = (promptSpec: CreatorPromptSpecSnapshot | null, key: string): string | null => {
+  const batch = promptSpec?.batch;
+  if (!batch || typeof batch !== 'object' || Array.isArray(batch)) return null;
+  const value = (batch as Record<string, unknown>)[key];
+  return typeof value === 'string' && value.trim() ? value.trim() : null;
+};
+
 const parseLineList = (text: string, key: string): string[] => {
   const pattern = new RegExp(`${key}\\s*[:：]\\s*([^\\n]+)`, 'i');
   const match = text.match(pattern);
@@ -352,6 +360,14 @@ export const parseCreatorStudioSourceContext = (text: string): CreatorStudioSour
     promptText: promptTextMatch?.[1]?.trim() || '',
     sourceTitle: firstNonEmptyString(promptSpec?.sourceTitle),
     variantOfAssetId: firstNonEmptyString(promptSpec?.variantOfAssetId),
+    batchRunId: firstNonEmptyString(
+      getPromptSpecBatchString(promptSpec, 'batchRunId'),
+      text.match(/batchRunId\s*[:：]\s*([^\n]+)/i)?.[1]
+    ),
+    batchTaskId: firstNonEmptyString(
+      getPromptSpecBatchString(promptSpec, 'batchTaskId'),
+      text.match(/batchTaskId\s*[:：]\s*([^\n]+)/i)?.[1]
+    ),
   };
 };
 
@@ -997,6 +1013,10 @@ export class CreatorAssetStore {
     if (models.length === 0) {
       throw new Error('At least one creative model is required');
     }
+    const unsupportedModel = models.find((model) => !model.supportsBatch);
+    if (unsupportedModel) {
+      throw new Error(`Model does not support batch: ${unsupportedModel.id}`);
+    }
     const templateIds = normalizeTags(input.templateIds).length > 0
       ? normalizeTags(input.templateIds)
       : normalizeTags([input.promptSpec.templateId ?? 'default-template']);
@@ -1007,6 +1027,12 @@ export class CreatorAssetStore {
     const id = uuidv4();
     const briefTitle = input.briefTitle.trim().slice(0, 120) || 'Creator Batch Run';
     const taskCount = directions.length * models.length * templateIds.length * sizes.length;
+    for (const model of models) {
+      const modelTaskCount = directions.length * templateIds.length * sizes.length;
+      if (modelTaskCount > model.maxBatchTasks) {
+        throw new Error(`Batch task count exceeds model limit: ${model.displayName}`);
+      }
+    }
     const estimatedCostUnits = directions.reduce((total) => total + models.reduce((modelTotal, model) => (
       modelTotal + (model.costUnitEstimate * templateIds.length * sizes.length)
     ), 0), 0);
@@ -1049,6 +1075,7 @@ export class CreatorAssetStore {
         for (const model of models) {
           for (const templateId of templateIds) {
             for (const size of sizes) {
+              const taskId = uuidv4();
               const promptSpec = {
                 ...direction.promptSpec,
                 selectedCreativeDirectionId: direction.id,
@@ -1067,13 +1094,14 @@ export class CreatorAssetStore {
                 },
                 batch: {
                   batchRunId: id,
+                  batchTaskId: taskId,
                   modelId: model.id,
                   modelName: model.displayName,
                   outputKinds: model.outputKinds,
                 },
               };
               insertTask.run(
-                uuidv4(),
+                taskId,
                 id,
                 projectId,
                 CreatorBatchTaskStatus.Pending,
@@ -1158,6 +1186,28 @@ export class CreatorAssetStore {
         completed_at = COALESCE(completed_at, ?)
       WHERE id = ?
     `).run(CreatorBatchTaskStatus.Skipped, now, now, task.id);
+    this.updateBatchRunStatus(task.batch_run_id);
+    return this.getBatchRun(task.batch_run_id);
+  }
+
+  failBatchTask(input: CreatorBatchTaskFailInput): CreatorBatchRunRecord | null {
+    const task = this.getBatchTaskRow(input.taskId);
+    if (!task) return null;
+    const now = Date.now();
+    this.db.prepare(`
+      UPDATE creator_batch_tasks
+      SET status = ?,
+        error = ?,
+        updated_at = ?,
+        completed_at = COALESCE(completed_at, ?)
+      WHERE id = ?
+    `).run(
+      CreatorBatchTaskStatus.Failed,
+      input.error.trim().slice(0, 1000) || 'Task failed',
+      now,
+      now,
+      task.id
+    );
     this.updateBatchRunStatus(task.batch_run_id);
     return this.getBatchRun(task.batch_run_id);
   }
@@ -1269,8 +1319,39 @@ export class CreatorAssetStore {
             completed_at = COALESCE(completed_at, ?)
           WHERE id = ?
         `).run(CreatorProductionRunStatus.Completed, JSON.stringify(outputAssetIds), now, now, run.id);
+        this.completeBatchTaskForRun(run, outputAssetIds, now);
       }
     })();
+  }
+
+  private completeBatchTaskForRun(
+    run: CreatorProductionRunRecord,
+    outputAssetIds: string[],
+    completedAt: number
+  ): void {
+    const batchRunId = getPromptSpecBatchString(run.promptSpec, 'batchRunId');
+    const batchTaskId = getPromptSpecBatchString(run.promptSpec, 'batchTaskId');
+    if (!batchRunId || !batchTaskId || outputAssetIds.length === 0) return;
+    const task = this.getBatchTaskRow(batchTaskId);
+    if (!task || task.batch_run_id !== batchRunId) return;
+    const existingAssetIds = parseJsonArray(task.asset_ids_json);
+    const nextAssetIds = [...new Set([...existingAssetIds, ...outputAssetIds])];
+    this.db.prepare(`
+      UPDATE creator_batch_tasks
+      SET status = ?,
+        asset_ids_json = ?,
+        error = NULL,
+        updated_at = ?,
+        completed_at = COALESCE(completed_at, ?)
+      WHERE id = ?
+    `).run(
+      CreatorBatchTaskStatus.Completed,
+      JSON.stringify(nextAssetIds),
+      completedAt,
+      completedAt,
+      batchTaskId
+    );
+    this.updateBatchRunStatus(batchRunId);
   }
 
   private createRunFromLatestPrompt(sessionId: string, createdAt: number): CreatorProductionRunRecord | null {
@@ -1317,7 +1398,11 @@ export class CreatorAssetStore {
       caseIdsJson,
       promptSpecJson,
       context.promptText,
-      JSON.stringify({ sourceTitle: context.sourceTitle }),
+      JSON.stringify({
+        sourceTitle: context.sourceTitle,
+        batchRunId: context.batchRunId,
+        batchTaskId: context.batchTaskId,
+      }),
       createdAt,
       createdAt,
     );
