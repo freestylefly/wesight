@@ -1248,11 +1248,11 @@ const PromptBuilder: React.FC<{
   };
 
   return (
-    <section className="grid gap-4 p-4 xl:grid-cols-[minmax(320px,420px)_1fr]">
-      <div className="space-y-3 rounded-lg border border-border bg-surface p-4">
+    <section className="grid min-w-0 gap-4 p-4 xl:grid-cols-[minmax(320px,420px)_minmax(0,1fr)]">
+      <div className="min-w-0 space-y-3 rounded-lg border border-border bg-surface p-4">
         <div>
           <div className="text-xs font-medium uppercase text-muted">{i18nService.t('creatorBuilderSource')}</div>
-          <div className="mt-1 text-sm font-semibold">{promptSpec.sourceTitle}</div>
+          <div className="mt-1 break-words text-sm font-semibold">{promptSpec.sourceTitle}</div>
         </div>
         <div className="rounded-lg border border-border bg-background p-3">
           <div className="text-xs font-medium text-secondary">{i18nService.t('creatorBuilderProject')}</div>
@@ -1321,8 +1321,8 @@ const PromptBuilder: React.FC<{
         <BuilderTextarea label={i18nService.t('creatorFieldNegative')} value={form.negativeRequirements} onChange={(value) => updateField('negativeRequirements', value)} />
         <MaterialTray materials={materials} onMaterialsChange={onMaterialsChange} />
       </div>
-      <div className="space-y-4">
-        <div className="rounded-lg border border-border bg-surface">
+      <div className="min-w-0 space-y-4">
+        <div className="min-w-0 rounded-lg border border-border bg-surface">
           <div className="flex items-center justify-between border-b border-border px-4 py-3">
             <h2 className="text-sm font-semibold">{i18nService.t('creatorPromptPreview')}</h2>
             <div className="flex flex-wrap justify-end gap-2">
@@ -1364,17 +1364,17 @@ const PromptBuilder: React.FC<{
               </button>
             </div>
           </div>
-          <pre className="max-h-[420px] whitespace-pre-wrap overflow-auto p-4 text-sm leading-6 text-foreground">{prompt}</pre>
+          <pre className="max-h-[420px] max-w-full whitespace-pre-wrap break-words overflow-auto p-4 text-sm leading-6 text-foreground">{prompt}</pre>
         </div>
-        <div className="rounded-lg border border-border bg-surface">
+        <div className="min-w-0 rounded-lg border border-border bg-surface">
           <div className="border-b border-border px-4 py-3">
             <h2 className="text-sm font-semibold">{i18nService.t('creatorContextPack')}</h2>
           </div>
-          <pre className="max-h-56 whitespace-pre-wrap overflow-auto p-4 text-xs leading-5 text-secondary">
+          <pre className="max-h-56 max-w-full whitespace-pre-wrap break-words overflow-auto p-4 text-xs leading-5 text-secondary">
             {promptSpec.contextPack || i18nService.t('creatorContextPackEmpty')}
           </pre>
         </div>
-        <div className="rounded-lg border border-border bg-surface">
+        <div className="min-w-0 rounded-lg border border-border bg-surface">
           <div className="border-b border-border px-4 py-3">
             <h2 className="text-sm font-semibold">{i18nService.t('creatorCreativeDirections')}</h2>
           </div>
@@ -1404,15 +1404,15 @@ const PromptBuilder: React.FC<{
                       {selected ? i18nService.t('creatorDirectionSelected') : i18nService.t('creatorUseDirection')}
                     </button>
                   </div>
-                  <p className="mt-1 text-xs text-secondary">{direction.template}</p>
-                  <p className="mt-2 text-xs text-muted">{direction.reason}</p>
-                  <p className="mt-2 text-xs text-secondary">{direction.promptFocus}</p>
+                  <p className="mt-1 break-words text-xs text-secondary">{direction.template}</p>
+                  <p className="mt-2 break-words text-xs text-muted">{direction.reason}</p>
+                  <p className="mt-2 break-words text-xs text-secondary">{direction.promptFocus}</p>
                 </div>
               );
             })}
           </div>
         </div>
-        <div className="rounded-lg border border-border bg-surface p-4">
+        <div className="min-w-0 rounded-lg border border-border bg-surface p-4">
           <h2 className="text-sm font-semibold">{i18nService.t('creatorRecommendedRuntime')}</h2>
           <p className="mt-1 text-xs leading-5 text-muted">{i18nService.t('creatorRecommendedRuntimeHint')}</p>
           <div className="mt-3 flex flex-wrap gap-1.5">
@@ -1434,7 +1434,7 @@ const PromptBuilder: React.FC<{
           </div>
           <p className="mt-3 text-xs leading-5 text-muted">{seedreamHint}</p>
         </div>
-        <div className="rounded-lg border border-border bg-surface">
+        <div className="min-w-0 rounded-lg border border-border bg-surface">
           <div className="flex items-center justify-between border-b border-border px-4 py-3">
             <h2 className="text-sm font-semibold">{i18nService.t('creatorPromptSpec')}</h2>
             <button
@@ -1446,7 +1446,7 @@ const PromptBuilder: React.FC<{
               {i18nService.t('copy')}
             </button>
           </div>
-          <pre className="max-h-64 overflow-auto p-4 text-xs leading-5 text-secondary">{JSON.stringify(promptSpec, null, 2)}</pre>
+          <pre className="max-h-64 max-w-full whitespace-pre-wrap break-words overflow-auto p-4 text-xs leading-5 text-secondary">{JSON.stringify(promptSpec, null, 2)}</pre>
         </div>
       </div>
     </section>
