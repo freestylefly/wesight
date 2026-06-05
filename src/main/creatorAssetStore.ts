@@ -53,6 +53,7 @@ import type {
   CreatorProductionRunRecord,
   CreatorProjectCreateInput,
   CreatorPromptAssetCreateInput,
+  CreatorPromptSpecBriefV1,
   CreatorPromptSpecSnapshot,
   CreatorPromptVersionCreateInput,
   CreatorPromptVersionDiffInput,
@@ -377,7 +378,7 @@ const ensurePromptSpecV1Snapshot = (
     referencePrompt: typeof input.referencePrompt === 'string' ? input.referencePrompt : null,
     referenceAnalysis: input.referenceAnalysis,
   };
-  const briefDefaults = {
+  const briefDefaults: CreatorPromptSpecBriefV1 = {
     taskType: typeof input.taskType === 'string' ? input.taskType : '',
     subject: typeof input.subject === 'string' ? input.subject : '',
     goal: typeof input.subject === 'string' && input.subject.trim() ? input.subject : sourceTitle,
