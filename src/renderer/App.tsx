@@ -18,6 +18,7 @@ import AppUpdateBadge from './components/update/AppUpdateBadge';
 import AppUpdateModal from './components/update/AppUpdateModal';
 import WindowTitleBar from './components/window/WindowTitleBar';
 import { defaultConfig, getProviderDisplayName } from './config';
+import { MainView } from './constants/app';
 import type { ApiConfig } from './services/api';
 import { apiService } from './services/api';
 import { type AppUpdateDownloadProgress, type AppUpdateInfo, checkForAppUpdate, UPDATE_HEARTBEAT_INTERVAL_MS,UPDATE_POLL_INTERVAL_MS } from './services/appUpdate';
@@ -34,10 +35,12 @@ import { setAvailableModels, setSelectedModel } from './store/slices/modelSlice'
 import { clearSelection } from './store/slices/quickActionSlice';
 import type { CoworkPermissionResult } from './types/cowork';
 
+const CreatorStudioView = React.lazy(() => import('./components/creatorStudio/CreatorStudioView'));
+
 const App: React.FC = () => {
   const [showSettings, setShowSettings] = useState(false);
   const [settingsOptions, setSettingsOptions] = useState<SettingsOpenOptions>({});
-  const [mainView, setMainView] = useState<'cowork' | 'skills' | 'runtime' | 'agents'>('cowork');
+  const [mainView, setMainView] = useState<MainView>(MainView.Cowork);
   const [isInitialized, setIsInitialized] = useState(false);
   const [initError, setInitError] = useState<string | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
@@ -276,15 +279,15 @@ const App: React.FC = () => {
   }, []);
 
   const handleShowSkills = useCallback(() => {
-    setMainView('skills');
+    setMainView(MainView.Skills);
   }, []);
 
   const handleShowCowork = useCallback(() => {
-    setMainView('cowork');
+    setMainView(MainView.Cowork);
   }, []);
 
   const handleShowRuntimeDashboard = useCallback(() => {
-    setMainView('runtime');
+    setMainView(MainView.Runtime);
   }, []);
 
   const handleShowMcp = useCallback(() => {
@@ -292,7 +295,11 @@ const App: React.FC = () => {
   }, [handleShowSettings]);
 
   const handleShowAgents = useCallback(() => {
-    setMainView('agents');
+    setMainView(MainView.Agents);
+  }, []);
+
+  const handleShowCreator = useCallback(() => {
+    setMainView(MainView.Creator);
   }, []);
 
   const handleShowAgentSettings = useCallback(() => {
@@ -304,10 +311,10 @@ const App: React.FC = () => {
   }, []);
 
   const handleNewChat = useCallback(() => {
-    const shouldClearInput = mainView === 'cowork' || !!currentSessionId;
+    const shouldClearInput = mainView === MainView.Cowork || !!currentSessionId;
     coworkService.clearSession();
     dispatch(clearSelection());
-    setMainView('cowork');
+    setMainView(MainView.Cowork);
     window.setTimeout(() => {
       window.dispatchEvent(new CustomEvent('cowork:focus-input', {
         detail: { clear: shouldClearInput },
@@ -319,7 +326,7 @@ const App: React.FC = () => {
     dispatch(setDraftPrompt({ sessionId: '__home__', draft: i18nService.t('skillCreatorPrompt') }));
     coworkService.clearSession();
     dispatch(clearSelection());
-    setMainView('cowork');
+    setMainView(MainView.Cowork);
   }, [dispatch]);
 
   const showToast = useCallback((message: string) => {
@@ -547,7 +554,7 @@ const App: React.FC = () => {
 
   useEffect(() => {
     const unsubscribe = window.electron.desktopPet.onOpenTaskRequested(({ sessionId }) => {
-      setMainView('cowork');
+      setMainView(MainView.Cowork);
       dispatch(clearSelection());
       void coworkService.loadSession(sessionId).then((session) => {
         if (!session) {
@@ -721,6 +728,7 @@ const App: React.FC = () => {
           onShowCowork={handleShowCowork}
           onShowRuntimeDashboard={handleShowRuntimeDashboard}
           onShowAgents={handleShowAgents}
+          onShowCreator={handleShowCreator}
           onShowAgentSettings={handleShowAgentSettings}
           onNewChat={handleNewChat}
           isCollapsed={isSidebarCollapsed}
@@ -731,7 +739,7 @@ const App: React.FC = () => {
         <div className={`flex-1 min-w-0 py-1.5 pr-1.5 ${isSidebarCollapsed ? 'pl-1.5' : ''}`}>
           <div className="relative h-full min-h-0 rounded-xl bg-background overflow-hidden">
             <EngineStartupOverlay />
-            {mainView === 'skills' ? (
+            {mainView === MainView.Skills ? (
               <SkillsView
                 isSidebarCollapsed={isSidebarCollapsed}
                 onToggleSidebar={handleToggleSidebar}
@@ -740,7 +748,7 @@ const App: React.FC = () => {
                 updateBadge={isSidebarCollapsed ? updateBadge : null}
                 readOnly={enterpriseConfig?.ui?.skills === 'readonly'}
               />
-            ) : mainView === 'runtime' ? (
+            ) : mainView === MainView.Runtime ? (
               <RuntimeDashboardView
                 isSidebarCollapsed={isSidebarCollapsed}
                 onToggleSidebar={handleToggleSidebar}
@@ -748,7 +756,7 @@ const App: React.FC = () => {
                 onShowCowork={handleShowCowork}
                 updateBadge={isSidebarCollapsed ? updateBadge : null}
               />
-            ) : mainView === 'agents' ? (
+            ) : mainView === MainView.Agents ? (
               <AgentsView
                 isSidebarCollapsed={isSidebarCollapsed}
                 onToggleSidebar={handleToggleSidebar}
@@ -756,6 +764,21 @@ const App: React.FC = () => {
                 onShowCowork={handleShowCowork}
                 updateBadge={isSidebarCollapsed ? updateBadge : null}
               />
+            ) : mainView === MainView.Creator ? (
+              <React.Suspense
+                fallback={(
+                  <div className="flex h-full items-center justify-center text-sm text-secondary">
+                    {i18nService.t('loading')}
+                  </div>
+                )}
+              >
+                <CreatorStudioView
+                  isSidebarCollapsed={isSidebarCollapsed}
+                  onToggleSidebar={handleToggleSidebar}
+                  onNewChat={handleNewChat}
+                  updateBadge={isSidebarCollapsed ? updateBadge : null}
+                />
+              </React.Suspense>
             ) : (
               <CoworkView
                 onRequestAppSettings={handleShowSettings}

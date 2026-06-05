@@ -1,8 +1,9 @@
-import { ChartBarIcon, CheckIcon, ChevronDownIcon, ExclamationTriangleIcon } from '@heroicons/react/24/outline';
+import { ChartBarIcon, CheckIcon, ChevronDownIcon, ExclamationTriangleIcon, SparklesIcon } from '@heroicons/react/24/outline';
 import { AgentRunTargetType } from '@shared/cowork/constants';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useSelector } from 'react-redux';
 
+import { MainView } from '../constants/app';
 import { agentService } from '../services/agent';
 import { coworkService } from '../services/cowork';
 import { i18nService } from '../services/i18n';
@@ -23,11 +24,12 @@ import LoginButton from './LoginButton';
 interface SidebarProps {
   onShowSettings: () => void;
   onShowLogin?: () => void;
-  activeView: 'cowork' | 'skills' | 'runtime' | 'agents';
+  activeView: MainView;
   onShowSkills: () => void;
   onShowCowork: () => void;
   onShowRuntimeDashboard: () => void;
   onShowAgents: () => void;
+  onShowCreator: () => void;
   onShowAgentSettings: () => void;
   onNewChat: () => void;
   isCollapsed: boolean;
@@ -43,6 +45,7 @@ const Sidebar: React.FC<SidebarProps> = ({
   onShowCowork,
   onShowRuntimeDashboard,
   onShowAgents,
+  onShowCreator,
   onShowAgentSettings,
   onNewChat,
   isCollapsed,
@@ -179,7 +182,7 @@ const Sidebar: React.FC<SidebarProps> = ({
             type="button"
             onClick={onNewChat}
             className={`w-full inline-flex items-center gap-2 rounded-lg px-2.5 py-2 text-sm font-medium transition-colors ${
-              activeView === 'cowork'
+              activeView === MainView.Cowork
                 ? 'bg-primary/10 text-primary hover:bg-primary/20'
                 : 'text-secondary hover:text-foreground hover:bg-surface-raised'
             }`}
@@ -205,7 +208,7 @@ const Sidebar: React.FC<SidebarProps> = ({
               onShowRuntimeDashboard();
             }}
             className={`w-full inline-flex items-center gap-2 rounded-lg px-2.5 py-2 text-sm font-medium transition-colors ${
-              activeView === 'runtime'
+              activeView === MainView.Runtime
                 ? 'bg-primary/10 text-primary hover:bg-primary/20'
                 : 'text-secondary hover:text-foreground hover:bg-surface-raised'
             }`}
@@ -220,7 +223,7 @@ const Sidebar: React.FC<SidebarProps> = ({
               onShowSkills();
             }}
             className={`w-full inline-flex items-center gap-2 rounded-lg px-2.5 py-2 text-sm font-medium transition-colors ${
-              activeView === 'skills'
+              activeView === MainView.Skills
                 ? 'bg-primary/10 text-primary hover:bg-primary/20'
                 : 'text-secondary hover:text-foreground hover:bg-surface-raised'
             }`}
@@ -235,13 +238,28 @@ const Sidebar: React.FC<SidebarProps> = ({
               onShowAgents();
             }}
             className={`w-full inline-flex items-center gap-2 rounded-lg px-2.5 py-2 text-sm font-medium transition-colors ${
-              activeView === 'agents'
+              activeView === MainView.Agents
                 ? 'bg-primary/10 text-primary hover:bg-primary/20'
                 : 'text-secondary hover:text-foreground hover:bg-surface-raised'
             }`}
           >
             <UserGroupIcon className="h-4 w-4" />
             {i18nService.t('agentTeams')}
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setIsSearchOpen(false);
+              onShowCreator();
+            }}
+            className={`w-full inline-flex items-center gap-2 rounded-lg px-2.5 py-2 text-sm font-medium transition-colors ${
+              activeView === MainView.Creator
+                ? 'bg-primary/10 text-primary hover:bg-primary/20'
+                : 'text-secondary hover:text-foreground hover:bg-surface-raised'
+            }`}
+          >
+            <SparklesIcon className="h-4 w-4" />
+            {i18nService.t('creatorStudioNav')}
           </button>
         </div>
       </div>

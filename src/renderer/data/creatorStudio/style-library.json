@@ -1,0 +1,1884 @@
+{
+  "version": 1,
+  "repository": "https://github.com/freestylefly/awesome-gpt-image-2",
+  "templateDocument": "docs/templates.md",
+  "tagLabels": {
+    "Art": {
+      "en": "Art",
+      "zh": "艺术"
+    },
+    "Campaign": {
+      "en": "Campaign",
+      "zh": "商业 Campaign"
+    },
+    "Chart": {
+      "en": "Chart",
+      "zh": "图表"
+    },
+    "Classical": {
+      "en": "Classical",
+      "zh": "古典"
+    },
+    "Creative": {
+      "en": "Creative",
+      "zh": "创意"
+    },
+    "Dashboard": {
+      "en": "Dashboard",
+      "zh": "仪表盘"
+    },
+    "Document": {
+      "en": "Document",
+      "zh": "文档"
+    },
+    "Education": {
+      "en": "Education",
+      "zh": "教育"
+    },
+    "Identity": {
+      "en": "Identity",
+      "zh": "身份系统"
+    },
+    "Interior": {
+      "en": "Interior",
+      "zh": "室内"
+    },
+    "Layout": {
+      "en": "Layout",
+      "zh": "版式"
+    },
+    "Lens": {
+      "en": "Lens",
+      "zh": "镜头"
+    },
+    "Logo": {
+      "en": "Logo",
+      "zh": "Logo"
+    },
+    "Map": {
+      "en": "Map",
+      "zh": "地图"
+    },
+    "Packaging": {
+      "en": "Packaging",
+      "zh": "包装"
+    },
+    "Pose": {
+      "en": "Pose",
+      "zh": "动作"
+    },
+    "Publishing": {
+      "en": "Publishing",
+      "zh": "出版"
+    },
+    "R&D": {
+      "en": "R&D",
+      "zh": "研发"
+    },
+    "Scene": {
+      "en": "Scene",
+      "zh": "场景"
+    },
+    "Screenshot": {
+      "en": "Screenshot",
+      "zh": "截图"
+    },
+    "Scroll": {
+      "en": "Scroll",
+      "zh": "长卷"
+    },
+    "Special": {
+      "en": "Special",
+      "zh": "特殊输出"
+    },
+    "Storyboard": {
+      "en": "Storyboard",
+      "zh": "分镜"
+    },
+    "Style": {
+      "en": "Style",
+      "zh": "风格"
+    },
+    "Typography": {
+      "en": "Typography",
+      "zh": "字体"
+    }
+  },
+  "categories": [
+    {
+      "id": "cat-ui",
+      "value": "UI & Interfaces",
+      "anchor": "cat-ui",
+      "templateAnchor": "tpl-ui",
+      "cover": "/images/category-covers/ui.jpg",
+      "title": {
+        "en": "UI & Interfaces",
+        "zh": "UI 与界面"
+      },
+      "description": {
+        "en": "Apps, websites, dashboards, social screenshots, and product interfaces.",
+        "zh": "App、网页、仪表盘、社媒截图与产品界面。"
+      }
+    },
+    {
+      "id": "cat-infographic",
+      "value": "Charts & Infographics",
+      "anchor": "cat-infographic",
+      "templateAnchor": "tpl-infographic",
+      "cover": "/images/category-covers/infographic.jpg",
+      "title": {
+        "en": "Charts & Infographics",
+        "zh": "图表与信息可视化"
+      },
+      "description": {
+        "en": "Infographics, knowledge maps, technical explainers, and structured diagrams.",
+        "zh": "信息图、知识图谱、技术解释与结构化图解。"
+      }
+    },
+    {
+      "id": "cat-poster",
+      "value": "Posters & Typography",
+      "anchor": "cat-poster",
+      "templateAnchor": "tpl-poster",
+      "cover": "/images/category-covers/poster.jpg",
+      "title": {
+        "en": "Posters & Typography",
+        "zh": "海报与排版"
+      },
+      "description": {
+        "en": "Event posters, covers, type-driven visuals, and strong layout compositions.",
+        "zh": "活动海报、封面、字体视觉和强排版画面。"
+      }
+    },
+    {
+      "id": "cat-product",
+      "value": "Products & E-commerce",
+      "anchor": "cat-product",
+      "templateAnchor": "tpl-product",
+      "cover": "/images/category-covers/product.jpg",
+      "title": {
+        "en": "Products & E-commerce",
+        "zh": "商品与电商"
+      },
+      "description": {
+        "en": "Product shots, detail pages, packaging, selling points, and ads.",
+        "zh": "商品图、详情页、包装卖点和商业广告。"
+      }
+    },
+    {
+      "id": "cat-brand",
+      "value": "Brand & Logos",
+      "anchor": "cat-brand",
+      "templateAnchor": "tpl-brand",
+      "cover": "/images/category-covers/brand.jpg",
+      "title": {
+        "en": "Brand & Logos",
+        "zh": "品牌与标志"
+      },
+      "description": {
+        "en": "Logos, identity systems, brand touchpoints, and campaign visuals.",
+        "zh": "Logo、VI、品牌触点和 Campaign 视觉系统。"
+      }
+    },
+    {
+      "id": "cat-architecture",
+      "value": "Architecture & Spaces",
+      "anchor": "cat-architecture",
+      "templateAnchor": "tpl-architecture",
+      "cover": "/images/category-covers/architecture.jpg",
+      "title": {
+        "en": "Architecture & Spaces",
+        "zh": "建筑与空间"
+      },
+      "description": {
+        "en": "Architecture renders, interiors, city maps, and spatial concepts.",
+        "zh": "建筑表现、室内空间、城市地图和空间概念。"
+      }
+    },
+    {
+      "id": "cat-photo",
+      "value": "Photography & Realism",
+      "anchor": "cat-photo",
+      "templateAnchor": "tpl-photo",
+      "cover": "/images/category-covers/photo.jpg",
+      "title": {
+        "en": "Photography & Realism",
+        "zh": "摄影与写实"
+      },
+      "description": {
+        "en": "Portraits, phone photography, film texture, and commercial photography.",
+        "zh": "人像、手机纪实、胶片质感和商业摄影。"
+      }
+    },
+    {
+      "id": "cat-illustration",
+      "value": "Illustration & Art",
+      "anchor": "cat-illustration",
+      "templateAnchor": "tpl-illustration",
+      "cover": "/images/category-covers/illustration.jpg",
+      "title": {
+        "en": "Illustration & Art",
+        "zh": "插画与艺术"
+      },
+      "description": {
+        "en": "Illustration, art styles, material experiments, and decorative images.",
+        "zh": "插画、艺术风格、材质实验和装饰画面。"
+      }
+    },
+    {
+      "id": "cat-character",
+      "value": "Characters & People",
+      "anchor": "cat-character",
+      "templateAnchor": "tpl-character",
+      "cover": "/images/category-covers/character.jpg",
+      "title": {
+        "en": "Characters & People",
+        "zh": "人物与角色"
+      },
+      "description": {
+        "en": "Character design, pose references, cards, and 3D toys.",
+        "zh": "角色设定、动作参考、卡牌和 3D 玩具。"
+      }
+    },
+    {
+      "id": "cat-scene",
+      "value": "Scenes & Storytelling",
+      "anchor": "cat-scene",
+      "templateAnchor": "tpl-scene",
+      "cover": "/images/category-covers/scene.jpg",
+      "title": {
+        "en": "Scenes & Storytelling",
+        "zh": "场景与叙事"
+      },
+      "description": {
+        "en": "Storyboards, narrative scenes, livestream frames, and worldbuilding.",
+        "zh": "分镜、故事场景、直播画面和世界观叙事。"
+      }
+    },
+    {
+      "id": "cat-history",
+      "value": "History & Classical Themes",
+      "anchor": "cat-history",
+      "templateAnchor": "tpl-history",
+      "cover": "/images/category-covers/history.jpg",
+      "title": {
+        "en": "History & Classical Themes",
+        "zh": "历史与古风题材"
+      },
+      "description": {
+        "en": "Classical scrolls, historical figures, traditional themes, and poetry visuals.",
+        "zh": "古风长卷、历史人物、传统题材和诗词画面。"
+      }
+    },
+    {
+      "id": "cat-document",
+      "value": "Documents & Publishing",
+      "anchor": "cat-document",
+      "templateAnchor": "tpl-document",
+      "cover": "/images/category-covers/document.jpg",
+      "title": {
+        "en": "Documents & Publishing",
+        "zh": "文档与出版物"
+      },
+      "description": {
+        "en": "White papers, manuals, encyclopedic plates, and publishing layouts.",
+        "zh": "白皮书、手册、百科图鉴和出版页设计。"
+      }
+    },
+    {
+      "id": "cat-other",
+      "value": "Other Use Cases",
+      "anchor": "cat-other",
+      "templateAnchor": "tpl-other",
+      "cover": "/images/category-covers/other.jpg",
+      "title": {
+        "en": "Other Use Cases",
+        "zh": "其他应用场景"
+      },
+      "description": {
+        "en": "Creative experiments, special tasks, mixed workflows, and practical cases.",
+        "zh": "创意实验、特殊任务、混合玩法和实用场景。"
+      }
+    }
+  ],
+  "styles": [
+    {
+      "id": "3d",
+      "value": "3D",
+      "title": {
+        "en": "3D",
+        "zh": "3D"
+      },
+      "keywords": [
+        "3d",
+        "toy",
+        "render",
+        "玩具"
+      ]
+    },
+    {
+      "id": "architecture",
+      "value": "Architecture",
+      "title": {
+        "en": "Architecture",
+        "zh": "建筑"
+      },
+      "keywords": []
+    },
+    {
+      "id": "brand",
+      "value": "Brand",
+      "title": {
+        "en": "Brand",
+        "zh": "品牌"
+      },
+      "keywords": [
+        "brand",
+        "logo",
+        "identity",
+        "品牌",
+        "标志"
+      ]
+    },
+    {
+      "id": "character",
+      "value": "Character",
+      "title": {
+        "en": "Character",
+        "zh": "角色"
+      },
+      "keywords": [
+        "character",
+        "avatar",
+        "pose",
+        "角色",
+        "人物"
+      ]
+    },
+    {
+      "id": "characters",
+      "value": "Characters",
+      "title": {
+        "en": "Characters",
+        "zh": "人物"
+      },
+      "keywords": []
+    },
+    {
+      "id": "charts",
+      "value": "Charts",
+      "title": {
+        "en": "Charts",
+        "zh": "图表"
+      },
+      "keywords": []
+    },
+    {
+      "id": "classical",
+      "value": "Classical",
+      "title": {
+        "en": "Classical",
+        "zh": "古典"
+      },
+      "keywords": [
+        "classical",
+        "dynasty",
+        "history",
+        "古风",
+        "历史"
+      ]
+    },
+    {
+      "id": "documents",
+      "value": "Documents",
+      "title": {
+        "en": "Documents",
+        "zh": "文档"
+      },
+      "keywords": []
+    },
+    {
+      "id": "history",
+      "value": "History",
+      "title": {
+        "en": "History",
+        "zh": "历史"
+      },
+      "keywords": []
+    },
+    {
+      "id": "illustration",
+      "value": "Illustration",
+      "title": {
+        "en": "Illustration",
+        "zh": "插画"
+      },
+      "keywords": [
+        "illustration",
+        "painting",
+        "watercolor",
+        "插画",
+        "绘画"
+      ]
+    },
+    {
+      "id": "infographic",
+      "value": "Infographic",
+      "title": {
+        "en": "Infographic",
+        "zh": "信息图"
+      },
+      "keywords": [
+        "infographic",
+        "diagram",
+        "信息图",
+        "图解"
+      ]
+    },
+    {
+      "id": "other",
+      "value": "Other Use Cases",
+      "title": {
+        "en": "Other Use Cases",
+        "zh": "其他应用场景"
+      },
+      "keywords": []
+    },
+    {
+      "id": "photography",
+      "value": "Photography",
+      "title": {
+        "en": "Photography",
+        "zh": "摄影"
+      },
+      "keywords": []
+    },
+    {
+      "id": "poster",
+      "value": "Poster",
+      "title": {
+        "en": "Poster",
+        "zh": "海报"
+      },
+      "keywords": [
+        "poster",
+        "cover",
+        "typography",
+        "海报",
+        "封面"
+      ]
+    },
+    {
+      "id": "product",
+      "value": "Product",
+      "title": {
+        "en": "Product",
+        "zh": "商品"
+      },
+      "keywords": [
+        "product",
+        "packaging",
+        "商品",
+        "包装"
+      ]
+    },
+    {
+      "id": "products",
+      "value": "Products",
+      "title": {
+        "en": "Products",
+        "zh": "商品"
+      },
+      "keywords": []
+    },
+    {
+      "id": "realistic",
+      "value": "Realistic",
+      "title": {
+        "en": "Realistic",
+        "zh": "写实"
+      },
+      "keywords": [
+        "photo",
+        "realistic",
+        "camera",
+        "写真",
+        "写实"
+      ]
+    },
+    {
+      "id": "scenes",
+      "value": "Scenes",
+      "title": {
+        "en": "Scenes",
+        "zh": "场景"
+      },
+      "keywords": []
+    },
+    {
+      "id": "ui",
+      "value": "UI",
+      "title": {
+        "en": "UI",
+        "zh": "界面"
+      },
+      "keywords": [
+        "ui",
+        "interface",
+        "dashboard",
+        "界面",
+        "截图"
+      ]
+    }
+  ],
+  "scenes": [
+    {
+      "id": "creative",
+      "value": "Creative",
+      "title": {
+        "en": "Creative",
+        "zh": "创意"
+      },
+      "keywords": []
+    },
+    {
+      "id": "tech",
+      "value": "Tech",
+      "title": {
+        "en": "Tech",
+        "zh": "科技"
+      },
+      "keywords": [
+        "ai",
+        "rag",
+        "tech",
+        "data",
+        "技术",
+        "数据"
+      ]
+    },
+    {
+      "id": "commerce",
+      "value": "Commerce",
+      "title": {
+        "en": "Commerce",
+        "zh": "商业"
+      },
+      "keywords": [
+        "product",
+        "brand",
+        "ad",
+        "campaign",
+        "商品",
+        "商业",
+        "广告"
+      ]
+    },
+    {
+      "id": "education",
+      "value": "Education",
+      "title": {
+        "en": "Education",
+        "zh": "教育"
+      },
+      "keywords": [
+        "guide",
+        "atlas",
+        "science",
+        "learning",
+        "学习",
+        "科普"
+      ]
+    },
+    {
+      "id": "social",
+      "value": "Social",
+      "title": {
+        "en": "Social",
+        "zh": "社媒"
+      },
+      "keywords": [
+        "social",
+        "x ",
+        "wechat",
+        "朋友圈",
+        "社媒"
+      ]
+    },
+    {
+      "id": "fashion",
+      "value": "Fashion",
+      "title": {
+        "en": "Fashion",
+        "zh": "时尚"
+      },
+      "keywords": [
+        "fashion",
+        "clothing",
+        "portrait",
+        "服饰",
+        "写真"
+      ]
+    },
+    {
+      "id": "food",
+      "value": "Food",
+      "title": {
+        "en": "Food",
+        "zh": "食品饮品"
+      },
+      "keywords": [
+        "food",
+        "drink",
+        "coffee",
+        "tea",
+        "餐厅",
+        "咖啡",
+        "茶"
+      ]
+    },
+    {
+      "id": "travel",
+      "value": "Travel",
+      "title": {
+        "en": "Travel",
+        "zh": "旅行"
+      },
+      "keywords": [
+        "city",
+        "map",
+        "street",
+        "城市",
+        "地图",
+        "街头"
+      ]
+    },
+    {
+      "id": "story",
+      "value": "Story",
+      "title": {
+        "en": "Story",
+        "zh": "叙事"
+      },
+      "keywords": [
+        "story",
+        "scene",
+        "world",
+        "故事",
+        "场景"
+      ]
+    },
+    {
+      "id": "history",
+      "value": "History",
+      "title": {
+        "en": "History",
+        "zh": "历史"
+      },
+      "keywords": [
+        "history",
+        "dynasty",
+        "ancient",
+        "历史",
+        "古希腊",
+        "唐"
+      ]
+    }
+  ],
+  "templates": [
+    {
+      "id": "ui-screenshot-system",
+      "anchor": "tpl-ui",
+      "cover": "./creator-studio/images/case17.jpg",
+      "title": {
+        "en": "UI Screenshot System",
+        "zh": "UI 截图系统"
+      },
+      "description": {
+        "en": "High-fidelity app, web, dashboard, and social interface prompts.",
+        "zh": "生成 App、网页、仪表盘、社媒截图等高保真界面。"
+      },
+      "category": "UI & Interfaces",
+      "styles": [
+        "UI"
+      ],
+      "scenes": [
+        "Tech",
+        "Social"
+      ],
+      "tags": [
+        "UI",
+        "Dashboard",
+        "Screenshot"
+      ],
+      "useWhen": {
+        "en": "Use for app screens, dashboards, social screenshots, and live interface mockups.",
+        "zh": "用于 App 截图、仪表盘、社媒截图和直播界面。"
+      },
+      "guidance": {
+        "en": [
+          "Lock platform, aspect ratio, layout hierarchy, and exact visible text.",
+          "Specify UI chrome such as status bars, tabs, action rows, or comment layers."
+        ],
+        "zh": [
+          "锁定平台、比例、层级和画面文字。",
+          "明确状态栏、Tab、操作区、评论层等 UI 元素。"
+        ]
+      },
+      "pitfalls": {
+        "en": [
+          "Avoid vague platform names and generic app mockups.",
+          "Constrain text readability and platform-specific details."
+        ],
+        "zh": [
+          "避免平台描述过泛。",
+          "约束文字可读性和平台特征。"
+        ]
+      },
+      "exampleCases": [
+        17,
+        2,
+        4
+      ]
+    },
+    {
+      "id": "infographic-engine",
+      "anchor": "tpl-infographic",
+      "cover": "./creator-studio/images/case334.png",
+      "title": {
+        "en": "Infographic Engine",
+        "zh": "信息图引擎"
+      },
+      "description": {
+        "en": "Structured diagrams, timelines, knowledge maps, and explainers.",
+        "zh": "生成结构化图解、时间线、知识图谱和技术解释图。"
+      },
+      "category": "Charts & Infographics",
+      "styles": [
+        "Infographic",
+        "Charts"
+      ],
+      "scenes": [
+        "Education",
+        "Tech"
+      ],
+      "tags": [
+        "Infographic",
+        "Chart",
+        "Education"
+      ],
+      "useWhen": {
+        "en": "Use for explainer graphics, technical diagrams, timelines, and knowledge cards.",
+        "zh": "用于解释图、技术图解、时间线和知识卡片。"
+      },
+      "guidance": {
+        "en": [
+          "Define 3-5 modules, information flow, visual hierarchy, and short labels.",
+          "Use color groups, arrows, icons, and clean spacing to reduce clutter."
+        ],
+        "zh": [
+          "定义 3-5 个模块、信息流、层级和短标签。",
+          "用色块、箭头、图标和留白控制复杂度。"
+        ]
+      },
+      "pitfalls": {
+        "en": [
+          "Avoid long paragraphs inside the image.",
+          "Limit module count before adding visual detail."
+        ],
+        "zh": [
+          "避免把长段正文塞进画面。",
+          "先限制模块数量，再补视觉细节。"
+        ]
+      },
+      "exampleCases": [
+        334,
+        1,
+        8
+      ]
+    },
+    {
+      "id": "scientific-scale-diagram",
+      "anchor": "tpl-infographic",
+      "cover": "./creator-studio/images/case341.jpg",
+      "title": {
+        "en": "Scientific Scale Diagram",
+        "zh": "科学尺度缩放图"
+      },
+      "description": {
+        "en": "Multi-scale science visuals with readable labels and hierarchy.",
+        "zh": "生成多尺度科学信息图，强调层级、标签和可读性。"
+      },
+      "category": "Charts & Infographics",
+      "styles": [
+        "Infographic",
+        "Charts",
+        "Realistic"
+      ],
+      "scenes": [
+        "Education",
+        "Tech"
+      ],
+      "tags": [
+        "Infographic",
+        "Chart",
+        "Education"
+      ],
+      "useWhen": {
+        "en": "Use when the topic needs micro-to-macro scale comparison and labeled detail windows.",
+        "zh": "用于需要从微观到宏观展示尺度变化的科普主题。"
+      },
+      "guidance": {
+        "en": [
+          "Use 6-8 scale frames and keep each label short.",
+          "Show units, magnification, and distinct scale detail."
+        ],
+        "zh": [
+          "使用 6-8 个尺度框，每个标签保持短句。",
+          "展示单位、倍率和不同尺度的细节。"
+        ]
+      },
+      "pitfalls": {
+        "en": [
+          "Avoid making every scale frame visually identical.",
+          "Avoid generic magnifying glass icon layouts."
+        ],
+        "zh": [
+          "避免所有尺度框长得一样。",
+          "避免通用放大镜式布局。"
+        ]
+      },
+      "exampleCases": [
+        341
+      ]
+    },
+    {
+      "id": "poster-layout-system",
+      "anchor": "tpl-poster",
+      "cover": "./creator-studio/images/case345.jpg",
+      "title": {
+        "en": "Poster Layout System",
+        "zh": "海报排版系统"
+      },
+      "description": {
+        "en": "Event, product, movie, and social poster compositions.",
+        "zh": "生成活动、产品、电影和社媒传播海报。"
+      },
+      "category": "Posters & Typography",
+      "styles": [
+        "Poster"
+      ],
+      "scenes": [
+        "Commerce",
+        "Social"
+      ],
+      "tags": [
+        "Poster",
+        "Typography",
+        "Campaign"
+      ],
+      "useWhen": {
+        "en": "Use for event posters, movie posters, covers, and social campaign visuals.",
+        "zh": "用于活动海报、电影海报、封面和社媒传播视觉。"
+      },
+      "guidance": {
+        "en": [
+          "Lock subject, headline, layout, palette, and aspect ratio.",
+          "Make the title hierarchy and primary visual clear."
+        ],
+        "zh": [
+          "锁定主体、标题、版式、配色和比例。",
+          "突出标题层级和主视觉。"
+        ]
+      },
+      "pitfalls": {
+        "en": [
+          "Avoid mixed moodboards or process sheets when asking for one finished poster.",
+          "Constrain extra text and decorative symbols."
+        ],
+        "zh": [
+          "需要成品海报时，避免生成拼贴展示板。",
+          "约束多余文字和装饰符号。"
+        ]
+      },
+      "exampleCases": [
+        345,
+        5,
+        10
+      ]
+    },
+    {
+      "id": "sports-campaign-poster",
+      "anchor": "tpl-poster",
+      "cover": "./creator-studio/images/case350.jpg",
+      "title": {
+        "en": "Sports Campaign Poster",
+        "zh": "运动商业 Campaign"
+      },
+      "description": {
+        "en": "Commercial sports visuals with athletes, props, and brand color.",
+        "zh": "生成运动员、道具、品牌色统一的商业运动海报。"
+      },
+      "category": "Posters & Typography",
+      "styles": [
+        "Poster",
+        "Realistic"
+      ],
+      "scenes": [
+        "Commerce",
+        "Fashion"
+      ],
+      "tags": [
+        "Poster",
+        "Campaign",
+        "Typography"
+      ],
+      "useWhen": {
+        "en": "Use for sports brand campaigns, athlete posters, and product-led sport visuals.",
+        "zh": "用于运动品牌 Campaign、运动员海报和运动产品视觉。"
+      },
+      "guidance": {
+        "en": [
+          "Define sport, athlete pose, hero prop, title, and brand palette.",
+          "Use dramatic light, clean composition, and readable data overlays."
+        ],
+        "zh": [
+          "定义运动项目、姿态、核心道具、标题和品牌色。",
+          "使用强光影、干净构图和可读数据层。"
+        ]
+      },
+      "pitfalls": {
+        "en": [
+          "Avoid wrong equipment and noisy collage.",
+          "Keep the athlete and hero prop visually dominant."
+        ],
+        "zh": [
+          "避免错误运动器材和杂乱拼贴。",
+          "让运动员和核心道具占据主导。"
+        ]
+      },
+      "exampleCases": [
+        350,
+        3
+      ]
+    },
+    {
+      "id": "conceptual-typography-poster",
+      "anchor": "tpl-poster",
+      "cover": "./creator-studio/images/case355.jpg",
+      "title": {
+        "en": "Conceptual Typography Poster",
+        "zh": "概念字体海报"
+      },
+      "description": {
+        "en": "Premium title-led posters with strong typographic systems.",
+        "zh": "生成以标题文字为主视觉的高级字体海报。"
+      },
+      "category": "Posters & Typography",
+      "styles": [
+        "Poster"
+      ],
+      "scenes": [
+        "Creative",
+        "Social"
+      ],
+      "tags": [
+        "Typography",
+        "Poster",
+        "Style"
+      ],
+      "useWhen": {
+        "en": "Use when the exact title must become the main visual structure.",
+        "zh": "用于标题文字需要成为主视觉结构的海报。"
+      },
+      "guidance": {
+        "en": [
+          "Make typography the hero and spell the title exactly.",
+          "Tie human figures, objects, or landscapes to the title meaning."
+        ],
+        "zh": [
+          "让字体成为画面主角，并保证标题拼写准确。",
+          "人物、物体或风景需要服务标题含义。"
+        ]
+      },
+      "pitfalls": {
+        "en": [
+          "Avoid default word art, unrelated icons, and misspelled title text.",
+          "Limit the color system to a restrained palette."
+        ],
+        "zh": [
+          "避免默认字效、无关图标和标题错字。",
+          "控制配色数量，保持克制。"
+        ]
+      },
+      "exampleCases": [
+        355
+      ]
+    },
+    {
+      "id": "ink-double-exposure-poster",
+      "anchor": "tpl-poster",
+      "cover": "./creator-studio/images/case359.jpg",
+      "title": {
+        "en": "Ink Double Exposure Poster",
+        "zh": "水墨双重曝光海报"
+      },
+      "description": {
+        "en": "Chinese ink, portrait, and layered atmosphere composition.",
+        "zh": "生成水墨、人像与层叠氛围结合的视觉海报。"
+      },
+      "category": "Posters & Typography",
+      "styles": [
+        "Poster",
+        "Illustration",
+        "Classical"
+      ],
+      "scenes": [
+        "Story",
+        "History"
+      ],
+      "tags": [
+        "Poster",
+        "Classical",
+        "Style"
+      ],
+      "useWhen": {
+        "en": "Use for poetic portrait posters, ink atmospheres, and layered cultural visuals.",
+        "zh": "用于诗意人像海报、水墨氛围和文化主题视觉。"
+      },
+      "guidance": {
+        "en": [
+          "Blend portrait silhouette, ink texture, atmosphere, and negative space.",
+          "Keep composition quiet, premium, and readable."
+        ],
+        "zh": [
+          "融合人像剪影、水墨质感、氛围和留白。",
+          "保持构图克制、高级、可读。"
+        ]
+      },
+      "pitfalls": {
+        "en": [
+          "Avoid cheap fantasy collage and overloaded scenery.",
+          "Use subtle text or no text unless required."
+        ],
+        "zh": [
+          "避免廉价奇幻拼贴和景物堆叠。",
+          "非必要时减少文字。"
+        ]
+      },
+      "exampleCases": [
+        359
+      ]
+    },
+    {
+      "id": "nature-science-poster",
+      "anchor": "tpl-poster",
+      "cover": "./creator-studio/images/case339.jpg",
+      "title": {
+        "en": "Nature Science Poster",
+        "zh": "自然科普海报"
+      },
+      "description": {
+        "en": "Minimal product-style science posters for natural subjects.",
+        "zh": "生成极简产品感自然科普海报。"
+      },
+      "category": "Posters & Typography",
+      "styles": [
+        "Poster",
+        "Infographic"
+      ],
+      "scenes": [
+        "Education"
+      ],
+      "tags": [
+        "Poster",
+        "Education",
+        "Style"
+      ],
+      "useWhen": {
+        "en": "Use for natural subjects that need a premium, clean science poster feel.",
+        "zh": "用于自然主题的高级、干净科普海报。"
+      },
+      "guidance": {
+        "en": [
+          "Use a clear subject, minimal copy, soft shadows, and disciplined whitespace.",
+          "Keep the scientific label short and visible."
+        ],
+        "zh": [
+          "使用清晰主体、少量文案、柔和阴影和充足留白。",
+          "让科普标签短而清楚。"
+        ]
+      },
+      "pitfalls": {
+        "en": [
+          "Avoid heavy advertising language.",
+          "Avoid dense encyclopedia blocks."
+        ],
+        "zh": [
+          "避免广告感太重。",
+          "避免密集百科正文。"
+        ]
+      },
+      "exampleCases": [
+        339
+      ]
+    },
+    {
+      "id": "product-commerce-visual",
+      "anchor": "tpl-product",
+      "cover": "./creator-studio/images/case373.jpg",
+      "title": {
+        "en": "Product Commerce Visual",
+        "zh": "商品商业视觉"
+      },
+      "description": {
+        "en": "Product shots, packaging, detail pages, and selling-point layouts.",
+        "zh": "生成商品图、包装、详情页和卖点排版。"
+      },
+      "category": "Products & E-commerce",
+      "styles": [
+        "Product",
+        "Realistic"
+      ],
+      "scenes": [
+        "Commerce",
+        "Food"
+      ],
+      "tags": [
+        "Product",
+        "Commerce",
+        "Packaging"
+      ],
+      "useWhen": {
+        "en": "Use for product hero shots, packaging visuals, detail pages, and sales layouts.",
+        "zh": "用于商品主图、包装视觉、详情页和销售卖点排版。"
+      },
+      "guidance": {
+        "en": [
+          "Define product, selling points, material, scene, lighting, and layout blocks.",
+          "Separate hero product, benefit labels, and supporting props."
+        ],
+        "zh": [
+          "定义商品、卖点、材质、场景、光线和版块。",
+          "区分主商品、卖点标签和辅助道具。"
+        ]
+      },
+      "pitfalls": {
+        "en": [
+          "Avoid random props that weaken product recognition.",
+          "Constrain packaging text and claim wording."
+        ],
+        "zh": [
+          "避免无关道具削弱商品识别。",
+          "约束包装文字和卖点表达。"
+        ]
+      },
+      "exampleCases": [
+        373,
+        358
+      ]
+    },
+    {
+      "id": "personalized-beauty-report",
+      "anchor": "tpl-product",
+      "cover": "./creator-studio/images/case353.jpg",
+      "title": {
+        "en": "Personalized Beauty Report",
+        "zh": "个性化美妆报告"
+      },
+      "description": {
+        "en": "Recommendation-report layouts for beauty and lifestyle products.",
+        "zh": "生成美妆与生活方式产品的推荐报告版式。"
+      },
+      "category": "Products & E-commerce",
+      "styles": [
+        "Product",
+        "UI"
+      ],
+      "scenes": [
+        "Commerce",
+        "Fashion"
+      ],
+      "tags": [
+        "Product",
+        "Layout",
+        "Style"
+      ],
+      "useWhen": {
+        "en": "Use for beauty recommendations, skin reports, shopping assistants, and lifestyle product cards.",
+        "zh": "用于美妆推荐、肤质报告、导购助手和生活方式商品卡片。"
+      },
+      "guidance": {
+        "en": [
+          "Use a report-like hierarchy with diagnosis, recommendation, and product cards.",
+          "Keep product images, labels, and ratings aligned."
+        ],
+        "zh": [
+          "使用诊断、推荐和商品卡片的报告层级。",
+          "对齐商品图、标签和评分。"
+        ]
+      },
+      "pitfalls": {
+        "en": [
+          "Avoid medical claims and unreadable dense notes.",
+          "Keep recommendation logic simple."
+        ],
+        "zh": [
+          "避免医疗化结论和难读小字。",
+          "保持推荐逻辑清楚。"
+        ]
+      },
+      "exampleCases": [
+        353
+      ]
+    },
+    {
+      "id": "brand-identity-package",
+      "anchor": "tpl-brand",
+      "cover": "./creator-studio/images/case354.jpg",
+      "title": {
+        "en": "Brand Identity Package",
+        "zh": "品牌身份包"
+      },
+      "description": {
+        "en": "Logo, palette, typography, applications, and brand touchpoints.",
+        "zh": "生成 Logo、配色、字体、应用触点与品牌系统。"
+      },
+      "category": "Brand & Logos",
+      "styles": [
+        "Brand"
+      ],
+      "scenes": [
+        "Commerce"
+      ],
+      "tags": [
+        "Brand",
+        "Logo",
+        "Identity"
+      ],
+      "useWhen": {
+        "en": "Use for logo systems, brand boards, visual identity kits, and application mockups.",
+        "zh": "用于 Logo 系统、品牌板、VI 套件和应用样机。"
+      },
+      "guidance": {
+        "en": [
+          "Define brand name, positioning, palette, typography, logo usage, and touchpoints.",
+          "Ask for a coherent board with aligned applications."
+        ],
+        "zh": [
+          "定义品牌名、定位、配色、字体、Logo 用法和触点。",
+          "要求视觉板中的应用统一对齐。"
+        ]
+      },
+      "pitfalls": {
+        "en": [
+          "Avoid unrelated logo variants and inconsistent palettes.",
+          "Keep brand text accurate."
+        ],
+        "zh": [
+          "避免无关 Logo 变体和混乱配色。",
+          "保持品牌文字准确。"
+        ]
+      },
+      "exampleCases": [
+        354
+      ]
+    },
+    {
+      "id": "brand-touchpoint-board",
+      "anchor": "tpl-brand",
+      "cover": "./creator-studio/images/case362.jpg",
+      "title": {
+        "en": "Brand Touchpoint Board",
+        "zh": "品牌触点视觉板"
+      },
+      "description": {
+        "en": "Campaign boards across packaging, social, web, and display contexts.",
+        "zh": "生成包装、社媒、网页和展示场景里的品牌触点板。"
+      },
+      "category": "Brand & Logos",
+      "styles": [
+        "Brand",
+        "Product"
+      ],
+      "scenes": [
+        "Commerce",
+        "Social"
+      ],
+      "tags": [
+        "Brand",
+        "Identity",
+        "Campaign"
+      ],
+      "useWhen": {
+        "en": "Use for multi-touchpoint campaign boards and brand rollout previews.",
+        "zh": "用于多触点 Campaign 展示和品牌落地预览。"
+      },
+      "guidance": {
+        "en": [
+          "Specify touchpoint list, shared visual rules, and mockup arrangement.",
+          "Use one palette and one typography logic across all panels."
+        ],
+        "zh": [
+          "指定触点清单、统一视觉规则和样机排列。",
+          "让所有面板共享配色和字体逻辑。"
+        ]
+      },
+      "pitfalls": {
+        "en": [
+          "Avoid mixing many unrelated campaign styles.",
+          "Limit touchpoints if readability drops."
+        ],
+        "zh": [
+          "避免混入多个无关 Campaign 风格。",
+          "可读性下降时减少触点数量。"
+        ]
+      },
+      "exampleCases": [
+        362
+      ]
+    },
+    {
+      "id": "architecture-space",
+      "anchor": "tpl-architecture",
+      "cover": "./creator-studio/images/case331.png",
+      "title": {
+        "en": "Architecture & Space",
+        "zh": "建筑与空间"
+      },
+      "description": {
+        "en": "Interior, exterior, city, map, and spatial concept visuals.",
+        "zh": "生成室内、建筑、城市地图和空间概念视觉。"
+      },
+      "category": "Architecture & Spaces",
+      "styles": [
+        "Architecture"
+      ],
+      "scenes": [
+        "Travel",
+        "Commerce"
+      ],
+      "tags": [
+        "Architecture",
+        "Interior",
+        "Map"
+      ],
+      "useWhen": {
+        "en": "Use for interiors, architecture renders, city maps, spatial plans, and environment concepts.",
+        "zh": "用于室内、建筑表现、城市地图、空间规划和环境概念图。"
+      },
+      "guidance": {
+        "en": [
+          "Define viewpoint, scale, material, lighting, and spatial function.",
+          "For maps, specify landmarks, labels, border decoration, and visual accuracy level."
+        ],
+        "zh": [
+          "定义视角、尺度、材质、光线和空间功能。",
+          "地图需要指定地标、标签、边框装饰和准确度。"
+        ]
+      },
+      "pitfalls": {
+        "en": [
+          "Avoid impossible perspectives unless the output is conceptual.",
+          "Lock map label language and relative placement."
+        ],
+        "zh": [
+          "概念图之外要避免不合理透视。",
+          "锁定地图标签语言和相对位置。"
+        ]
+      },
+      "exampleCases": [
+        331,
+        11
+      ]
+    },
+    {
+      "id": "realistic-photography",
+      "anchor": "tpl-photo",
+      "cover": "./creator-studio/images/case377.jpg",
+      "title": {
+        "en": "Realistic Photography",
+        "zh": "写实摄影"
+      },
+      "description": {
+        "en": "Lens, lighting, film texture, and documentary-style photo prompts.",
+        "zh": "控制镜头、光线、胶片质感和纪实摄影效果。"
+      },
+      "category": "Photography & Realism",
+      "styles": [
+        "Photography",
+        "Realistic"
+      ],
+      "scenes": [
+        "Fashion",
+        "Commerce"
+      ],
+      "tags": [
+        "Photography",
+        "Realistic",
+        "Lens"
+      ],
+      "useWhen": {
+        "en": "Use for portraits, street photos, product photography, and cinematic realism.",
+        "zh": "用于人像、街拍、商品摄影和电影感写实。"
+      },
+      "guidance": {
+        "en": [
+          "Specify camera distance, lens, light source, texture, background, and motion.",
+          "Use believable imperfections for documentary realism."
+        ],
+        "zh": [
+          "指定机位、镜头、光源、质感、背景和动作。",
+          "加入可信的小瑕疵增强纪实感。"
+        ]
+      },
+      "pitfalls": {
+        "en": [
+          "Avoid over-polished plastic skin unless commercial beauty is required.",
+          "Add negative constraints for hands, text, and anatomy when needed."
+        ],
+        "zh": [
+          "商业美妆之外，避免过度磨皮。",
+          "需要时加入手部、文字、结构类负面约束。"
+        ]
+      },
+      "exampleCases": [
+        377
+      ]
+    },
+    {
+      "id": "street-accident-moment",
+      "anchor": "tpl-photo",
+      "cover": "./creator-studio/images/case376.jpg",
+      "title": {
+        "en": "Street Accident Moment",
+        "zh": "街头意外瞬间摄影"
+      },
+      "description": {
+        "en": "Realistic phone-photo scenes with negative constraints.",
+        "zh": "生成手机纪实风街头瞬间，并加入负面约束。"
+      },
+      "category": "Photography & Realism",
+      "styles": [
+        "Photography",
+        "Realistic"
+      ],
+      "scenes": [
+        "Travel",
+        "Social"
+      ],
+      "tags": [
+        "Photography",
+        "Realistic",
+        "Scene"
+      ],
+      "useWhen": {
+        "en": "Use for candid street moments, accidental spills, documentary phone shots, and fast action.",
+        "zh": "用于街头抓拍、意外泼洒、手机纪实和快速动作。"
+      },
+      "guidance": {
+        "en": [
+          "Describe the exact moment, camera height, motion blur, and street context.",
+          "Add negative constraints for staged poses and fake ad lighting."
+        ],
+        "zh": [
+          "描述具体瞬间、机位高度、运动模糊和街景。",
+          "加入避免摆拍和广告棚拍感的限制。"
+        ]
+      },
+      "pitfalls": {
+        "en": [
+          "Avoid too-clean compositions.",
+          "Keep the event plausible and grounded."
+        ],
+        "zh": [
+          "避免画面过于干净。",
+          "让事件看起来可信。"
+        ]
+      },
+      "exampleCases": [
+        376
+      ]
+    },
+    {
+      "id": "illustration-art-style",
+      "anchor": "tpl-illustration",
+      "cover": "./creator-studio/images/case346.jpg",
+      "title": {
+        "en": "Illustration & Art Style",
+        "zh": "插画与艺术风格"
+      },
+      "description": {
+        "en": "Anime, watercolor, ink, material experiments, and art direction.",
+        "zh": "生成动漫、水彩、水墨、材质实验和艺术风格图。"
+      },
+      "category": "Illustration & Art",
+      "styles": [
+        "Illustration"
+      ],
+      "scenes": [
+        "Story",
+        "Creative"
+      ],
+      "tags": [
+        "Illustration",
+        "Art",
+        "Style"
+      ],
+      "useWhen": {
+        "en": "Use for anime, watercolor, ink, decorative art, and style experiments.",
+        "zh": "用于动漫、水彩、水墨、装饰画和风格实验。"
+      },
+      "guidance": {
+        "en": [
+          "Define composition, subject, palette, brush material, mood, and rendering depth.",
+          "For reference images, state what must be preserved."
+        ],
+        "zh": [
+          "定义构图、主体、配色、笔触材质、情绪和完成度。",
+          "参考图任务需要说明保留哪些特征。"
+        ]
+      },
+      "pitfalls": {
+        "en": [
+          "Avoid style-only prompts without composition.",
+          "Lock character identity when using references."
+        ],
+        "zh": [
+          "避免只写风格，不写构图。",
+          "使用参考图时锁定角色识别。"
+        ]
+      },
+      "exampleCases": [
+        346,
+        6
+      ]
+    },
+    {
+      "id": "character-design-sheet",
+      "anchor": "tpl-character",
+      "cover": "./creator-studio/images/case347.jpg",
+      "title": {
+        "en": "Character Design Sheet",
+        "zh": "角色设定表"
+      },
+      "description": {
+        "en": "Characters, pose sheets, action grids, and identity consistency.",
+        "zh": "生成角色设定、动作分解和一致性参考。"
+      },
+      "category": "Characters & People",
+      "styles": [
+        "Character",
+        "Illustration"
+      ],
+      "scenes": [
+        "Story"
+      ],
+      "tags": [
+        "Character",
+        "Pose",
+        "Style"
+      ],
+      "useWhen": {
+        "en": "Use for character sheets, pose grids, action breakdowns, and identity references.",
+        "zh": "用于角色设定表、动作网格、动作拆解和一致性参考。"
+      },
+      "guidance": {
+        "en": [
+          "Define identity anchors, outfit, proportions, pose count, and sheet layout.",
+          "Keep face, hairstyle, and costume details consistent."
+        ],
+        "zh": [
+          "定义身份锚点、服装、比例、动作数量和版式。",
+          "保持脸、发型和服装细节一致。"
+        ]
+      },
+      "pitfalls": {
+        "en": [
+          "Avoid changing costume details between poses.",
+          "Limit pose count if the sheet becomes crowded."
+        ],
+        "zh": [
+          "避免不同动作里服装细节变化。",
+          "画面拥挤时减少动作数量。"
+        ]
+      },
+      "exampleCases": [
+        347
+      ]
+    },
+    {
+      "id": "3d-collectible-toy",
+      "anchor": "tpl-character",
+      "cover": "./creator-studio/images/case378.jpg",
+      "title": {
+        "en": "3D Collectible Toy",
+        "zh": "3D 收藏玩具"
+      },
+      "description": {
+        "en": "Reference photo to premium 3D collectible figure prompts.",
+        "zh": "把参考图转换成高级 3D 收藏玩具效果。"
+      },
+      "category": "Characters & People",
+      "styles": [
+        "3D",
+        "Character"
+      ],
+      "scenes": [
+        "Commerce",
+        "Creative"
+      ],
+      "tags": [
+        "Character",
+        "3D",
+        "Style"
+      ],
+      "useWhen": {
+        "en": "Use for premium collectible figures, avatar toys, blind-box characters, and 3D display renders.",
+        "zh": "用于高级收藏玩具、头像公仔、潮玩角色和 3D 展示图。"
+      },
+      "guidance": {
+        "en": [
+          "Preserve face and outfit anchors from the reference.",
+          "Specify material, packaging, base, lighting, and collectible scale."
+        ],
+        "zh": [
+          "保留参考图中的脸和服装锚点。",
+          "指定材质、包装、底座、光线和收藏比例。"
+        ]
+      },
+      "pitfalls": {
+        "en": [
+          "Avoid generic toy bodies without identity details.",
+          "Keep packaging text minimal and accurate."
+        ],
+        "zh": [
+          "避免没有身份细节的通用玩具。",
+          "包装文字保持少量且准确。"
+        ]
+      },
+      "exampleCases": [
+        378
+      ]
+    },
+    {
+      "id": "scene-storytelling",
+      "anchor": "tpl-scene",
+      "cover": "./creator-studio/images/case330.png",
+      "title": {
+        "en": "Scene Storytelling",
+        "zh": "场景叙事"
+      },
+      "description": {
+        "en": "Storyboards, worldbuilding, narrative scenes, and emotional pacing.",
+        "zh": "生成分镜、世界观、故事场景和情绪节奏。"
+      },
+      "category": "Scenes & Storytelling",
+      "styles": [
+        "Scenes",
+        "Illustration"
+      ],
+      "scenes": [
+        "Story",
+        "Social"
+      ],
+      "tags": [
+        "Scene",
+        "Story",
+        "Storyboard"
+      ],
+      "useWhen": {
+        "en": "Use for storyboards, worldbuilding, live scenes, and emotional narrative frames.",
+        "zh": "用于分镜、世界观、直播场景和情绪叙事画面。"
+      },
+      "guidance": {
+        "en": [
+          "Define who, where, when, conflict, emotion, and camera framing.",
+          "Use scene details to support narrative rather than decoration."
+        ],
+        "zh": [
+          "定义人物、地点、时间、冲突、情绪和机位。",
+          "让场景细节服务故事。"
+        ]
+      },
+      "pitfalls": {
+        "en": [
+          "Avoid generic fantasy backgrounds.",
+          "Keep narrative cues visible in the frame."
+        ],
+        "zh": [
+          "避免通用幻想背景。",
+          "让故事线索在画面里可见。"
+        ]
+      },
+      "exampleCases": [
+        330
+      ]
+    },
+    {
+      "id": "history-classical-themes",
+      "anchor": "tpl-history",
+      "cover": "./creator-studio/images/case375.jpg",
+      "title": {
+        "en": "History & Classical Themes",
+        "zh": "历史与古风题材"
+      },
+      "description": {
+        "en": "Dynasty clothing, scroll narrative, poetry, and traditional motifs.",
+        "zh": "生成朝代服饰、长卷叙事、诗词和传统题材。"
+      },
+      "category": "History & Classical Themes",
+      "styles": [
+        "History",
+        "Classical",
+        "Illustration"
+      ],
+      "scenes": [
+        "History",
+        "Story"
+      ],
+      "tags": [
+        "History",
+        "Classical",
+        "Scroll"
+      ],
+      "useWhen": {
+        "en": "Use for ancient Chinese themes, scrolls, dynasty clothing, poetry visuals, and historical scenes.",
+        "zh": "用于古风题材、长卷、朝代服饰、诗词视觉和历史场景。"
+      },
+      "guidance": {
+        "en": [
+          "Specify dynasty, clothing system, object references, layout format, and cultural mood.",
+          "Use scroll, album page, or poster format deliberately."
+        ],
+        "zh": [
+          "指定朝代、服饰制度、器物参考、版式和文化气质。",
+          "明确长卷、册页或海报形式。"
+        ]
+      },
+      "pitfalls": {
+        "en": [
+          "Avoid mixing dynasties when historical accuracy matters.",
+          "Constrain random modern props."
+        ],
+        "zh": [
+          "需要历史准确时，避免朝代混搭。",
+          "约束随机现代物件。"
+        ]
+      },
+      "exampleCases": [
+        375,
+        338
+      ]
+    },
+    {
+      "id": "document-publishing",
+      "anchor": "tpl-document",
+      "cover": "./creator-studio/images/case360.jpg",
+      "title": {
+        "en": "Document & Publishing",
+        "zh": "文档与出版物"
+      },
+      "description": {
+        "en": "White papers, manuals, encyclopedic plates, and page systems.",
+        "zh": "生成白皮书、手册、百科图鉴和页面系统。"
+      },
+      "category": "Documents & Publishing",
+      "styles": [
+        "Documents",
+        "Infographic"
+      ],
+      "scenes": [
+        "Education",
+        "Tech"
+      ],
+      "tags": [
+        "Document",
+        "Publishing",
+        "Layout"
+      ],
+      "useWhen": {
+        "en": "Use for white papers, manuals, encyclopedic plates, report pages, and publication systems.",
+        "zh": "用于白皮书、手册、百科图鉴、报告页面和出版系统。"
+      },
+      "guidance": {
+        "en": [
+          "Define page size, columns, table of contents, figure system, and typography hierarchy.",
+          "Use readable headings, tables, labels, and page rhythm."
+        ],
+        "zh": [
+          "定义页面尺寸、分栏、目录、图表系统和字体层级。",
+          "使用可读标题、表格、标签和页面节奏。"
+        ]
+      },
+      "pitfalls": {
+        "en": [
+          "Avoid tiny dense text.",
+          "Keep charts and captions aligned to the page grid."
+        ],
+        "zh": [
+          "避免密集小字。",
+          "让图表和说明对齐页面网格。"
+        ]
+      },
+      "exampleCases": [
+        360
+      ]
+    },
+    {
+      "id": "concept-product-breakdown",
+      "anchor": "tpl-other",
+      "cover": "./creator-studio/images/case370.jpg",
+      "title": {
+        "en": "Concept Product Breakdown",
+        "zh": "概念产品研发拆解"
+      },
+      "description": {
+        "en": "R&D boards, exploded views, mixed tasks, and special outputs.",
+        "zh": "生成研发板、拆解图、混合任务和特殊输出。"
+      },
+      "category": "Other Use Cases",
+      "styles": [
+        "Other Use Cases",
+        "Product"
+      ],
+      "scenes": [
+        "Creative",
+        "Tech"
+      ],
+      "tags": [
+        "Creative",
+        "R&D",
+        "Special"
+      ],
+      "useWhen": {
+        "en": "Use for experimental prompt tasks, R&D boards, exploded diagrams, and unusual visual systems.",
+        "zh": "用于实验型任务、研发视觉板、拆解图和特殊视觉系统。"
+      },
+      "guidance": {
+        "en": [
+          "Define the artifact type, components, labels, material logic, and final presentation format.",
+          "Use clear callouts and a controlled technical style."
+        ],
+        "zh": [
+          "定义产物类型、组件、标签、材质逻辑和展示格式。",
+          "使用清晰标注和受控技术风格。"
+        ]
+      },
+      "pitfalls": {
+        "en": [
+          "Avoid unspecified mixed tasks.",
+          "Keep labels short and component relationships visible."
+        ],
+        "zh": [
+          "避免任务边界过泛。",
+          "标签要短，组件关系要清楚。"
+        ]
+      },
+      "exampleCases": [
+        370,
+        361
+      ]
+    }
+  ]
+}

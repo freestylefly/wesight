@@ -1,0 +1,34 @@
+{
+  "schemaVersion": 1,
+  "appVersion": "2026.6.2",
+  "source": {
+    "name": "awesome-gpt-image-2",
+    "repository": "https://github.com/freestylefly/awesome-gpt-image-2",
+    "version": 1,
+    "commit": "5eac7f2523c4fe952d1319207cac0a7f046d0520",
+    "paths": {
+      "cases": "refer/awesome-gpt-image-2/data/cases.json",
+      "styleLibrary": "refer/awesome-gpt-image-2/data/style-library.json"
+    }
+  },
+  "importedAt": "2026-06-05T03:51:35.811Z",
+  "counts": {
+    "cases": 490,
+    "categories": 13,
+    "styles": 19,
+    "scenes": 10,
+    "templates": 22
+  },
+  "runtimeDependency": {
+    "referPathRequired": false,
+    "imageAssetsCopied": false,
+    "thumbnailsCopied": true,
+    "thumbnailMaxSize": 640,
+    "thumbnailPath": "public/creator-studio/images"
+  },
+  "skillStrategy": {
+    "gptImage2StyleLibrary": "skillhub_recommendation",
+    "copiedToSkills": false,
+    "note": "Phase 0-2 keeps the style library as structured renderer data. The Agent skill can be recommended or generated in Phase 3 when Cowork integration starts."
+  }
+}
