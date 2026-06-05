@@ -3,11 +3,21 @@ export interface LocalizedText {
   zh: string;
 }
 
+export interface CreatorStudioImageMetadata {
+  width: number;
+  height: number;
+  aspectRatio: number;
+  mimeType: string;
+  byteSize: number;
+}
+
 export interface CreatorStudioCase {
   id: string;
   sourceCaseId: number;
   title: string;
   image: string | null;
+  imageOriginal: CreatorStudioImageMetadata | null;
+  imageThumbnail: CreatorStudioImageMetadata | null;
   imageAlt: string;
   sourceLabel: string;
   sourceUrl: string | null;

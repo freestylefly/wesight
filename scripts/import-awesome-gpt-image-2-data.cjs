@@ -66,6 +66,98 @@ const getThumbnailPublicPath = (imagePath) => {
   return name ? `${publicThumbnailPrefix}/${name}` : null;
 };
 
+const getThumbnailOutputPath = (imagePath) => {
+  const name = getThumbnailName(imagePath);
+  return name ? path.join(thumbnailDir, name) : null;
+};
+
+const getMimeType = (filePath, buffer) => {
+  if (buffer[0] === 0x89 && buffer[1] === 0x50 && buffer[2] === 0x4e && buffer[3] === 0x47) {
+    return 'image/png';
+  }
+  if (buffer[0] === 0xff && buffer[1] === 0xd8) {
+    return 'image/jpeg';
+  }
+  const ext = path.extname(filePath).toLowerCase();
+  if (ext === '.webp') return 'image/webp';
+  if (ext === '.gif') return 'image/gif';
+  return 'application/octet-stream';
+};
+
+const readPngDimensions = (buffer) => {
+  if (
+    buffer.length < 24
+    || buffer[0] !== 0x89
+    || buffer[1] !== 0x50
+    || buffer[2] !== 0x4e
+    || buffer[3] !== 0x47
+  ) {
+    return null;
+  }
+  return {
+    width: buffer.readUInt32BE(16),
+    height: buffer.readUInt32BE(20),
+  };
+};
+
+const readJpegDimensions = (buffer) => {
+  if (buffer.length < 4 || buffer[0] !== 0xff || buffer[1] !== 0xd8) {
+    return null;
+  }
+
+  let offset = 2;
+  while (offset + 9 < buffer.length) {
+    if (buffer[offset] !== 0xff) {
+      offset += 1;
+      continue;
+    }
+
+    const marker = buffer[offset + 1];
+    if (marker === 0xd9 || marker === 0xda) {
+      break;
+    }
+    const segmentLength = buffer.readUInt16BE(offset + 2);
+    if (segmentLength < 2) {
+      return null;
+    }
+
+    const isStartOfFrame = [
+      0xc0, 0xc1, 0xc2, 0xc3,
+      0xc5, 0xc6, 0xc7,
+      0xc9, 0xca, 0xcb,
+      0xcd, 0xce, 0xcf,
+    ].includes(marker);
+    if (isStartOfFrame) {
+      return {
+        width: buffer.readUInt16BE(offset + 7),
+        height: buffer.readUInt16BE(offset + 5),
+      };
+    }
+
+    offset += 2 + segmentLength;
+  }
+
+  return null;
+};
+
+const readImageMetadata = (filePath) => {
+  if (!filePath || !fs.existsSync(filePath)) {
+    return null;
+  }
+  const buffer = fs.readFileSync(filePath);
+  const dimensions = readPngDimensions(buffer) || readJpegDimensions(buffer);
+  if (!dimensions || !dimensions.width || !dimensions.height) {
+    return null;
+  }
+  return {
+    width: dimensions.width,
+    height: dimensions.height,
+    aspectRatio: Number((dimensions.width / dimensions.height).toFixed(4)),
+    mimeType: getMimeType(filePath, buffer),
+    byteSize: buffer.length,
+  };
+};
+
 const commandExists = (command) => {
   try {
     childProcess.execFileSync(command, ['--version'], {
@@ -125,7 +217,7 @@ const ensureThumbnail = (imagePath) => {
     fail(`missing source image: ${path.relative(rootDir, sourcePath)}`);
   }
 
-  const outputPath = path.join(thumbnailDir, thumbnailName);
+  const outputPath = getThumbnailOutputPath(imagePath);
   const shouldGenerate = !fs.existsSync(outputPath)
     || fs.statSync(outputPath).mtimeMs < fs.statSync(sourcePath).mtimeMs;
   if (shouldGenerate) {
@@ -213,11 +305,17 @@ const cases = sourceCasesData.cases.map((item) => {
     }
   }
 
+  const image = ensureThumbnail(item.image);
+  const imageSourcePath = getImageSourcePath(item.image);
+  const thumbnailOutputPath = getThumbnailOutputPath(item.image);
+
   return {
     id: `case-${item.id}`,
     sourceCaseId: item.id,
     title: item.title || `Case ${item.id}`,
-    image: ensureThumbnail(item.image),
+    image,
+    imageOriginal: readImageMetadata(imageSourcePath),
+    imageThumbnail: readImageMetadata(thumbnailOutputPath),
     imageAlt: item.imageAlt || item.title || `Case ${item.id}`,
     sourceLabel: item.sourceLabel || '',
     sourceUrl: item.sourceUrl || null,

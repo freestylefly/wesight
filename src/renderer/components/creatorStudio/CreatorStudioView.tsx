@@ -110,6 +110,10 @@ const SeedreamStatus = {
 type SeedreamStatus = typeof SeedreamStatus[keyof typeof SeedreamStatus];
 
 const CASE_PAGE_SIZE = 80;
+const GALLERY_THUMBNAIL_SIZE_MIN = 180;
+const GALLERY_THUMBNAIL_SIZE_MAX = 360;
+const GALLERY_THUMBNAIL_SIZE_STEP = 20;
+const GALLERY_THUMBNAIL_SIZE_DEFAULT = 260;
 
 const defaultBuilderForm: CreatorPromptForm = {
   subject: '',
@@ -140,7 +144,8 @@ const PlaceholderImage: React.FC<{
   src: string | null;
   alt: string;
   className?: string;
-}> = ({ src, alt, className = '' }) => {
+  fit?: 'cover' | 'contain';
+}> = ({ src, alt, className = '', fit = 'cover' }) => {
   const [failed, setFailed] = useState(false);
   if (!src || failed) {
     return (
@@ -156,9 +161,24 @@ const PlaceholderImage: React.FC<{
       alt={alt}
       loading="lazy"
       onError={() => setFailed(true)}
-      className={`object-cover ${className}`}
+      className={`${fit === 'cover' ? 'object-cover' : 'object-contain'} ${className}`}
     />
   );
+};
+
+const formatImageDimensions = (image: CreatorStudioCase['imageOriginal']): string => (
+  image ? `${image.width} x ${image.height}` : i18nService.t('creatorImageUnknown')
+);
+
+const formatImageAspectRatio = (image: CreatorStudioCase['imageOriginal']): string => (
+  image ? `${image.aspectRatio.toFixed(2)}:1` : i18nService.t('creatorImageUnknown')
+);
+
+const formatImageFileSize = (image: CreatorStudioCase['imageOriginal']): string => {
+  if (!image) return i18nService.t('creatorImageUnknown');
+  if (image.byteSize < 1024) return `${image.byteSize} B`;
+  if (image.byteSize < 1024 * 1024) return `${(image.byteSize / 1024).toFixed(1)} KB`;
+  return `${(image.byteSize / 1024 / 1024).toFixed(1)} MB`;
 };
 
 const CreatorStudioView: React.FC<CreatorStudioViewProps> = ({
@@ -939,72 +959,102 @@ const Gallery: React.FC<{
   onSelectCase,
   onUseCase,
   onLoadMore,
-}) => (
-  <section className="space-y-4 p-4">
-    <div className="grid gap-3 lg:grid-cols-[minmax(220px,1fr)_180px_160px_160px_auto]">
-      <label className="relative block">
-        <MagnifyingGlassIcon className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted" />
-        <input
-          value={query}
-          onChange={(event) => onQueryChange(event.target.value)}
-          placeholder={i18nService.t('creatorSearchPlaceholder')}
-          className="h-10 w-full rounded-lg border border-border bg-surface px-9 text-sm outline-none focus:border-primary"
-        />
-      </label>
-      <FilterSelect value={category} onChange={onCategoryChange} label={i18nService.t('creatorFilterCategory')}>
-        {styleLibrary.categories.map((item) => (
-          <option key={item.id} value={item.value}>{getText(item.title)}</option>
-        ))}
-      </FilterSelect>
-      <FilterSelect value={style} onChange={onStyleChange} label={i18nService.t('creatorFilterStyle')}>
-        {styleLibrary.styles.map((item) => (
-          <option key={item.id} value={item.value}>{getText(item.title)}</option>
-        ))}
-      </FilterSelect>
-      <FilterSelect value={scene} onChange={onSceneChange} label={i18nService.t('creatorFilterScene')}>
-        {styleLibrary.scenes.map((item) => (
-          <option key={item.id} value={item.value}>{getText(item.title)}</option>
-        ))}
-      </FilterSelect>
-      <button
-        type="button"
-        onClick={onClearFilters}
-        className="h-10 rounded-lg border border-border px-3 text-sm font-medium text-secondary transition-colors hover:bg-surface-raised hover:text-foreground"
-      >
-        {i18nService.t('creatorClearFilters')}
-      </button>
-    </div>
-    <div className="text-xs text-muted">
-      {i18nService.t('creatorResultCount').replace('{count}', String(totalCount))}
-    </div>
-    {totalCount === 0 ? (
-      <div className="flex min-h-[220px] flex-col items-center justify-center rounded-lg border border-dashed border-border bg-surface text-center">
-        <PhotoIcon className="h-10 w-10 text-muted" />
-        <div className="mt-3 text-sm font-medium">{i18nService.t('creatorEmptyTitle')}</div>
-        <div className="mt-1 text-xs text-muted">{i18nService.t('creatorEmptyHint')}</div>
-      </div>
-    ) : (
-      <>
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
-          {filteredCases.map((item) => (
-            <CaseCard key={item.id} item={item} onSelect={onSelectCase} onUseCase={onUseCase} />
+}) => {
+  const [thumbnailSize, setThumbnailSize] = useState(GALLERY_THUMBNAIL_SIZE_DEFAULT);
+  const imageFrameHeight = Math.round(thumbnailSize * 0.78);
+
+  return (
+    <section className="space-y-4 p-4">
+      <div className="grid gap-3 lg:grid-cols-[minmax(220px,1fr)_180px_160px_160px_auto]">
+        <label className="relative block">
+          <MagnifyingGlassIcon className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted" />
+          <input
+            value={query}
+            onChange={(event) => onQueryChange(event.target.value)}
+            placeholder={i18nService.t('creatorSearchPlaceholder')}
+            className="h-10 w-full rounded-lg border border-border bg-surface px-9 text-sm outline-none focus:border-primary"
+          />
+        </label>
+        <FilterSelect value={category} onChange={onCategoryChange} label={i18nService.t('creatorFilterCategory')}>
+          {styleLibrary.categories.map((item) => (
+            <option key={item.id} value={item.value}>{getText(item.title)}</option>
           ))}
+        </FilterSelect>
+        <FilterSelect value={style} onChange={onStyleChange} label={i18nService.t('creatorFilterStyle')}>
+          {styleLibrary.styles.map((item) => (
+            <option key={item.id} value={item.value}>{getText(item.title)}</option>
+          ))}
+        </FilterSelect>
+        <FilterSelect value={scene} onChange={onSceneChange} label={i18nService.t('creatorFilterScene')}>
+          {styleLibrary.scenes.map((item) => (
+            <option key={item.id} value={item.value}>{getText(item.title)}</option>
+          ))}
+        </FilterSelect>
+        <button
+          type="button"
+          onClick={onClearFilters}
+          className="h-10 rounded-lg border border-border px-3 text-sm font-medium text-secondary transition-colors hover:bg-surface-raised hover:text-foreground"
+        >
+          {i18nService.t('creatorClearFilters')}
+        </button>
+      </div>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="text-xs text-muted">
+          {i18nService.t('creatorResultCount').replace('{count}', String(totalCount))}
         </div>
-        {hasMore && (
-          <div className="flex justify-center pt-2">
-            <button
-              type="button"
-              onClick={onLoadMore}
-              className="rounded-lg border border-border px-4 py-2 text-sm font-medium text-secondary transition-colors hover:bg-surface-raised hover:text-foreground"
-            >
-              {i18nService.t('creatorLoadMore')}
-            </button>
+        <label className="flex items-center gap-2 rounded-lg border border-border bg-surface px-3 py-2 text-xs text-secondary">
+          <span>{i18nService.t('creatorThumbnailSize')}</span>
+          <input
+            type="range"
+            min={GALLERY_THUMBNAIL_SIZE_MIN}
+            max={GALLERY_THUMBNAIL_SIZE_MAX}
+            step={GALLERY_THUMBNAIL_SIZE_STEP}
+            value={thumbnailSize}
+            onChange={(event) => setThumbnailSize(Number(event.target.value))}
+            aria-label={i18nService.t('creatorThumbnailSize')}
+            className="w-28 accent-primary"
+          />
+          <span className="w-12 text-right tabular-nums">{thumbnailSize}px</span>
+        </label>
+      </div>
+      {totalCount === 0 ? (
+        <div className="flex min-h-[220px] flex-col items-center justify-center rounded-lg border border-dashed border-border bg-surface text-center">
+          <PhotoIcon className="h-10 w-10 text-muted" />
+          <div className="mt-3 text-sm font-medium">{i18nService.t('creatorEmptyTitle')}</div>
+          <div className="mt-1 text-xs text-muted">{i18nService.t('creatorEmptyHint')}</div>
+        </div>
+      ) : (
+        <>
+          <div
+            className="grid gap-3"
+            style={{ gridTemplateColumns: `repeat(auto-fill, minmax(${thumbnailSize}px, 1fr))` }}
+          >
+            {filteredCases.map((item) => (
+              <CaseCard
+                key={item.id}
+                item={item}
+                imageFrameHeight={imageFrameHeight}
+                onSelect={onSelectCase}
+                onUseCase={onUseCase}
+              />
+            ))}
           </div>
-        )}
-      </>
-    )}
-  </section>
-);
+          {hasMore && (
+            <div className="flex justify-center pt-2">
+              <button
+                type="button"
+                onClick={onLoadMore}
+                className="rounded-lg border border-border px-4 py-2 text-sm font-medium text-secondary transition-colors hover:bg-surface-raised hover:text-foreground"
+              >
+                {i18nService.t('creatorLoadMore')}
+              </button>
+            </div>
+          )}
+        </>
+      )}
+    </section>
+  );
+};
 
 const FilterSelect: React.FC<{
   value: string;
@@ -1025,12 +1075,18 @@ const FilterSelect: React.FC<{
 
 const CaseCard: React.FC<{
   item: CreatorStudioCase;
+  imageFrameHeight: number;
   onSelect: (item: CreatorStudioCase) => void;
   onUseCase: (item: CreatorStudioCase) => void;
-}> = ({ item, onSelect, onUseCase }) => (
+}> = ({ item, imageFrameHeight, onSelect, onUseCase }) => (
   <article className="overflow-hidden rounded-lg border border-border bg-surface">
     <button type="button" className="block w-full text-left" onClick={() => onSelect(item)}>
-      <PlaceholderImage src={item.image} alt={item.imageAlt} className="aspect-[4/3] w-full" />
+      <div
+        className="flex items-center justify-center bg-surface-raised p-2"
+        style={{ height: imageFrameHeight }}
+      >
+        <PlaceholderImage src={item.image} alt={item.imageAlt} fit="contain" className="h-full w-full" />
+      </div>
       <div className="space-y-2 p-3">
         <div className="line-clamp-2 min-h-[40px] text-sm font-semibold">{item.title}</div>
         <div className="flex flex-wrap gap-1.5">
@@ -1040,7 +1096,10 @@ const CaseCard: React.FC<{
             </span>
           ))}
         </div>
-        <div className="truncate text-xs text-muted">{item.sourceLabel || i18nService.t('creatorUnknownSource')}</div>
+        <div className="flex items-center justify-between gap-2 text-xs text-muted">
+          <span className="truncate">{item.sourceLabel || i18nService.t('creatorUnknownSource')}</span>
+          <span className="shrink-0 tabular-nums">{formatImageDimensions(item.imageOriginal)}</span>
+        </div>
       </div>
     </button>
     <div className="border-t border-border p-2">
@@ -1618,7 +1677,10 @@ const CaseDrawer: React.FC<{
   onSaveCase: (item: CreatorStudioCase) => void;
 }> = ({ item, onClose, onUseCase, onSaveCase }) => (
   <Drawer onClose={onClose} title={item.title}>
-    <PlaceholderImage src={item.image} alt={item.imageAlt} className="aspect-[4/3] w-full rounded-lg" />
+    <div className="rounded-lg bg-surface-raised p-2">
+      <PlaceholderImage src={item.image} alt={item.imageAlt} fit="contain" className="max-h-[70vh] w-full rounded-md" />
+    </div>
+    <ImageMetadataPanel item={item} />
     <div className="mt-4 flex flex-wrap gap-1.5">
       {[item.category, ...item.styles, ...item.scenes].map((tag) => (
         <span key={tag} className="rounded-md bg-surface-raised px-2 py-0.5 text-xs text-secondary">{tag}</span>
@@ -1642,6 +1704,29 @@ const CaseDrawer: React.FC<{
     </section>
     <p className="mt-4 text-xs leading-5 text-muted">{i18nService.t('creatorDisclaimer')}</p>
   </Drawer>
+);
+
+const ImageMetadataPanel: React.FC<{
+  item: CreatorStudioCase;
+}> = ({ item }) => (
+  <section className="mt-4 grid grid-cols-2 gap-2">
+    <ImageMetadataItem label={i18nService.t('creatorOriginalImage')} value={formatImageDimensions(item.imageOriginal)} />
+    <ImageMetadataItem label={i18nService.t('creatorThumbnailImage')} value={formatImageDimensions(item.imageThumbnail)} />
+    <ImageMetadataItem label={i18nService.t('creatorImageAspectRatio')} value={formatImageAspectRatio(item.imageOriginal)} />
+    <ImageMetadataItem label={i18nService.t('creatorImageCropStatus')} value={i18nService.t('creatorImageNotCropped')} />
+    <ImageMetadataItem label={i18nService.t('creatorImageFileSize')} value={formatImageFileSize(item.imageOriginal)} />
+    <ImageMetadataItem label={i18nService.t('creatorImageMimeType')} value={item.imageOriginal?.mimeType ?? i18nService.t('creatorImageUnknown')} />
+  </section>
+);
+
+const ImageMetadataItem: React.FC<{
+  label: string;
+  value: string;
+}> = ({ label, value }) => (
+  <div className="rounded-lg border border-border bg-surface p-3">
+    <div className="text-[11px] font-medium uppercase text-muted">{label}</div>
+    <div className="mt-1 text-sm tabular-nums text-foreground">{value}</div>
+  </div>
 );
 
 const TemplateDrawer: React.FC<{
