@@ -18,7 +18,7 @@ import styleLibraryData from '../../data/creatorStudio/style-library.json';
 import { i18nService } from '../../services/i18n';
 import { skillService } from '../../services/skill';
 import { RootState } from '../../store';
-import { setActiveSkillIds,setSkills } from '../../store/slices/skillSlice';
+import { setActiveSkillIds, setSkills } from '../../store/slices/skillSlice';
 import type {
   CreatorPromptSpec,
   CreatorStudioCase,
@@ -38,6 +38,7 @@ import {
   renderCreatorCoworkDraft,
   renderCreatorPrompt,
 } from '../../utils/creatorStudio';
+import { CreatorAssetGrid } from './CreatorAssetGrid';
 
 const cases = casesData as CreatorStudioCase[];
 const styleLibrary = styleLibraryData as CreatorStudioStyleLibrary;
@@ -47,6 +48,7 @@ const CreatorStudioTab = {
   Gallery: 'gallery',
   Templates: 'templates',
   Builder: 'builder',
+  Assets: 'assets',
 } as const;
 
 type CreatorStudioTab = typeof CreatorStudioTab[keyof typeof CreatorStudioTab];
@@ -55,6 +57,7 @@ interface CreatorStudioViewProps {
   isSidebarCollapsed: boolean;
   onToggleSidebar: () => void;
   onSendToCowork: (draft: string, options: CreatorCoworkSendOptions) => void | Promise<void>;
+  onOpenCoworkSession: (sessionId: string) => Promise<boolean>;
   updateBadge?: React.ReactNode;
 }
 
@@ -124,6 +127,7 @@ const CreatorStudioView: React.FC<CreatorStudioViewProps> = ({
   isSidebarCollapsed,
   onToggleSidebar,
   onSendToCowork,
+  onOpenCoworkSession,
   updateBadge,
 }) => {
   const dispatch = useDispatch();
@@ -335,6 +339,9 @@ const CreatorStudioView: React.FC<CreatorStudioViewProps> = ({
         <TabButton active={activeTab === CreatorStudioTab.Builder} onClick={() => setActiveTab(CreatorStudioTab.Builder)}>
           {i18nService.t('creatorBuilderTab')}
         </TabButton>
+        <TabButton active={activeTab === CreatorStudioTab.Assets} onClick={() => setActiveTab(CreatorStudioTab.Assets)}>
+          {i18nService.t('creatorAssetsTab')}
+        </TabButton>
       </div>
 
       <main className="min-h-0 flex-1 overflow-y-auto">
@@ -381,6 +388,9 @@ const CreatorStudioView: React.FC<CreatorStudioViewProps> = ({
             isSendingToCowork={isSendingToCowork}
             onSendToCowork={sendToCowork}
           />
+        )}
+        {activeTab === CreatorStudioTab.Assets && (
+          <CreatorAssetGrid onOpenCoworkSession={onOpenCoworkSession} />
         )}
       </main>
 

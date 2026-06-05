@@ -40,6 +40,7 @@ import {
   type RuntimeEvent,
   RuntimeEventType,
 } from './coworkEventStore';
+import type { CreatorAssetStore } from './creatorAssetStore';
 import { encodeCodexAppThreadId } from './libs/codexAppIds';
 import {
   type CoworkMemoryGuardLevel,
@@ -799,11 +800,16 @@ export class CoworkStore {
   private db: Database.Database;
   private readonly eventStore: CoworkEventStore;
   private readonly nextMessageSequenceBySession = new Map<string, number>();
+  private creatorAssetStore: CreatorAssetStore | null = null;
 
   constructor(db: Database.Database) {
     this.db = db;
     ensureCoworkEventSchema(db);
     this.eventStore = new CoworkEventStore(db);
+  }
+
+  setCreatorAssetStore(creatorAssetStore: CreatorAssetStore): void {
+    this.creatorAssetStore = creatorAssetStore;
   }
 
   private getOne<T>(sql: string, params: (string | number | null)[] = []): T | undefined {
@@ -1392,6 +1398,10 @@ export class CoworkStore {
         });
       })();
       this.nextMessageSequenceBySession.set(sessionId, sequence + 1);
+      this.creatorAssetStore?.handleCoworkMessageInserted({
+        sessionId,
+        message: insertedMessage,
+      });
 
       return insertedMessage;
     }, { sessionId });

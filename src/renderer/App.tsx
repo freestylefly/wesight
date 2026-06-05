@@ -381,6 +381,16 @@ const App: React.FC = () => {
     }, 0);
   }, [dispatch, ensureCreativeProducerAgent]);
 
+  const handleOpenCreatorSourceSession = useCallback(async (sessionId: string) => {
+    const session = await coworkService.loadSession(sessionId);
+    if (!session) {
+      return false;
+    }
+    dispatch(clearSelection());
+    setMainView(MainView.Cowork);
+    return true;
+  }, [dispatch]);
+
   const showToast = useCallback((message: string) => {
     setToastMessage(message);
     if (toastTimerRef.current) {
@@ -828,6 +838,7 @@ const App: React.FC = () => {
                   isSidebarCollapsed={isSidebarCollapsed}
                   onToggleSidebar={handleToggleSidebar}
                   onSendToCowork={handleSendCreatorDraftToCowork}
+                  onOpenCoworkSession={handleOpenCreatorSourceSession}
                   updateBadge={isSidebarCollapsed ? updateBadge : null}
                 />
               </React.Suspense>

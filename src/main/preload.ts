@@ -3,6 +3,7 @@ import { contextBridge, ipcRenderer, type IpcRendererEvent } from 'electron';
 import { IpcChannel as ScheduledTaskIpc } from '../scheduledTask/constants';
 import { CoworkIpcChannel } from '../shared/cowork/constants';
 import type { CoworkFileActivity } from '../shared/cowork/fileActivity';
+import { CreatorStudioIpcChannel } from '../shared/creatorStudio/constants';
 import { DialogIpcChannel } from '../shared/dialog/constants';
 import { type FeishuEngineKeyType, type FeishuManagementModeType, type FeishuRuntimeOwnershipType, ImIpcChannel } from '../shared/im/constants';
 import { DesktopPetIpcChannel, type DesktopPetTaskSnapshot, type PetConfig, type PetPosition } from '../shared/pet/constants';
@@ -531,6 +532,16 @@ contextBridge.exposeInMainWorld('electron', {
       ipcRenderer.on('cowork:sessions:changed', handler);
       return () => ipcRenderer.removeListener('cowork:sessions:changed', handler);
     },
+  },
+  creatorStudio: {
+    listAssets: (input?: { limit?: number; offset?: number }) =>
+      ipcRenderer.invoke(CreatorStudioIpcChannel.AssetList, input),
+    getAssetSource: (assetId: string) =>
+      ipcRenderer.invoke(CreatorStudioIpcChannel.AssetGetSource, assetId),
+    setAssetFavorite: (input: { assetId: string; favorite: boolean }) =>
+      ipcRenderer.invoke(CreatorStudioIpcChannel.AssetSetFavorite, input),
+    revealAssetInFolder: (assetId: string) =>
+      ipcRenderer.invoke(CreatorStudioIpcChannel.AssetRevealInFolder, assetId),
   },
   dialog: {
     selectDirectory: () => ipcRenderer.invoke('dialog:selectDirectory'),

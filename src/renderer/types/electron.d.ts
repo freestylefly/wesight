@@ -15,6 +15,11 @@ import type {
 } from '@shared/cowork/runtimeMetrics';
 import type { CoworkSessionRuntimeSnapshot } from '@shared/cowork/runtimeSnapshot';
 import type { CoworkStudioAssetsResult } from '@shared/cowork/studioAssets';
+import type {
+  CreatorProductionAssetListResult,
+  CreatorProductionAssetRecord,
+  CreatorProductionAssetSourceLookup,
+} from '@shared/creatorStudio/types';
 import type { FeishuEngineKeyType, FeishuManagementModeType, FeishuRuntimeOwnershipType, WeixinOwnershipType } from '@shared/im/constants';
 import type { DesktopPetTaskSnapshot, PetConfig, PetPosition } from '@shared/pet/constants';
 import type { SkillMarketplaceSort, SkillMarketplaceSourceType } from '@shared/skills/constants';
@@ -764,6 +769,25 @@ interface IElectronAPI {
     onStreamComplete: (callback: (data: { sessionId: string; claudeSessionId: string | null }) => void) => () => void;
     onStreamError: (callback: (data: { sessionId: string; error: string }) => void) => () => void;
     onSessionsChanged: (callback: () => void) => () => void;
+  };
+  creatorStudio: {
+    listAssets: (input?: { limit?: number; offset?: number }) => Promise<{
+      success: boolean;
+      assets?: CreatorProductionAssetListResult['assets'];
+      total?: number;
+      error?: string;
+    }>;
+    getAssetSource: (assetId: string) => Promise<{
+      success: boolean;
+      source?: CreatorProductionAssetSourceLookup;
+      error?: string;
+    }>;
+    setAssetFavorite: (input: { assetId: string; favorite: boolean }) => Promise<{
+      success: boolean;
+      asset?: CreatorProductionAssetRecord;
+      error?: string;
+    }>;
+    revealAssetInFolder: (assetId: string) => Promise<{ success: boolean; error?: string }>;
   };
   dialog: {
     selectDirectory: () => Promise<{ success: boolean; path: string | null }>;

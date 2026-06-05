@@ -61,6 +61,7 @@ import { APP_NAME } from './appConstants';
 import { getAutoLaunchEnabled, isAutoLaunched, setAutoLaunchEnabled } from './autoLaunchManager';
 import { CoworkFileActivityTracker } from './coworkFileActivityTracker';
 import { type CoworkMessage, type CoworkSessionMeta,CoworkStore } from './coworkStore';
+import { CreatorAssetStore } from './creatorAssetStore';
 import { setLanguage, t } from './i18n';
 import { IMGatewayConfig,IMGatewayManager } from './im';
 import {
@@ -70,6 +71,7 @@ import {
   rejectPairingRequest,
 } from './im/imPairingStore';
 import type { Platform } from './im/types';
+import { registerCreatorStudioIpcHandlers } from './ipcHandlers/creatorStudio';
 import {
   getCronJobService,
   initCronJobServiceManager,
@@ -732,6 +734,7 @@ process.on('exit', (code) => {
 
 let store: SqliteStore | null = null;
 let coworkStore: CoworkStore | null = null;
+let creatorAssetStore: CreatorAssetStore | null = null;
 let runtimeTelemetryStore: RuntimeTelemetryStore | null = null;
 let runtimeTelemetryTracker: RuntimeTelemetryTracker | null = null;
 let coworkRunner: CoworkRunner | null = null;
@@ -1134,12 +1137,20 @@ const getCoworkStore = () => {
   if (!coworkStore) {
     const sqliteStore = getStore();
     coworkStore = new CoworkStore(sqliteStore.getDatabase());
+    coworkStore.setCreatorAssetStore(getCreatorAssetStore());
     const cleaned = coworkStore.autoDeleteNonPersonalMemories();
     if (cleaned > 0) {
       console.info(`[cowork-memory] Auto-deleted ${cleaned} non-personal/procedural memories`);
     }
   }
   return coworkStore;
+};
+
+const getCreatorAssetStore = () => {
+  if (!creatorAssetStore) {
+    creatorAssetStore = new CreatorAssetStore(getStore().getDatabase());
+  }
+  return creatorAssetStore;
 };
 
 const getCoworkFileActivityTracker = (): CoworkFileActivityTracker => {
@@ -5972,6 +5983,10 @@ if (!gotTheLock) {
     getIMGatewayManager: () => getIMGatewayManager() as any,
     getOpenClawRuntimeAdapter: () => openClawRuntimeAdapter as any,
   });
+
+  // ==================== Creator Studio IPC Handlers ====================
+
+  registerCreatorStudioIpcHandlers(ipcMain, getCreatorAssetStore);
 
   // ==================== Permissions IPC Handlers ====================
 
