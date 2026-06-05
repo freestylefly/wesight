@@ -961,13 +961,13 @@ Builder 页面增加：
 | P1 | 已完成 | PromptSpecV1 snapshot、legacy adapter、compiler、Builder 迁移、Batch task 标准块、Asset schemaVersion、Compiler tests 已落地 | Cowork metadata 双写仍属于后续集成增强，不阻塞 P1 compiler 闭环 | 下一阶段推进 P2 Context Pack role strategy |
 | P2 | 基本完成 | 模板动态字段、案例 prompt 逆向拆解、自然语言填表、模板感知 directions、模板说明展示、Context Pack role strategy 已落地 | 图片语义摘要仍是本地尺寸/色彩级别，尚未接入懒分析或 LLM 摘要 | 后续按需推进素材图片摘要缓存 |
 | P3 | 基本完成 | Recipe、Prompt Version、diff、fork、rollback、资产变体链路、Batch winning asset provenance 已落地 | 批量结果表现统计仍属于 P4 评估范围 | 后续进入评估和治理阶段 |
-| P4 | 未开始 | 无 | 历史表现、Recipe 自动化、导出生产包、敏感信息和授权检查均未实现 | 等 P1-P3 闭环后启动治理阶段 |
+| P4 | 部分完成 | Builder 已展示本地 adoption/favorite/selected、Batch completion/failed 统计；生产包单 JSON manifest 导出已落地；导出前敏感信息、本地路径、授权、用途、来源会话、未评审资产检查已落地 | 模板/模型/方向聚合表现和 Recipe scheduled creative workflow 尚未实现 | 下一阶段推进 Recipe 自动化和按模板/模型/方向聚合报表 |
 
-当前没有阻塞 P1 下一步的产品决策。后续进入 P4 前需要补充决策：
+当前 P4 已采用前序确认的推荐决策：
 
-1. Recipe 自动化是否复用现有 scheduled task 系统，还是先只提供手动导出和复用。
-2. 生产包导出格式优先选择 zip 目录结构、单 JSON manifest，还是后续可导入的 WeSight package。
-3. 评估指标第一版是否只统计本地资产 adoption/favorite/selected，还是需要接入真实生成失败率和成本。
+1. Recipe 自动化后续复用现有 scheduled task 系统；当前先完成手动导出和复用闭环。
+2. 生产包第一版使用单 JSON manifest，后续再升级 zip 或 WeSight package。
+3. 评估指标第一版统计本地 adoption/favorite/selected、Batch completed/failed/skipped，不先接真实成本和失败率接口。
 
 ### 19.1 P0+ 任务
 

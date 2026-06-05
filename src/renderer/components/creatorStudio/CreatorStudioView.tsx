@@ -53,6 +53,12 @@ import type {
 } from '../../types/creatorStudio';
 import { CreatorMaterialRole, CreatorMaterialSource, CreatorPromptSourceMode, CreatorStudioSourceType, CreatorTemplateFieldKind } from '../../types/creatorStudio';
 import { applyCreatorBriefAutofill } from '../../utils/creatorBriefAutofill';
+import {
+  buildCreatorProductionPackage,
+  CreatorProductionPackageIssueSeverity,
+  type CreatorProductionPackageSummary,
+  summarizeCreatorProductionPackage,
+} from '../../utils/creatorProductionPackage';
 import { compileCreatorPrompt, CreatorPromptCompileTarget } from '../../utils/creatorPromptCompiler';
 import { CreatorPromptLintSeverity, lintCreatorPromptSpec } from '../../utils/creatorPromptLint';
 import { reverseEngineerCreatorPrompt } from '../../utils/creatorPromptReverseEngineer';
@@ -190,6 +196,22 @@ const copyText = async (text: string) => {
   dispatchToast(i18nService.t('copied'));
 };
 
+const encodeTextBase64 = (text: string): string => {
+  const bytes = new TextEncoder().encode(text);
+  let binary = '';
+  const chunkSize = 0x8000;
+  for (let index = 0; index < bytes.length; index += chunkSize) {
+    const chunk = bytes.subarray(index, index + chunkSize);
+    binary += String.fromCharCode(...chunk);
+  }
+  return btoa(binary);
+};
+
+const buildProductionPackageFileName = (projectName: string): string => {
+  const safeProjectName = projectName.trim().replace(/[^a-zA-Z0-9._-]+/g, '-').replace(/^-+|-+$/g, '') || 'creator-project';
+  return `${safeProjectName}-production-package.json`;
+};
+
 const PlaceholderImage: React.FC<{
   src: string | null;
   alt: string;
@@ -285,6 +307,7 @@ const CreatorStudioView: React.FC<CreatorStudioViewProps> = ({
   const [activeBatchRun, setActiveBatchRun] = useState<CreatorBatchRunRecord | null>(null);
   const [isCreatingBatchRun, setIsCreatingBatchRun] = useState(false);
   const [recipes, setRecipes] = useState<CreatorRecipeRecord[]>([]);
+  const [projectAssets, setProjectAssets] = useState<CreatorProductionAssetRecord[]>([]);
 
   useEffect(() => {
     void skillService.loadSkills().then((loadedSkills) => {
@@ -316,6 +339,12 @@ const CreatorStudioView: React.FC<CreatorStudioViewProps> = ({
   const loadRecipes = useCallback(async (projectId: string) => {
     const result = await creatorStudioAssetService.listRecipes({ projectId, limit: 50 });
     setRecipes(result.recipes);
+  }, []);
+
+  const loadProjectAssets = useCallback(async (projectId: string) => {
+    const result = await creatorStudioAssetService.listAssets({ projectId, limit: 200 });
+    setProjectAssets(result.assets);
+    return result.assets;
   }, []);
 
   useEffect(() => {
@@ -352,6 +381,13 @@ const CreatorStudioView: React.FC<CreatorStudioViewProps> = ({
       dispatchToast(i18nService.t('creatorRecipeLoadFailed'));
     });
   }, [currentProjectId, loadRecipes]);
+
+  useEffect(() => {
+    if (!currentProjectId) return;
+    void loadProjectAssets(currentProjectId).catch(() => {
+      dispatchToast(i18nService.t('creatorAssetsLoadFailed'));
+    });
+  }, [currentProjectId, loadProjectAssets]);
 
   const searchableLabels = useMemo(() => {
     const labels = new Map<string, string[]>();
@@ -418,6 +454,19 @@ const CreatorStudioView: React.FC<CreatorStudioViewProps> = ({
     [boardContextPack, boardPromptSpec, boardWorkspace?.brandKit]
   );
   const batchPromptText = useMemo(() => renderCreatorPrompt(batchPromptSpec), [batchPromptSpec]);
+  const currentProject = useMemo(
+    () => workspace?.projects.find((project) => project.id === currentProjectId) ?? null,
+    [currentProjectId, workspace?.projects]
+  );
+  const productionPackageSummary = useMemo<CreatorProductionPackageSummary>(() => (
+    summarizeCreatorProductionPackage({
+      projectId: currentProjectId,
+      project: currentProject,
+      assets: projectAssets,
+      recipes,
+      batchRuns,
+    })
+  ), [batchRuns, currentProject, currentProjectId, projectAssets, recipes]);
 
   useEffect(() => {
     let cancelled = false;
@@ -717,6 +766,7 @@ const CreatorStudioView: React.FC<CreatorStudioViewProps> = ({
         ].filter((item): item is string => Boolean(item?.trim())),
       });
       dispatchToast(i18nService.t('creatorPromptAssetSaved'));
+      await loadProjectAssets(projectId);
     } catch (error) {
       dispatchToast(error instanceof Error ? error.message : i18nService.t('creatorPromptAssetSaveFailed'));
     }
@@ -784,6 +834,48 @@ const CreatorStudioView: React.FC<CreatorStudioViewProps> = ({
       dispatchToast(i18nService.t('creatorRecipeImported'));
     } catch (error) {
       dispatchToast(error instanceof Error ? error.message : i18nService.t('creatorRecipeImportFailed'));
+    }
+  };
+
+  const exportProductionPackage = async () => {
+    const projectId = currentProjectId || workspace?.currentProjectId;
+    if (!projectId) {
+      dispatchToast(i18nService.t('creatorWorkspaceLoadFailed'));
+      return;
+    }
+    try {
+      const [assetResult, recipeResult, batchResult] = await Promise.all([
+        creatorStudioAssetService.listAssets({ projectId, limit: 200 }),
+        creatorStudioAssetService.listRecipes({ projectId, limit: 50 }),
+        creatorStudioAssetService.listBatchRuns({ projectId, limit: 20 }),
+      ]);
+      setProjectAssets(assetResult.assets);
+      setRecipes(recipeResult.recipes);
+      setBatchRuns(batchResult.runs);
+      setActiveBatchRun((current) => {
+        if (!current) return batchResult.runs[0] ?? null;
+        return batchResult.runs.find((run) => run.id === current.id) ?? batchResult.runs[0] ?? null;
+      });
+      const project = workspace?.projects.find((item) => item.id === projectId) ?? null;
+      const manifest = buildCreatorProductionPackage({
+        projectId,
+        project,
+        assets: assetResult.assets,
+        recipes: recipeResult.recipes,
+        batchRuns: batchResult.runs,
+      });
+      const dataBase64 = encodeTextBase64(JSON.stringify(manifest, null, 2));
+      const result = await window.electron.dialog.saveInlineFile({
+        dataBase64,
+        fileName: buildProductionPackageFileName(manifest.project.name),
+        mimeType: 'application/json',
+      });
+      if (!result.success) {
+        throw new Error(result.error || i18nService.t('creatorProductionPackageExportFailed'));
+      }
+      dispatchToast(i18nService.t('creatorProductionPackageExported'));
+    } catch (error) {
+      dispatchToast(error instanceof Error ? error.message : i18nService.t('creatorProductionPackageExportFailed'));
     }
   };
 
@@ -1086,11 +1178,13 @@ const CreatorStudioView: React.FC<CreatorStudioViewProps> = ({
             workspace={workspace}
             currentProjectId={currentProjectId}
             recipes={recipes}
+            productionPackageSummary={productionPackageSummary}
             onProjectChange={(projectId) => void switchProject(projectId)}
             onCreateProject={createProject}
             onUseRecipe={useRecipeInBuilder}
             onSaveRecipe={(promptSpec) => void saveRecipe(promptSpec)}
             onImportRecipe={(recipeJson) => void importRecipe(recipeJson)}
+            onExportProductionPackage={() => void exportProductionPackage()}
             onClearSource={() => {
               setBuilderSeed(null);
               setBuilderForm(defaultBuilderForm);
@@ -1488,6 +1582,30 @@ const getLintSeverityClass = (severity: CreatorPromptLintSeverity): string => {
   }
 };
 
+const getProductionIssueSeverityClass = (severity: CreatorProductionPackageIssueSeverity): string => {
+  switch (severity) {
+    case CreatorProductionPackageIssueSeverity.Blocker:
+      return 'bg-red-500/10 text-red-600';
+    case CreatorProductionPackageIssueSeverity.Warning:
+      return 'bg-amber-500/10 text-amber-700 dark:text-amber-400';
+    case CreatorProductionPackageIssueSeverity.Info:
+    default:
+      return 'bg-surface-raised text-muted';
+  }
+};
+
+const getProductionIssueSeverityLabel = (severity: CreatorProductionPackageIssueSeverity): string => {
+  switch (severity) {
+    case CreatorProductionPackageIssueSeverity.Blocker:
+      return i18nService.t('creatorProductionIssueSeverityBlocker');
+    case CreatorProductionPackageIssueSeverity.Warning:
+      return i18nService.t('creatorProductionIssueSeverityWarning');
+    case CreatorProductionPackageIssueSeverity.Info:
+    default:
+      return i18nService.t('creatorProductionIssueSeverityInfo');
+  }
+};
+
 const capitalizeLintSeverity = (severity: CreatorPromptLintSeverity): string => (
   severity.charAt(0).toUpperCase() + severity.slice(1)
 );
@@ -1505,11 +1623,13 @@ const PromptBuilder: React.FC<{
   workspace: CreatorWorkspaceSnapshot | null;
   currentProjectId: string;
   recipes: CreatorRecipeRecord[];
+  productionPackageSummary: CreatorProductionPackageSummary;
   onProjectChange: (projectId: string) => void;
   onCreateProject: (name: string) => Promise<void> | void;
   onUseRecipe: (recipe: CreatorRecipeRecord) => void;
   onSaveRecipe: (promptSpec: CreatorPromptSpec) => void;
   onImportRecipe: (recipeJson: string) => void;
+  onExportProductionPackage: () => void;
   onClearSource: () => void;
   onOpenSourceDetail: () => void;
   brandKit: CreatorBrandKitRecord | null;
@@ -1534,11 +1654,13 @@ const PromptBuilder: React.FC<{
   workspace,
   currentProjectId,
   recipes,
+  productionPackageSummary,
   onProjectChange,
   onCreateProject,
   onUseRecipe,
   onSaveRecipe,
   onImportRecipe,
+  onExportProductionPackage,
   onClearSource,
   onOpenSourceDetail,
   brandKit,
@@ -1810,6 +1932,54 @@ const PromptBuilder: React.FC<{
                 </div>
               </div>
             ))}
+          </div>
+        </div>
+        <div className="rounded-lg border border-border bg-background p-3">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <div className="text-xs font-medium text-secondary">{i18nService.t('creatorProductionPackage')}</div>
+              <p className="mt-1 text-xs leading-5 text-muted">{i18nService.t('creatorProductionPackageHint')}</p>
+            </div>
+            <button
+              type="button"
+              disabled={!currentProjectId}
+              onClick={onExportProductionPackage}
+              className="shrink-0 rounded-md border border-border px-2 py-1 text-[11px] font-medium text-secondary transition-colors hover:bg-surface-raised hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {i18nService.t('creatorProductionPackageExport')}
+            </button>
+          </div>
+          <div className="mt-3 grid grid-cols-3 gap-2">
+            <ProductionMetric label={i18nService.t('creatorProductionMetricAssets')} value={String(productionPackageSummary.stats.totalAssets)} />
+            <ProductionMetric label={i18nService.t('creatorProductionMetricSelected')} value={String(productionPackageSummary.stats.selectedAssets)} />
+            <ProductionMetric label={i18nService.t('creatorProductionMetricAdopted')} value={String(productionPackageSummary.stats.adoptedAssets)} />
+            <ProductionMetric label={i18nService.t('creatorProductionMetricRecipes')} value={String(productionPackageSummary.stats.recipes)} />
+            <ProductionMetric label={i18nService.t('creatorProductionMetricBatches')} value={String(productionPackageSummary.stats.batchRuns)} />
+            <ProductionMetric label={i18nService.t('creatorProductionMetricCompletion')} value={`${productionPackageSummary.stats.completionRate}%`} />
+          </div>
+          <div className="mt-3 space-y-2">
+            <div className="text-[11px] font-semibold uppercase text-muted">{i18nService.t('creatorProductionPackageGovernance')}</div>
+            {productionPackageSummary.issues.length === 0 ? (
+              <div className="rounded-lg border border-border bg-surface p-3 text-xs text-muted">
+                {i18nService.t('creatorProductionPackageNoIssues')}
+              </div>
+            ) : productionPackageSummary.issues.slice(0, 5).map((issue) => (
+              <div key={issue.code} className="rounded-lg border border-border bg-surface p-2">
+                <div className="flex items-start gap-2">
+                  <span className={`shrink-0 rounded-md px-1.5 py-0.5 text-[10px] font-medium ${getProductionIssueSeverityClass(issue.severity)}`}>
+                    {getProductionIssueSeverityLabel(issue.severity)}
+                  </span>
+                  <p className="min-w-0 text-xs leading-5 text-secondary">
+                    {i18nService.t(issue.messageKey).replace('{count}', String(issue.count))}
+                  </p>
+                </div>
+              </div>
+            ))}
+            {productionPackageSummary.issues.length > 5 && (
+              <div className="text-xs text-muted">
+                {i18nService.t('creatorProductionPackageMoreIssues').replace('{count}', String(productionPackageSummary.issues.length - 5))}
+              </div>
+            )}
           </div>
         </div>
         <BuilderSection title={i18nService.t('creatorBuilderSectionBrief')}>
@@ -2370,6 +2540,16 @@ const MaterialTray: React.FC<{
     </div>
   );
 };
+
+const ProductionMetric: React.FC<{
+  label: string;
+  value: string;
+}> = ({ label, value }) => (
+  <div className="rounded-lg border border-border bg-surface p-2">
+    <div className="truncate text-[11px] text-muted">{label}</div>
+    <div className="mt-1 text-sm font-semibold text-foreground">{value}</div>
+  </div>
+);
 
 const BuilderInput: React.FC<{
   label: string;
