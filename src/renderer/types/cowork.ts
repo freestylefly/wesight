@@ -248,6 +248,7 @@ export interface CoworkStartOptions {
   agentId?: string;
   teamId?: string;
   imageAttachments?: CoworkImageAttachment[];
+  messageMetadata?: Record<string, unknown>;
 }
 
 // Continue session options
@@ -257,6 +258,7 @@ export interface CoworkContinueOptions {
   systemPrompt?: string;
   activeSkillIds?: string[];
   imageAttachments?: CoworkImageAttachment[];
+  messageMetadata?: Record<string, unknown>;
 }
 
 // IPC result types

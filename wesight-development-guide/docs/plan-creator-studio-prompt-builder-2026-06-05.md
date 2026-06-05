@@ -116,7 +116,7 @@ Prompt Builder 不应被定位为一个普通的 prompt 拼接表单，而应成
 | Context Pack 只是清单 | 缺少图像理解、约束摘要和素材使用策略 | 增加素材分析和 role-specific instruction |
 | 缺少 PromptSpec Lint | 难发现比例冲突、文字过长、素材角色冲突 | 增加规则检查和质量建议 |
 | 保存缺少版本 | 难以复盘 prompt 变更和生产结果 | 增加 version、diff、fork、recipe |
-| Cowork metadata 仍是文本 | 后续追踪和复跑依赖正则解析 | P1/P2 扩展结构化 draft metadata |
+| Cowork metadata 仅靠文本解析 | 后续追踪和复跑依赖正则解析 | 已双写文本 draft 和结构化 message metadata |
 
 ## 6. 产品目标
 
@@ -761,16 +761,16 @@ Prompt:
 ```
 ````
 
-这种方案适合 P0/P1，但后续存在限制：
+这种文本方案适合人工阅读，但如果只依赖文本会有以下限制：
 
 - 需要正则解析。
 - metadata 不稳定。
 - 不利于复跑和自动化。
 - 不利于 generatedImages 自动关联 batchTask。
 
-### 15.2 目标方式
+### 15.2 当前双写方式
 
-后续建议扩展 Cowork draft metadata：
+当前 Creator Studio 发送到 Cowork 时保留文本 draft，同时写入结构化 message metadata：
 
 ```typescript
 interface CoworkDraftMetadata {
@@ -779,9 +779,11 @@ interface CoworkDraftMetadata {
   promptText: string;
   activeSkillIds: string[];
   attachments: CoworkAttachment[];
-  executionIntent: 'draft' | 'generate' | 'batch-task';
+  requestedAction: 'prompt_draft' | 'image_generation' | 'asset_variant' | 'batch_task' | 'batch_run';
 }
 ```
+
+后续可继续把 generatedImages、batchTask 和 production asset 自动关联到同一 metadata 链路。
 
 过渡策略：
 
@@ -958,7 +960,7 @@ Builder 页面增加：
 | 阶段 | 当前状态 | 已完成证据 | 未闭环项 | 下一步 |
 |---|---|---|---|---|
 | P0+ | 已完成 | Source Mode、来源条、来源条一键保存 Recipe、表单分组、Preview tabs、selected direction 编译、基础 Lint、来源回跳均已落地 | 无 | 已进入 P1+ 后续阶段 |
-| P1 | 已完成 | PromptSpecV1 snapshot、legacy adapter、compiler、Builder 迁移、Batch task 标准块、Asset schemaVersion、Compiler tests 已落地 | Cowork metadata 双写仍属于后续集成增强，不阻塞 P1 compiler 闭环 | 下一阶段推进 P2 Context Pack role strategy |
+| P1 | 已完成 | PromptSpecV1 snapshot、legacy adapter、compiler、Builder 迁移、Batch task 标准块、Asset schemaVersion、Compiler tests、Cowork 文本 draft 和 message metadata 双写已落地 | 无 | 下一阶段推进 P2 Context Pack role strategy |
 | P2 | 已完成 | 模板动态字段、案例 prompt 逆向拆解、自然语言填表、模板感知 directions、模板说明展示、Context Pack role strategy、图片尺寸/比例/构图/明暗/对比/色彩摘要已落地 | 无 | 后续可按需升级为 LLM 视觉摘要缓存 |
 | P3 | 已完成 | Recipe、Prompt Version、diff、fork、rollback、资产变体链路、Batch winning asset provenance 已落地；批量结果表现统计已在 P4 完成 | 无 | 已进入评估和治理阶段 |
 | P4 | 已完成 | Builder 已展示本地 adoption/favorite/selected、Batch completion/failed 统计；模板/模型/方向聚合表现已落地；Recipe 可通过内联排期表单创建 Scheduled Tasks cron 自动化任务；生产包单 JSON manifest 导出已落地；导出前敏感信息、本地路径、授权、用途、来源会话、未评审资产检查已落地 | 无 | 后续进入 P5 时可升级更丰富的自动化模板和交付目标 |
@@ -1055,7 +1057,7 @@ Builder 页面增加：
 | UI 变得太重 | Builder 可能变成复杂专业工具 | 默认显示核心字段，高级字段折叠 |
 | Prompt 质量不可验证 | Prompt 好坏主观 | 先做规则 lint，再用结果指标校准 |
 | Provider 差异大 | 不同模型参数和能力不同 | 用 capability registry 和 compiler target 处理 |
-| Cowork metadata 改动影响面大 | 涉及 session、draft、资产解析 | 先双写文本和 metadata |
+| Cowork metadata 改动影响面大 | 涉及 session、draft、资产解析 | 已双写文本和 metadata，后续观察 generatedImages/asset 自动关联 |
 | 素材分析成本高 | 图片摘要和色彩提取可能耗时 | 懒分析、缓存、用户触发 |
 | 隐私和敏感信息 | 本地路径、品牌素材、token 可能进入 prompt | Lint 和导出前检查敏感信息 |
 

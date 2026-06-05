@@ -1261,16 +1261,17 @@ export class OpenClawRuntimeAdapter extends EventEmitter implements CoworkRuntim
     this.confirmationModeBySession.set(sessionId, confirmationMode);
 
     if (!options.skipInitialUserMessage) {
-      const metadata = (options.skillIds?.length || options.imageAttachments?.length)
-        ? {
-          ...(options.skillIds?.length ? { skillIds: options.skillIds } : {}),
-          ...(options.imageAttachments?.length ? { imageAttachments: options.imageAttachments } : {}),
-        }
-        : undefined;
+      const metadata: Record<string, unknown> = { ...(options.messageMetadata ?? {}) };
+      if (options.skillIds?.length) {
+        metadata.skillIds = options.skillIds;
+      }
+      if (options.imageAttachments?.length) {
+        metadata.imageAttachments = options.imageAttachments;
+      }
       const userMessage = this.store.addMessage(sessionId, {
         type: 'user',
         content: prompt,
-        metadata,
+        metadata: Object.keys(metadata).length > 0 ? metadata : undefined,
       });
       this.emit('message', sessionId, userMessage);
     }

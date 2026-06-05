@@ -8,7 +8,7 @@ import { useDispatch,useSelector } from 'react-redux';
 import { i18nService } from '../../services/i18n';
 import { skillService } from '../../services/skill';
 import { RootState } from '../../store';
-import { addDraftAttachment, clearDraftAttachments, type DraftAttachment,setDraftAttachments, setDraftPrompt } from '../../store/slices/coworkSlice';
+import { addDraftAttachment, clearDraftAttachments, clearDraftMessageMetadata, type DraftAttachment,setDraftAttachments, setDraftPrompt } from '../../store/slices/coworkSlice';
 import { setSkills, toggleActiveSkill } from '../../store/slices/skillSlice';
 import { CoworkImageAttachment } from '../../types/cowork';
 import { Skill } from '../../types/skill';
@@ -170,7 +170,7 @@ export interface CoworkPromptInputRef {
 }
 
 interface CoworkPromptInputProps {
-  onSubmit: (prompt: string, skillPrompt?: string, imageAttachments?: CoworkImageAttachment[]) => boolean | void | Promise<boolean | void>;
+  onSubmit: (prompt: string, skillPrompt?: string, imageAttachments?: CoworkImageAttachment[], messageMetadata?: Record<string, unknown>) => boolean | void | Promise<boolean | void>;
   onStop?: () => void;
   isStreaming?: boolean;
   placeholder?: string;
@@ -219,6 +219,7 @@ const CoworkPromptInput = React.forwardRef<CoworkPromptInputRef, CoworkPromptInp
     const draftKey = sessionId || '__home__';
     const draftPrompt = useSelector((state: RootState) => state.cowork.draftPrompts[draftKey] || '');
     const attachments = useSelector((state: RootState) => state.cowork.draftAttachments[draftKey] || []) as CoworkAttachment[];
+    const messageMetadata = useSelector((state: RootState) => state.cowork.draftMessageMetadata[draftKey]);
     const agentEngine = useSelector((state: RootState) => state.cowork.config.agentEngine);
     const selectorEngine = effectiveEngine ?? agentEngine;
     const [value, setValue] = useState(draftPrompt);
@@ -307,6 +308,7 @@ const CoworkPromptInput = React.forwardRef<CoworkPromptInputRef, CoworkPromptInp
         setValue('');
         setCaretIndex(0);
         dispatch(clearDraftAttachments(draftKey));
+        dispatch(clearDraftMessageMetadata(draftKey));
       }
       requestAnimationFrame(() => {
         textareaRef.current?.focus();
@@ -443,15 +445,16 @@ const CoworkPromptInput = React.forwardRef<CoworkPromptInputRef, CoworkPromptInp
         base64Lengths: imageAtts.map(a => a.base64Data.length),
       });
     }
-    const result = await onSubmit(finalPrompt, skillPrompt, imageAtts.length > 0 ? imageAtts : undefined);
+    const result = await onSubmit(finalPrompt, skillPrompt, imageAtts.length > 0 ? imageAtts : undefined, messageMetadata);
     if (result === false) return;
     setValue('');
     setCaretIndex(0);
     setDismissedSlashTriggerKey('');
     dispatch(setDraftPrompt({ sessionId: draftKey, draft: '' }));
     dispatch(clearDraftAttachments(draftKey));
+    dispatch(clearDraftMessageMetadata(draftKey));
     setImageVisionHint(false);
-  }, [value, attachments, onSlashCommand, showFolderSelector, workingDirectory, isStreaming, disabled, activeSkillIds, skills, onSubmit, dispatch, draftKey]);
+  }, [value, attachments, onSlashCommand, showFolderSelector, workingDirectory, isStreaming, disabled, activeSkillIds, skills, onSubmit, dispatch, draftKey, messageMetadata]);
 
   const handleSelectSkill = useCallback((skill: Skill) => {
     dispatch(toggleActiveSkill(skill.id));

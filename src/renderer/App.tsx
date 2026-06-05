@@ -32,7 +32,7 @@ import { matchesShortcut } from './services/shortcuts';
 import { themeService } from './services/theme';
 import { RootState, store } from './store';
 import { setCurrentAgentId } from './store/slices/agentSlice';
-import { type DraftAttachment, setDraftAttachments, setDraftPrompt } from './store/slices/coworkSlice';
+import { type DraftAttachment, setDraftAttachments, setDraftMessageMetadata, setDraftPrompt } from './store/slices/coworkSlice';
 import { setAvailableModels, setSelectedModel } from './store/slices/modelSlice';
 import { clearSelection } from './store/slices/quickActionSlice';
 import { setActiveSkillIds } from './store/slices/skillSlice';
@@ -45,6 +45,7 @@ interface CreatorCoworkSendOptions {
   activeSkillIds: string[];
   preferCreativeProducer?: boolean;
   attachments?: DraftAttachment[];
+  messageMetadata?: Record<string, unknown>;
 }
 
 const App: React.FC = () => {
@@ -375,6 +376,7 @@ const App: React.FC = () => {
     dispatch(setActiveSkillIds(options.activeSkillIds));
     dispatch(setDraftPrompt({ sessionId: '__home__', draft }));
     dispatch(setDraftAttachments({ draftKey: '__home__', attachments: options.attachments ?? [] }));
+    dispatch(setDraftMessageMetadata({ draftKey: '__home__', metadata: options.messageMetadata }));
     setMainView(MainView.Cowork);
     window.setTimeout(() => {
       window.dispatchEvent(new CustomEvent('cowork:focus-input', {

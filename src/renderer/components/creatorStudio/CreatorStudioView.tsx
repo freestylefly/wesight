@@ -116,6 +116,7 @@ interface CreatorCoworkSendOptions {
   activeSkillIds: string[];
   preferCreativeProducer?: boolean;
   attachments?: CreatorCoworkDraftAttachment[];
+  messageMetadata?: Record<string, unknown>;
 }
 
 interface CreatorCoworkDraftAttachment {
@@ -241,6 +242,30 @@ const buildRecipeAutomationPrompt = (recipe: CreatorRecipeRecord): string => (
     '```',
   ].join('\n')
 );
+
+const buildCreatorCoworkMessageMetadata = ({
+  promptSpec,
+  promptText,
+  activeSkillIds,
+  requestedAction,
+  source,
+}: {
+  promptSpec?: unknown;
+  promptText?: string;
+  activeSkillIds: string[];
+  requestedAction: string;
+  source?: Record<string, unknown>;
+}): Record<string, unknown> => ({
+  domain: 'creator_studio',
+  promptSpec,
+  promptText,
+  activeSkillIds,
+  requestedAction,
+  source: {
+    studio: 'creator_studio',
+    ...(source ?? {}),
+  },
+});
 
 const PlaceholderImage: React.FC<{
   src: string | null;
@@ -713,6 +738,18 @@ const CreatorStudioView: React.FC<CreatorStudioViewProps> = ({
       ].join('\n'), {
         activeSkillIds: installedRecommendedSkillIds,
         preferCreativeProducer: true,
+        messageMetadata: buildCreatorCoworkMessageMetadata({
+          promptSpec,
+          promptText,
+          activeSkillIds: installedRecommendedSkillIds,
+          requestedAction: 'asset_variant',
+          source: {
+            assetId: asset.id,
+            sourceType: 'asset',
+            templateId: asset.templateId,
+            caseIds: asset.caseIds,
+          },
+        }),
       });
     } catch {
       dispatchToast(i18nService.t('creatorSendToCoworkFailed'));
@@ -744,6 +781,20 @@ const CreatorStudioView: React.FC<CreatorStudioViewProps> = ({
         activeSkillIds: installedRecommendedSkillIds,
         preferCreativeProducer: true,
         attachments: compiled.attachments,
+        messageMetadata: buildCreatorCoworkMessageMetadata({
+          promptSpec: compiled.promptSpec,
+          promptText: compiled.promptText,
+          activeSkillIds: installedRecommendedSkillIds,
+          requestedAction: requestImageGeneration ? 'image_generation' : 'prompt_draft',
+          source: {
+            sourceType: promptSpec.sourceType,
+            sourceMode: promptSpec.sourceMode,
+            sourceId: promptSpec.sourceId,
+            sourceTitle: promptSpec.sourceTitle,
+            templateId: promptSpec.templateId,
+            caseIds: promptSpec.caseIds,
+          },
+        }),
       });
     } catch {
       dispatchToast(i18nService.t('creatorSendToCoworkFailed'));
@@ -1094,6 +1145,20 @@ const CreatorStudioView: React.FC<CreatorStudioViewProps> = ({
       ].join('\n'), {
         activeSkillIds: installedRecommendedSkillIds,
         preferCreativeProducer: true,
+        messageMetadata: buildCreatorCoworkMessageMetadata({
+          promptSpec: task.promptSpec,
+          promptText: task.promptText,
+          activeSkillIds: installedRecommendedSkillIds,
+          requestedAction: 'batch_task',
+          source: {
+            batchRunId: task.batchRunId,
+            batchTaskId: task.id,
+            directionId: task.directionId,
+            modelId: task.modelId,
+            templateId: task.templateId,
+            size: task.size,
+          },
+        }),
       });
     } catch {
       dispatchToast(i18nService.t('creatorSendToCoworkFailed'));
@@ -1140,6 +1205,17 @@ const CreatorStudioView: React.FC<CreatorStudioViewProps> = ({
       ].join('\n'), {
         activeSkillIds: installedRecommendedSkillIds,
         preferCreativeProducer: true,
+        messageMetadata: buildCreatorCoworkMessageMetadata({
+          promptSpec: pendingTasks.map((task) => task.promptSpec),
+          activeSkillIds: installedRecommendedSkillIds,
+          requestedAction: 'batch_run',
+          source: {
+            batchRunId: batchRun.id,
+            briefTitle: batchRun.briefTitle,
+            taskIds: pendingTasks.map((task) => task.id),
+            taskCount: pendingTasks.length,
+          },
+        }),
       });
     } catch {
       dispatchToast(i18nService.t('creatorSendToCoworkFailed'));

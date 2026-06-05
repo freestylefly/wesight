@@ -34,6 +34,8 @@ interface CoworkState {
   draftPrompts: Record<string, string>;
   /** Keyed by draftKey (sessionId or '__home__'), stores pending attachments */
   draftAttachments: Record<string, DraftAttachment[]>;
+  /** Keyed by draftKey (sessionId or '__home__'), stores pending message metadata */
+  draftMessageMetadata: Record<string, Record<string, unknown>>;
   unreadSessionIds: string[];
   isCoworkActive: boolean;
   isStreaming: boolean;
@@ -61,6 +63,7 @@ const initialState: CoworkState = {
   currentSession: null,
   draftPrompts: {},
   draftAttachments: {},
+  draftMessageMetadata: {},
   unreadSessionIds: [],
   isCoworkActive: false,
   isStreaming: false,
@@ -444,6 +447,15 @@ const coworkSlice = createSlice({
       }
     },
 
+    setDraftMessageMetadata(state, action: PayloadAction<{ draftKey: string; metadata?: Record<string, unknown> }>) {
+      const { draftKey, metadata } = action.payload;
+      if (!metadata || Object.keys(metadata).length === 0) {
+        delete state.draftMessageMetadata[draftKey];
+      } else {
+        state.draftMessageMetadata[draftKey] = metadata;
+      }
+    },
+
     addDraftAttachment(state, action: PayloadAction<{ draftKey: string; attachment: DraftAttachment }>) {
       const { draftKey, attachment } = action.payload;
       const existing = state.draftAttachments[draftKey] || [];
@@ -453,6 +465,10 @@ const coworkSlice = createSlice({
 
     clearDraftAttachments(state, action: PayloadAction<string>) {
       delete state.draftAttachments[action.payload];
+    },
+
+    clearDraftMessageMetadata(state, action: PayloadAction<string>) {
+      delete state.draftMessageMetadata[action.payload];
     },
   },
 });
@@ -464,8 +480,10 @@ export const {
   setCurrentSession,
   setDraftPrompt,
   setDraftAttachments,
+  setDraftMessageMetadata,
   addDraftAttachment,
   clearDraftAttachments,
+  clearDraftMessageMetadata,
   addSession,
   updateSessionStatus,
   deleteSession,

@@ -333,7 +333,12 @@ const CoworkView: React.FC<CoworkViewProps> = ({ onRequestAppSettings, onShowSki
     };
   }, [dispatch]);
 
-  const handleStartSession = async (prompt: string, skillPrompt?: string, imageAttachments?: CoworkImageAttachment[]): Promise<boolean | void> => {
+  const handleStartSession = async (
+    prompt: string,
+    skillPrompt?: string,
+    imageAttachments?: CoworkImageAttachment[],
+    messageMetadata?: Record<string, unknown>
+  ): Promise<boolean | void> => {
     // Prevent duplicate submissions
     if (isStartingRef.current) return;
     isStartingRef.current = true;
@@ -406,8 +411,9 @@ const CoworkView: React.FC<CoworkViewProps> = ({ onRequestAppSettings, onShowSki
             type: 'user',
             content: prompt,
             timestamp: now,
-            metadata: (sessionSkillIds.length > 0 || (imageAttachments && imageAttachments.length > 0))
+            metadata: (messageMetadata || sessionSkillIds.length > 0 || (imageAttachments && imageAttachments.length > 0))
               ? {
+                ...(messageMetadata ?? {}),
                 ...(sessionSkillIds.length > 0 ? { skillIds: sessionSkillIds } : {}),
                 ...(imageAttachments && imageAttachments.length > 0 ? { imageAttachments } : {}),
               }
@@ -448,6 +454,7 @@ const CoworkView: React.FC<CoworkViewProps> = ({ onRequestAppSettings, onShowSki
         agentId: currentAgentId,
         teamId: currentTargetType === AgentRunTargetType.Team && currentTeamId ? currentTeamId : undefined,
         imageAttachments,
+        messageMetadata,
       });
 
       if (!startedSession && startError) {
@@ -492,7 +499,12 @@ const CoworkView: React.FC<CoworkViewProps> = ({ onRequestAppSettings, onShowSki
     }
   };
 
-  const handleContinueSession = async (prompt: string, skillPrompt?: string, imageAttachments?: CoworkImageAttachment[]) => {
+  const handleContinueSession = async (
+    prompt: string,
+    skillPrompt?: string,
+    imageAttachments?: CoworkImageAttachment[],
+    messageMetadata?: Record<string, unknown>
+  ) => {
     if (!currentSession) return;
     // Prevent duplicate submissions
     if (isContinuingRef.current) return;
@@ -538,6 +550,7 @@ const CoworkView: React.FC<CoworkViewProps> = ({ onRequestAppSettings, onShowSki
         systemPrompt: combinedSystemPrompt,
         activeSkillIds: sessionSkillIds.length > 0 ? sessionSkillIds : undefined,
         imageAttachments,
+        messageMetadata,
       });
     } finally {
       isContinuingRef.current = false;

@@ -1436,6 +1436,7 @@ export class CoworkRunner extends EventEmitter {
       workspaceRoot?: string;
       confirmationMode?: 'modal' | 'text';
       imageAttachments?: Array<{ name: string; mimeType: string; base64Data: string }>;
+      messageMetadata?: Record<string, unknown>;
     } = {}
   ): Promise<void> {
     this.stoppedSessions.delete(sessionId);
@@ -1449,7 +1450,7 @@ export class CoworkRunner extends EventEmitter {
 
     if (!options.skipInitialUserMessage) {
       // Add user message with skill info and imageAttachments
-      const messageMetadata: Record<string, unknown> = {};
+      const messageMetadata: Record<string, unknown> = { ...(options.messageMetadata ?? {}) };
       if (options.skillIds?.length) {
         messageMetadata.skillIds = options.skillIds;
       }
@@ -1528,7 +1529,7 @@ export class CoworkRunner extends EventEmitter {
     }
   }
 
-  async continueSession(sessionId: string, prompt: string, options: { systemPrompt?: string; skillIds?: string[]; imageAttachments?: Array<{ name: string; mimeType: string; base64Data: string }> } = {}): Promise<void> {
+  async continueSession(sessionId: string, prompt: string, options: { systemPrompt?: string; skillIds?: string[]; imageAttachments?: Array<{ name: string; mimeType: string; base64Data: string }>; messageMetadata?: Record<string, unknown> } = {}): Promise<void> {
     this.stoppedSessions.delete(sessionId);
     const activeSession = this.activeSessions.get(sessionId);
     if (!activeSession) {
@@ -1537,6 +1538,7 @@ export class CoworkRunner extends EventEmitter {
         skillIds: options.skillIds,
         systemPrompt: options.systemPrompt,
         imageAttachments: options.imageAttachments,
+        messageMetadata: options.messageMetadata,
       });
       return;
     }
@@ -1545,7 +1547,7 @@ export class CoworkRunner extends EventEmitter {
     this.store.updateSession(sessionId, { status: 'running' });
 
     // Add user message with skill info and imageAttachments
-    const messageMetadata: Record<string, unknown> = {};
+    const messageMetadata: Record<string, unknown> = { ...(options.messageMetadata ?? {}) };
     if (options.skillIds?.length) {
       messageMetadata.skillIds = options.skillIds;
     }

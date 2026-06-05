@@ -145,7 +145,7 @@ export class HermesRuntimeAdapter extends EventEmitter implements CoworkRuntime 
     this.store.updateSession(sessionId, { status: 'running' });
 
     if (shouldAddUserMessage) {
-      const metadata: Record<string, unknown> = {};
+      const metadata: Record<string, unknown> = { ...(options.messageMetadata ?? {}) };
       if (options.skillIds?.length) {
         metadata.skillIds = options.skillIds;
       }

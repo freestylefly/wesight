@@ -299,7 +299,7 @@ export class CodexAppRuntimeAdapter extends EventEmitter implements CoworkRuntim
 
     this.store.updateSession(sessionId, { status: 'running' });
     if (shouldAddUserMessage) {
-      const metadata: Record<string, unknown> = {};
+      const metadata: Record<string, unknown> = { ...(options.messageMetadata ?? {}) };
       if (options.skillIds?.length) metadata.skillIds = options.skillIds;
       if (options.imageAttachments?.length) metadata.imageAttachments = options.imageAttachments;
       const message = this.store.addMessage(sessionId, {

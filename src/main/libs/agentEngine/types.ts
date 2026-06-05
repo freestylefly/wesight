@@ -57,6 +57,7 @@ export type CoworkStartOptions = {
   workspaceRoot?: string;
   confirmationMode?: 'modal' | 'text';
   imageAttachments?: CoworkImageAttachment[];
+  messageMetadata?: Record<string, unknown>;
   agentId?: string;
   agentEngine?: CoworkAgentEngine;
   runtimeSnapshot?: CoworkSessionRuntimeSnapshot | null;
@@ -67,6 +68,7 @@ export type CoworkContinueOptions = {
   systemPrompt?: string;
   skillIds?: string[];
   imageAttachments?: CoworkImageAttachment[];
+  messageMetadata?: Record<string, unknown>;
   agentId?: string;
   agentEngine?: CoworkAgentEngine;
   runtimeSnapshot?: CoworkSessionRuntimeSnapshot | null;

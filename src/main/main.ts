@@ -4348,6 +4348,7 @@ if (!gotTheLock) {
     title?: string;
     activeSkillIds?: string[];
     imageAttachments?: Array<{ name: string; mimeType: string; base64Data: string }>;
+    messageMetadata?: Record<string, unknown>;
     agentId?: string;
     teamId?: string;
   }) => {
@@ -4411,7 +4412,7 @@ if (!gotTheLock) {
       coworkStoreInstance.updateSession(session.id, { status: 'running' });
 
       // Build metadata, include imageAttachments if present
-      const messageMetadata: Record<string, unknown> = {};
+      const messageMetadata: Record<string, unknown> = { ...(options.messageMetadata ?? {}) };
       if (options.activeSkillIds?.length) {
         messageMetadata.skillIds = options.activeSkillIds;
       }
@@ -4465,6 +4466,7 @@ if (!gotTheLock) {
         workspaceRoot: selectedWorkspaceRoot,
         confirmationMode: 'modal',
         imageAttachments: options.imageAttachments,
+        messageMetadata: options.messageMetadata,
         agentId: targetAgentId,
         agentEngine: activeEngine,
         runtimeSnapshot,
@@ -4509,6 +4511,7 @@ if (!gotTheLock) {
     systemPrompt?: string;
     activeSkillIds?: string[];
     imageAttachments?: Array<{ name: string; mimeType: string; base64Data: string }>;
+    messageMetadata?: Record<string, unknown>;
   }) => {
     try {
       subscribeSenderToCoworkSession(event.sender, options.sessionId);
@@ -4541,10 +4544,17 @@ if (!gotTheLock) {
       }
       updateDesktopPetTaskSnapshot(options.sessionId, DesktopPetTaskStatus.Thinking);
       if (existingSession?.teamId) {
+        const messageMetadata: Record<string, unknown> = { ...(options.messageMetadata ?? {}) };
+        if (options.activeSkillIds?.length) {
+          messageMetadata.skillIds = options.activeSkillIds;
+        }
+        if (options.imageAttachments?.length) {
+          messageMetadata.imageAttachments = options.imageAttachments;
+        }
         const userMessage = getCoworkStore().addMessage(options.sessionId, {
           type: 'user',
           content: options.prompt,
-          metadata: options.activeSkillIds?.length ? { skillIds: options.activeSkillIds } : undefined,
+          metadata: Object.keys(messageMetadata).length > 0 ? messageMetadata : undefined,
         });
         broadcastCoworkMessage(options.sessionId, userMessage);
         getCoworkStore().updateSession(options.sessionId, { status: 'running' });
@@ -4574,6 +4584,7 @@ if (!gotTheLock) {
         ),
         skillIds: options.activeSkillIds,
         imageAttachments: options.imageAttachments,
+        messageMetadata: options.messageMetadata,
         agentId: existingSession?.agentId || 'main',
         agentEngine: activeEngine,
         runtimeSnapshot,
