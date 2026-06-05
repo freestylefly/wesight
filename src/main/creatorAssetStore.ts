@@ -1458,6 +1458,7 @@ export class CreatorAssetStore {
       estimatedCostUnits,
       costUnitLabel: 'estimated units',
     };
+    const rootPromptSpec = ensurePromptSpecV1Snapshot(input.promptSpec, briefTitle);
     const insertTask = this.db.prepare(`
       INSERT INTO creator_batch_tasks (
         id, batch_run_id, project_id, status, direction_id, direction_title,
@@ -1478,7 +1479,7 @@ export class CreatorAssetStore {
         projectId,
         CreatorBatchRunStatus.Running,
         briefTitle,
-        JSON.stringify(input.promptSpec),
+        JSON.stringify(rootPromptSpec),
         input.promptText.trim(),
         JSON.stringify(summary),
         now,
@@ -1489,7 +1490,7 @@ export class CreatorAssetStore {
           for (const templateId of templateIds) {
             for (const size of sizes) {
               const taskId = uuidv4();
-              const promptSpec = {
+              const promptSpec = ensurePromptSpecV1Snapshot({
                 ...direction.promptSpec,
                 selectedCreativeDirectionId: direction.id,
                 selectedCreativeDirection: {
@@ -1512,7 +1513,7 @@ export class CreatorAssetStore {
                   modelName: model.displayName,
                   outputKinds: model.outputKinds,
                 },
-              };
+              }, direction.title);
               insertTask.run(
                 taskId,
                 id,
@@ -1525,7 +1526,16 @@ export class CreatorAssetStore {
                 templateId,
                 size,
                 JSON.stringify(promptSpec),
-                this.renderBatchTaskPrompt(direction.promptText, model.displayName, templateId, size),
+                this.renderBatchTaskPrompt({
+                  promptText: direction.promptText,
+                  promptSpec,
+                  batchRunId: id,
+                  batchTaskId: taskId,
+                  directionId: direction.id,
+                  modelName: model.displayName,
+                  templateId,
+                  size,
+                }),
                 '[]',
                 `${model.costUnitEstimate} ${model.costUnitLabel}`,
                 now,
@@ -2174,19 +2184,42 @@ export class CreatorAssetStore {
     return normalized.slice(0, 6);
   }
 
-  private renderBatchTaskPrompt(
-    promptText: string,
-    modelName: string,
-    templateId: string,
-    size: string
-  ): string {
+  private renderBatchTaskPrompt(input: {
+    promptText: string;
+    promptSpec: CreatorPromptSpecSnapshot;
+    batchRunId: string;
+    batchTaskId: string;
+    directionId: string;
+    modelName: string;
+    templateId: string;
+    size: string;
+  }): string {
     return [
-      promptText.trim(),
+      CREATOR_STUDIO_MARKER,
       '',
-      'Batch execution constraints:',
-      `model=${modelName}`,
-      `templateId=${templateId}`,
-      `size=${size}`,
+      `batchRunId: ${input.batchRunId}`,
+      `batchTaskId: ${input.batchTaskId}`,
+      `directionId: ${input.directionId}`,
+      `templateId: ${input.templateId}`,
+      `size: ${input.size}`,
+      `model: ${input.modelName}`,
+      '',
+      'PromptSpec:',
+      '```json',
+      JSON.stringify(input.promptSpec, null, 2),
+      '```',
+      '',
+      'Prompt:',
+      '```text',
+      [
+        input.promptText.trim(),
+        '',
+        'Batch execution constraints:',
+        `model=${input.modelName}`,
+        `templateId=${input.templateId}`,
+        `size=${input.size}`,
+      ].join('\n'),
+      '```',
     ].join('\n');
   }
 

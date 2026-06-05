@@ -140,4 +140,33 @@ describe('creator prompt compiler', () => {
     expect(compiled.promptText).not.toContain('Four differentiated creative directions');
     expect(compiled.promptText).not.toContain('Clarity hero');
   });
+
+  test('compiles batch task prompt with task metadata', () => {
+    const compiled = compileCreatorPrompt({
+      spec: createPromptSpec(),
+      target: CreatorPromptCompileTarget.BatchTask,
+      batchTask: {
+        batchRunId: 'batch-run-1',
+        batchTaskId: 'batch-task-1',
+        directionId: 'bold-campaign',
+        modelName: 'Seedream Image',
+        templateId: 'poster-system',
+        size: '16:9',
+      },
+    });
+
+    expect(compiled.target).toBe(CreatorPromptCompileTarget.BatchTask);
+    expect(compiled.promptText).toContain('[Creator Studio]');
+    expect(compiled.promptText).toContain('batchRunId: batch-run-1');
+    expect(compiled.promptText).toContain('batchTaskId: batch-task-1');
+    expect(compiled.promptText).toContain('PromptSpec:');
+    expect(compiled.promptText).toContain('Batch execution constraints');
+    expect(compiled.promptSpec.batch).toMatchObject({
+      batchRunId: 'batch-run-1',
+      batchTaskId: 'batch-task-1',
+      directionId: 'bold-campaign',
+      size: '16:9',
+    });
+    expect(compiled.promptSpec.constraints?.aspectRatio).toBe('16:9');
+  });
 });

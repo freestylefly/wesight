@@ -720,11 +720,24 @@ describe('CreatorAssetStore', () => {
     expect(batchRun.summary.sizes).toEqual(['1:1', '16:9']);
     expect(batchRun.tasks).toHaveLength(16);
     expect(batchRun.tasks[0].status).toBe(CreatorBatchTaskStatus.Pending);
+    expect(batchRun.promptSpec.schemaVersion).toBe(CreatorPromptSpecSchemaVersion.V1);
     expect(batchRun.tasks[0].promptText).toContain('Batch execution constraints');
+    expect(batchRun.tasks[0].promptText).toContain('[Creator Studio]');
+    expect(batchRun.tasks[0].promptText).toContain(`batchRunId: ${batchRun.id}`);
+    expect(batchRun.tasks[0].promptText).toContain(`batchTaskId: ${batchRun.tasks[0].id}`);
+    expect(batchRun.tasks[0].promptText).toContain('PromptSpec:');
     expect(batchRun.tasks[0].promptSpec.batch).toMatchObject({
       batchRunId: batchRun.id,
+      batchTaskId: batchRun.tasks[0].id,
       modelId: batchRun.tasks[0].modelId,
     });
+    expect(batchRun.tasks[0].promptSpec.schemaVersion).toBe(CreatorPromptSpecSchemaVersion.V1);
+
+    const context = parseCreatorStudioSourceContext(batchRun.tasks[0].promptText);
+    expect(context?.batchRunId).toBe(batchRun.id);
+    expect(context?.batchTaskId).toBe(batchRun.tasks[0].id);
+    expect(context?.promptSpec?.schemaVersion).toBe(CreatorPromptSpecSchemaVersion.V1);
+    expect(context?.promptText).toContain('Generate a bold launch visual.');
 
     const listed = store.listBatchRuns({ projectId });
     expect(listed.total).toBe(1);
