@@ -558,6 +558,26 @@ contextBridge.exposeInMainWorld('electron', {
       ipcRenderer.invoke(CreatorStudioIpcChannel.CollectionCreate, input),
     addAssetToCollection: (input: { assetId: string; collectionId: string }) =>
       ipcRenderer.invoke(CreatorStudioIpcChannel.CollectionAddAsset, input),
+    getBoardWorkspace: (projectId?: string) =>
+      ipcRenderer.invoke(CreatorStudioIpcChannel.BoardWorkspaceGet, projectId),
+    createBoard: (input: Record<string, unknown>) =>
+      ipcRenderer.invoke(CreatorStudioIpcChannel.BoardCreate, input),
+    setCurrentBoard: (input: Record<string, unknown>) =>
+      ipcRenderer.invoke(CreatorStudioIpcChannel.BoardSetCurrent, input),
+    addBoardCard: (input: Record<string, unknown>) =>
+      ipcRenderer.invoke(CreatorStudioIpcChannel.BoardCardAdd, input),
+    updateBoardCard: (input: Record<string, unknown>) =>
+      ipcRenderer.invoke(CreatorStudioIpcChannel.BoardCardUpdate, input),
+    removeBoardCard: (cardId: string) =>
+      ipcRenderer.invoke(CreatorStudioIpcChannel.BoardCardRemove, cardId),
+    moveBoardCard: (input: Record<string, unknown>) =>
+      ipcRenderer.invoke(CreatorStudioIpcChannel.BoardCardMove, input),
+    selectBoardCard: (input: Record<string, unknown>) =>
+      ipcRenderer.invoke(CreatorStudioIpcChannel.BoardCardSelect, input),
+    buildBoardContextPack: (input: Record<string, unknown>) =>
+      ipcRenderer.invoke(CreatorStudioIpcChannel.BoardBuildContextPack, input),
+    updateBrandKit: (input: Record<string, unknown>) =>
+      ipcRenderer.invoke(CreatorStudioIpcChannel.BrandKitUpdate, input),
   },
   dialog: {
     selectDirectory: () => ipcRenderer.invoke('dialog:selectDirectory'),

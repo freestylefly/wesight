@@ -3,6 +3,8 @@ import { afterEach, beforeEach, describe, expect, test } from 'vitest';
 
 import {
   CreatorAssetAdoptionStatus,
+  CreatorBoardCardKind,
+  CreatorBoardMoveDirection,
   CreatorProductionAssetKind,
   CreatorProductionAssetSource,
   CreatorProductionAssetStatus,
@@ -355,5 +357,62 @@ describe('CreatorAssetStore', () => {
     expect(store.listAssets({ projectId }).total).toBe(2);
     expect(store.listAssets({ projectId, source: CreatorProductionAssetSource.CreatorPrompt }).total).toBe(1);
     expect(store.listAssets({ projectId, tag: 'typography' }).total).toBe(1);
+  });
+
+  test('persists project boards, card selection, context packs, and brand kit', () => {
+    const workspace = store.createProject({ name: 'Board Project' });
+    const projectId = workspace.currentProjectId;
+    const boardWorkspace = store.getBoardWorkspace(projectId);
+
+    expect(boardWorkspace.projectId).toBe(projectId);
+    expect(boardWorkspace.boards).toHaveLength(1);
+    expect(boardWorkspace.cards).toHaveLength(0);
+
+    const promptCard = store.addBoardCard({
+      boardId: boardWorkspace.currentBoardId,
+      kind: CreatorBoardCardKind.Prompt,
+      title: 'Launch prompt',
+      promptText: 'Generate a launch visual.',
+      promptSpec: { sourceTitle: 'Launch prompt', caseIds: [] },
+      groupName: 'Round 1',
+    });
+    const directionCard = store.addBoardCard({
+      boardId: boardWorkspace.currentBoardId,
+      kind: CreatorBoardCardKind.Direction,
+      title: 'Bold route',
+      direction: {
+        id: 'bold',
+        title: 'Bold route',
+        template: 'Large headline',
+        style: 'High contrast',
+        reason: 'Social launch',
+        promptFocus: 'Increase visual contrast.',
+      },
+    });
+
+    store.selectBoardCard({ cardId: promptCard.id, selected: true });
+    store.selectBoardCard({ cardId: directionCard.id, selected: true });
+    store.moveBoardCard({ cardId: directionCard.id, direction: CreatorBoardMoveDirection.Up });
+
+    const updated = store.updateBrandKit({
+      projectId,
+      colors: ['#112233', '#ffffff'],
+      bannedWords: ['cheap'],
+      tone: 'confident',
+      visualPreferences: 'clean grid, premium lighting',
+    });
+    expect(updated.brandKit.colors).toEqual(['#112233', '#ffffff']);
+    expect(updated.brandKit.bannedWords).toEqual(['cheap']);
+
+    const context = store.buildBoardContextPack({ boardId: boardWorkspace.currentBoardId });
+    expect(context.cardIds).toHaveLength(2);
+    expect(context.contextPack).toContain('Board: Creative Board');
+    expect(context.contextPack).toContain('Launch prompt');
+    expect(context.contextPack).toContain('Bold route');
+    expect(context.contextPack).toContain('cheap');
+
+    const secondBoard = store.createBoard({ projectId, name: 'Round 2' });
+    expect(secondBoard.currentBoardId).not.toBe(boardWorkspace.currentBoardId);
+    expect(store.setCurrentBoard(projectId, boardWorkspace.currentBoardId).currentBoardId).toBe(boardWorkspace.currentBoardId);
   });
 });

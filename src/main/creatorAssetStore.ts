@@ -6,6 +6,8 @@ import { v4 as uuidv4 } from 'uuid';
 import {
   CreatorAssetAdoptionStatus,
   CreatorAssetSelectionStatus,
+  CreatorBoardCardKind,
+  CreatorBoardMoveDirection,
   CreatorProductionAssetKind,
   CreatorProductionAssetSource,
   CreatorProductionAssetStatus,
@@ -18,6 +20,19 @@ import type {
   CreatorAssetCollectionCreateInput,
   CreatorAssetCollectionRecord,
   CreatorAssetUpdateInput,
+  CreatorBoardCardCreateInput,
+  CreatorBoardCardMoveInput,
+  CreatorBoardCardRecord,
+  CreatorBoardCardSelectInput,
+  CreatorBoardCardUpdateInput,
+  CreatorBoardContextPackInput,
+  CreatorBoardContextPackResult,
+  CreatorBoardCreateInput,
+  CreatorBoardDirectionSnapshot,
+  CreatorBoardRecord,
+  CreatorBoardWorkspaceSnapshot,
+  CreatorBrandKitRecord,
+  CreatorBrandKitUpdateInput,
   CreatorCaseAssetCreateInput,
   CreatorProductionAssetListInput,
   CreatorProductionAssetListResult,
@@ -107,9 +122,50 @@ interface CollectionRow {
   asset_count: number;
 }
 
+interface BoardRow {
+  id: string;
+  project_id: string;
+  name: string;
+  description: string | null;
+  created_at: number;
+  updated_at: number;
+}
+
+interface BoardCardRow {
+  id: string;
+  board_id: string;
+  project_id: string;
+  kind: string;
+  title: string;
+  asset_id: string | null;
+  case_id: string | null;
+  prompt_text: string;
+  prompt_spec_json: string | null;
+  direction_json: string | null;
+  group_name: string | null;
+  notes: string | null;
+  position: number;
+  created_at: number;
+  updated_at: number;
+  selected?: number | null;
+}
+
+interface BrandKitRow {
+  project_id: string;
+  colors_json: string | null;
+  logo_asset_id: string | null;
+  logo_path: string | null;
+  banned_words_json: string | null;
+  tone: string | null;
+  visual_preferences: string | null;
+  created_at: number;
+  updated_at: number;
+}
+
 const CREATOR_STUDIO_MARKER = '[Creator Studio]';
 const CreatorWorkspaceStateKey = {
   CurrentProjectId: 'current_project_id',
+  CurrentBoardIdPrefix: 'current_board_id',
 } as const;
 
 const parseJsonArray = (value: string | null | undefined): string[] => {
@@ -152,6 +208,24 @@ const parsePromptSpec = (value: string | null | undefined): CreatorPromptSpecSna
     return parsed && typeof parsed === 'object'
       ? parsed as CreatorPromptSpecSnapshot
       : null;
+  } catch {
+    return null;
+  }
+};
+
+const parseDirection = (value: string | null | undefined): CreatorBoardDirectionSnapshot | null => {
+  if (!value) return null;
+  try {
+    const parsed = JSON.parse(value) as Partial<CreatorBoardDirectionSnapshot> | null;
+    if (!parsed || typeof parsed !== 'object' || typeof parsed.title !== 'string') return null;
+    return {
+      id: typeof parsed.id === 'string' && parsed.id.trim() ? parsed.id : parsed.title,
+      title: parsed.title,
+      template: typeof parsed.template === 'string' ? parsed.template : '',
+      style: typeof parsed.style === 'string' ? parsed.style : '',
+      reason: typeof parsed.reason === 'string' ? parsed.reason : '',
+      promptFocus: typeof parsed.promptFocus === 'string' ? parsed.promptFocus : '',
+    };
   } catch {
     return null;
   }
@@ -605,6 +679,215 @@ export class CreatorAssetStore {
     return this.getAsset(asset.id);
   }
 
+  getBoardWorkspace(projectIdInput?: string): CreatorBoardWorkspaceSnapshot {
+    const projectId = projectIdInput?.trim() || this.getCurrentProjectId();
+    this.ensureProjectExists(projectId);
+    const currentBoardId = this.ensureCurrentBoard(projectId);
+    return {
+      projectId,
+      currentBoardId,
+      boards: this.listBoards(projectId),
+      cards: this.listBoardCards(currentBoardId),
+      selectedCardIds: this.listSelectedBoardCardIds(currentBoardId),
+      brandKit: this.getBrandKit(projectId),
+    };
+  }
+
+  createBoard(input: CreatorBoardCreateInput): CreatorBoardWorkspaceSnapshot {
+    const projectId = input.projectId.trim();
+    this.ensureProjectExists(projectId);
+    const name = input.name.trim().slice(0, 80);
+    if (!name) {
+      throw new Error('Board name is required');
+    }
+    const now = Date.now();
+    const id = uuidv4();
+    this.db.prepare(`
+      INSERT INTO creator_boards (id, project_id, name, description, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?)
+    `).run(id, projectId, name, normalizeOptionalText(input.description), now, now);
+    this.setCurrentBoardId(projectId, id);
+    return this.getBoardWorkspace(projectId);
+  }
+
+  setCurrentBoard(projectId: string, boardId: string): CreatorBoardWorkspaceSnapshot {
+    const board = this.db.prepare(`
+      SELECT id
+      FROM creator_boards
+      WHERE id = ? AND project_id = ?
+    `).get(boardId, projectId) as { id: string } | undefined;
+    if (!board) {
+      throw new Error('Board not found');
+    }
+    this.setCurrentBoardId(projectId, boardId);
+    return this.getBoardWorkspace(projectId);
+  }
+
+  addBoardCard(input: CreatorBoardCardCreateInput): CreatorBoardCardRecord {
+    const board = this.getBoardRow(input.boardId);
+    if (!board) {
+      throw new Error('Board not found');
+    }
+    if (!Object.values(CreatorBoardCardKind).includes(input.kind)) {
+      throw new Error('Board card kind is invalid');
+    }
+    const now = Date.now();
+    const positionRow = this.db.prepare(`
+      SELECT COALESCE(MAX(position), -1) + 1 AS position
+      FROM creator_board_cards
+      WHERE board_id = ?
+    `).get(board.id) as { position: number };
+    const asset = input.assetId ? this.getAsset(input.assetId) : null;
+    const title = (input.title.trim() || asset?.fileName || 'Board Card').slice(0, 120);
+    const promptSpecJson = input.promptSpec ? JSON.stringify(input.promptSpec) : asset?.promptSpec ? JSON.stringify(asset.promptSpec) : null;
+    const directionJson = input.direction ? JSON.stringify(input.direction) : null;
+    const promptText = (input.promptText ?? asset?.promptText ?? '').trim();
+    const id = uuidv4();
+    this.db.prepare(`
+      INSERT INTO creator_board_cards (
+        id, board_id, project_id, kind, title, asset_id, case_id, prompt_text,
+        prompt_spec_json, direction_json, group_name, notes, position, metadata_json, created_at, updated_at
+      )
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      id,
+      board.id,
+      board.project_id,
+      input.kind,
+      title,
+      input.assetId ?? null,
+      input.caseId ?? null,
+      promptText,
+      promptSpecJson,
+      directionJson,
+      normalizeOptionalText(input.groupName),
+      normalizeOptionalText(input.notes),
+      positionRow.position,
+      '{}',
+      now,
+      now
+    );
+    return this.getBoardCard(id)!;
+  }
+
+  updateBoardCard(input: CreatorBoardCardUpdateInput): CreatorBoardCardRecord | null {
+    const card = this.getBoardCard(input.cardId);
+    if (!card) return null;
+    const now = Date.now();
+    this.db.prepare(`
+      UPDATE creator_board_cards
+      SET title = ?,
+        group_name = ?,
+        notes = ?,
+        direction_json = ?,
+        updated_at = ?
+      WHERE id = ?
+    `).run(
+      input.title === undefined ? card.title : input.title.trim().slice(0, 120) || card.title,
+      input.groupName === undefined ? card.groupName : normalizeOptionalText(input.groupName),
+      input.notes === undefined ? card.notes : normalizeOptionalText(input.notes),
+      input.direction === undefined ? (card.direction ? JSON.stringify(card.direction) : null) : input.direction ? JSON.stringify(input.direction) : null,
+      now,
+      card.id
+    );
+    return this.getBoardCard(card.id);
+  }
+
+  removeBoardCard(cardId: string): CreatorBoardCardRecord | null {
+    const card = this.getBoardCard(cardId);
+    if (!card) return null;
+    this.db.prepare('DELETE FROM creator_board_selections WHERE card_id = ?').run(card.id);
+    this.db.prepare('DELETE FROM creator_board_cards WHERE id = ?').run(card.id);
+    this.reindexBoardCards(card.boardId);
+    return card;
+  }
+
+  moveBoardCard(input: CreatorBoardCardMoveInput): CreatorBoardCardRecord | null {
+    const card = this.getBoardCard(input.cardId);
+    if (!card) return null;
+    const comparator = input.direction === CreatorBoardMoveDirection.Up ? '<' : '>';
+    const order = input.direction === CreatorBoardMoveDirection.Up ? 'DESC' : 'ASC';
+    const target = this.db.prepare(`
+      SELECT id, position
+      FROM creator_board_cards
+      WHERE board_id = ? AND position ${comparator} ?
+      ORDER BY position ${order}
+      LIMIT 1
+    `).get(card.boardId, card.position) as { id: string; position: number } | undefined;
+    if (!target) return card;
+    const now = Date.now();
+    this.db.transaction(() => {
+      this.db.prepare('UPDATE creator_board_cards SET position = ?, updated_at = ? WHERE id = ?')
+        .run(target.position, now, card.id);
+      this.db.prepare('UPDATE creator_board_cards SET position = ?, updated_at = ? WHERE id = ?')
+        .run(card.position, now, target.id);
+    })();
+    return this.getBoardCard(card.id);
+  }
+
+  selectBoardCard(input: CreatorBoardCardSelectInput): CreatorBoardCardRecord | null {
+    const card = this.getBoardCard(input.cardId);
+    if (!card) return null;
+    const now = Date.now();
+    this.db.prepare(`
+      INSERT INTO creator_board_selections (board_id, card_id, selected, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?)
+      ON CONFLICT(board_id, card_id) DO UPDATE SET selected = excluded.selected, updated_at = excluded.updated_at
+    `).run(card.boardId, card.id, input.selected ? 1 : 0, now, now);
+    return this.getBoardCard(card.id);
+  }
+
+  buildBoardContextPack(input: CreatorBoardContextPackInput): CreatorBoardContextPackResult {
+    const board = this.getBoardRow(input.boardId);
+    if (!board) {
+      throw new Error('Board not found');
+    }
+    const requested = Array.isArray(input.cardIds) ? new Set(input.cardIds.filter((id) => id.trim())) : null;
+    const cards = this.listBoardCards(board.id)
+      .filter((card) => requested ? requested.has(card.id) : card.selected);
+    const selectedCards = cards.length > 0 ? cards : this.listBoardCards(board.id);
+    const brandKit = this.getBrandKit(board.project_id);
+    const contextPack = this.renderBoardContextPack(board, selectedCards, brandKit);
+    return {
+      boardId: board.id,
+      cardIds: selectedCards.map((card) => card.id),
+      contextPack,
+    };
+  }
+
+  updateBrandKit(input: CreatorBrandKitUpdateInput): CreatorBoardWorkspaceSnapshot {
+    const projectId = input.projectId.trim();
+    this.ensureProjectExists(projectId);
+    const current = this.getBrandKit(projectId);
+    const now = Date.now();
+    this.db.prepare(`
+      INSERT INTO creator_brand_kits (
+        project_id, colors_json, logo_asset_id, logo_path, banned_words_json,
+        tone, visual_preferences, created_at, updated_at
+      )
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT(project_id) DO UPDATE SET
+        colors_json = excluded.colors_json,
+        logo_asset_id = excluded.logo_asset_id,
+        logo_path = excluded.logo_path,
+        banned_words_json = excluded.banned_words_json,
+        tone = excluded.tone,
+        visual_preferences = excluded.visual_preferences,
+        updated_at = excluded.updated_at
+    `).run(
+      projectId,
+      JSON.stringify(Array.isArray(input.colors) ? normalizeTags(input.colors) : current.colors),
+      input.logoAssetId === undefined ? current.logoAssetId : normalizeOptionalText(input.logoAssetId),
+      input.logoPath === undefined ? current.logoPath : normalizeOptionalText(input.logoPath),
+      JSON.stringify(Array.isArray(input.bannedWords) ? normalizeTags(input.bannedWords) : current.bannedWords),
+      input.tone === undefined ? current.tone : input.tone.trim().slice(0, 240),
+      input.visualPreferences === undefined ? current.visualPreferences : input.visualPreferences.trim().slice(0, 1000),
+      current.createdAt || now,
+      now
+    );
+    return this.getBoardWorkspace(projectId);
+  }
+
   private ingestGeneratedImages(sessionId: string, message: CoworkMessage): void {
     const images = getGeneratedImages(message.metadata);
     if (images.length === 0) return;
@@ -856,6 +1139,196 @@ export class CreatorAssetStore {
     }));
   }
 
+  private ensureProjectExists(projectId: string): void {
+    this.ensureDefaultProject();
+    const project = this.db.prepare('SELECT id FROM creator_projects WHERE id = ?').get(projectId);
+    if (!project) {
+      throw new Error('Project not found');
+    }
+  }
+
+  private getCurrentBoardStateKey(projectId: string): string {
+    return `${CreatorWorkspaceStateKey.CurrentBoardIdPrefix}:${projectId}`;
+  }
+
+  private setCurrentBoardId(projectId: string, boardId: string): void {
+    this.db.prepare(`
+      INSERT INTO creator_workspace_state (key, value, updated_at)
+      VALUES (?, ?, ?)
+      ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at
+    `).run(this.getCurrentBoardStateKey(projectId), boardId, Date.now());
+  }
+
+  private ensureCurrentBoard(projectId: string): string {
+    const currentRow = this.db.prepare(`
+      SELECT value
+      FROM creator_workspace_state
+      WHERE key = ?
+    `).get(this.getCurrentBoardStateKey(projectId)) as { value: string } | undefined;
+    if (currentRow?.value) {
+      const board = this.db.prepare(`
+        SELECT id
+        FROM creator_boards
+        WHERE id = ? AND project_id = ?
+      `).get(currentRow.value, projectId) as { id: string } | undefined;
+      if (board) return board.id;
+    }
+
+    const existing = this.db.prepare(`
+      SELECT id
+      FROM creator_boards
+      WHERE project_id = ?
+      ORDER BY updated_at DESC, created_at DESC
+      LIMIT 1
+    `).get(projectId) as { id: string } | undefined;
+    if (existing) {
+      this.setCurrentBoardId(projectId, existing.id);
+      return existing.id;
+    }
+
+    const now = Date.now();
+    const id = uuidv4();
+    this.db.prepare(`
+      INSERT INTO creator_boards (id, project_id, name, description, created_at, updated_at)
+      VALUES (?, ?, ?, NULL, ?, ?)
+    `).run(id, projectId, 'Creative Board', now, now);
+    this.setCurrentBoardId(projectId, id);
+    return id;
+  }
+
+  private getBoardRow(boardId: string): BoardRow | null {
+    const row = this.db.prepare(`
+      SELECT id, project_id, name, description, created_at, updated_at
+      FROM creator_boards
+      WHERE id = ?
+    `).get(boardId) as BoardRow | undefined;
+    return row ?? null;
+  }
+
+  private listBoards(projectId: string): CreatorBoardRecord[] {
+    const rows = this.db.prepare(`
+      SELECT id, project_id, name, description, created_at, updated_at
+      FROM creator_boards
+      WHERE project_id = ?
+      ORDER BY updated_at DESC, created_at DESC
+    `).all(projectId) as BoardRow[];
+    return rows.map((row) => this.mapBoardRow(row));
+  }
+
+  private getBoardCard(cardId: string): CreatorBoardCardRecord | null {
+    const row = this.db.prepare(`
+      SELECT
+        c.*,
+        COALESCE(s.selected, 0) AS selected
+      FROM creator_board_cards c
+      LEFT JOIN creator_board_selections s ON s.board_id = c.board_id AND s.card_id = c.id
+      WHERE c.id = ?
+    `).get(cardId) as BoardCardRow | undefined;
+    return row ? this.mapBoardCardRow(row) : null;
+  }
+
+  private listBoardCards(boardId: string): CreatorBoardCardRecord[] {
+    const rows = this.db.prepare(`
+      SELECT
+        c.*,
+        COALESCE(s.selected, 0) AS selected
+      FROM creator_board_cards c
+      LEFT JOIN creator_board_selections s ON s.board_id = c.board_id AND s.card_id = c.id
+      WHERE c.board_id = ?
+      ORDER BY c.position ASC, c.created_at ASC
+    `).all(boardId) as BoardCardRow[];
+    return rows.map((row) => this.mapBoardCardRow(row));
+  }
+
+  private listSelectedBoardCardIds(boardId: string): string[] {
+    const rows = this.db.prepare(`
+      SELECT card_id
+      FROM creator_board_selections
+      WHERE board_id = ? AND selected = 1
+      ORDER BY updated_at DESC
+    `).all(boardId) as Array<{ card_id: string }>;
+    return rows.map((row) => row.card_id);
+  }
+
+  private reindexBoardCards(boardId: string): void {
+    const rows = this.db.prepare(`
+      SELECT id
+      FROM creator_board_cards
+      WHERE board_id = ?
+      ORDER BY position ASC, created_at ASC
+    `).all(boardId) as Array<{ id: string }>;
+    const now = Date.now();
+    const update = this.db.prepare('UPDATE creator_board_cards SET position = ?, updated_at = ? WHERE id = ?');
+    this.db.transaction(() => {
+      rows.forEach((row, index) => update.run(index, now, row.id));
+    })();
+  }
+
+  private getBrandKit(projectId: string): CreatorBrandKitRecord {
+    const now = Date.now();
+    const row = this.db.prepare(`
+      SELECT project_id, colors_json, logo_asset_id, logo_path, banned_words_json,
+        tone, visual_preferences, created_at, updated_at
+      FROM creator_brand_kits
+      WHERE project_id = ?
+    `).get(projectId) as BrandKitRow | undefined;
+    if (!row) {
+      return {
+        projectId,
+        colors: [],
+        logoAssetId: null,
+        logoPath: null,
+        bannedWords: [],
+        tone: '',
+        visualPreferences: '',
+        createdAt: now,
+        updatedAt: now,
+      };
+    }
+    return {
+      projectId: row.project_id,
+      colors: parseJsonArray(row.colors_json),
+      logoAssetId: row.logo_asset_id,
+      logoPath: row.logo_path,
+      bannedWords: parseJsonArray(row.banned_words_json),
+      tone: row.tone ?? '',
+      visualPreferences: row.visual_preferences ?? '',
+      createdAt: row.created_at,
+      updatedAt: row.updated_at,
+    };
+  }
+
+  private renderBoardContextPack(
+    board: BoardRow,
+    cards: CreatorBoardCardRecord[],
+    brandKit: CreatorBrandKitRecord
+  ): string {
+    const lines = [
+      `Board: ${board.name}`,
+      `projectId: ${board.project_id}`,
+      '',
+      'Brand Kit:',
+      `colors: ${brandKit.colors.length > 0 ? brandKit.colors.join(', ') : 'none'}`,
+      `logo: ${brandKit.logoPath || brandKit.logoAssetId || 'none'}`,
+      `tone: ${brandKit.tone || 'none'}`,
+      `visualPreferences: ${brandKit.visualPreferences || 'none'}`,
+      `bannedWords: ${brandKit.bannedWords.length > 0 ? brandKit.bannedWords.join(', ') : 'none'}`,
+      '',
+      'Selected Board Cards:',
+    ];
+    cards.forEach((card, index) => {
+      lines.push(`${index + 1}. kind=${card.kind}; title=${card.title}; group=${card.groupName || 'none'}`);
+      if (card.assetId) lines.push(`   assetId=${card.assetId}`);
+      if (card.caseId) lines.push(`   caseId=${card.caseId}`);
+      if (card.notes) lines.push(`   notes=${card.notes}`);
+      if (card.direction) {
+        lines.push(`   direction=${card.direction.title}; template=${card.direction.template}; style=${card.direction.style}; focus=${card.direction.promptFocus}`);
+      }
+      if (card.promptText) lines.push(`   prompt=${card.promptText.slice(0, 1200)}`);
+    });
+    return lines.join('\n');
+  }
+
   private getAssetCollectionIds(assetId: string): string[] {
     const rows = this.db.prepare(`
       SELECT collection_id
@@ -889,6 +1362,38 @@ export class CreatorAssetStore {
       createdAt: row.created_at,
       updatedAt: row.updated_at,
       completedAt: row.completed_at,
+    };
+  }
+
+  private mapBoardRow(row: BoardRow): CreatorBoardRecord {
+    return {
+      id: row.id,
+      projectId: row.project_id,
+      name: row.name,
+      description: row.description,
+      createdAt: row.created_at,
+      updatedAt: row.updated_at,
+    };
+  }
+
+  private mapBoardCardRow(row: BoardCardRow): CreatorBoardCardRecord {
+    return {
+      id: row.id,
+      boardId: row.board_id,
+      projectId: row.project_id,
+      kind: row.kind as CreatorBoardCardKind,
+      title: row.title,
+      assetId: row.asset_id,
+      caseId: row.case_id,
+      promptText: row.prompt_text,
+      promptSpec: parsePromptSpec(row.prompt_spec_json),
+      direction: parseDirection(row.direction_json),
+      groupName: row.group_name,
+      notes: row.notes,
+      position: row.position,
+      selected: Boolean(row.selected),
+      createdAt: row.created_at,
+      updatedAt: row.updated_at,
     };
   }
 

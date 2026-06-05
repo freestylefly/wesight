@@ -11,6 +11,16 @@ export const CreatorStudioIpcChannel = {
   ProjectSetCurrent: 'creatorStudio:project:setCurrent',
   CollectionCreate: 'creatorStudio:collection:create',
   CollectionAddAsset: 'creatorStudio:collection:addAsset',
+  BoardWorkspaceGet: 'creatorStudio:board:workspace:get',
+  BoardCreate: 'creatorStudio:board:create',
+  BoardSetCurrent: 'creatorStudio:board:setCurrent',
+  BoardCardAdd: 'creatorStudio:board:card:add',
+  BoardCardUpdate: 'creatorStudio:board:card:update',
+  BoardCardRemove: 'creatorStudio:board:card:remove',
+  BoardCardMove: 'creatorStudio:board:card:move',
+  BoardCardSelect: 'creatorStudio:board:card:select',
+  BoardBuildContextPack: 'creatorStudio:board:contextPack:build',
+  BrandKitUpdate: 'creatorStudio:brandKit:update',
 } as const;
 
 export type CreatorStudioIpcChannel =
@@ -117,6 +127,36 @@ export const CreatorAssetSelectionStatusValues = [
   CreatorAssetSelectionStatus.Unselected,
 ] as const;
 
+export const CreatorBoardCardKind = {
+  Asset: 'asset',
+  Case: 'case',
+  Prompt: 'prompt',
+  Direction: 'direction',
+} as const;
+
+export type CreatorBoardCardKind =
+  typeof CreatorBoardCardKind[keyof typeof CreatorBoardCardKind];
+
+export const CreatorBoardCardKindValues = [
+  CreatorBoardCardKind.Asset,
+  CreatorBoardCardKind.Case,
+  CreatorBoardCardKind.Prompt,
+  CreatorBoardCardKind.Direction,
+] as const;
+
+export const CreatorBoardMoveDirection = {
+  Up: 'up',
+  Down: 'down',
+} as const;
+
+export type CreatorBoardMoveDirection =
+  typeof CreatorBoardMoveDirection[keyof typeof CreatorBoardMoveDirection];
+
+export const CreatorBoardMoveDirectionValues = [
+  CreatorBoardMoveDirection.Up,
+  CreatorBoardMoveDirection.Down,
+] as const;
+
 export const CreatorStudioDefaultProjectId = 'creator-project-default';
 
 export const CreatorStudioAssetListDefaultLimit = 60;
@@ -155,4 +195,14 @@ export const isCreatorAssetAdoptionStatus = (value: unknown): value is CreatorAs
 export const isCreatorAssetSelectionStatus = (value: unknown): value is CreatorAssetSelectionStatus => (
   typeof value === 'string'
   && CreatorAssetSelectionStatusValues.includes(value as CreatorAssetSelectionStatus)
+);
+
+export const isCreatorBoardCardKind = (value: unknown): value is CreatorBoardCardKind => (
+  typeof value === 'string'
+  && CreatorBoardCardKindValues.includes(value as CreatorBoardCardKind)
+);
+
+export const isCreatorBoardMoveDirection = (value: unknown): value is CreatorBoardMoveDirection => (
+  typeof value === 'string'
+  && CreatorBoardMoveDirectionValues.includes(value as CreatorBoardMoveDirection)
 );

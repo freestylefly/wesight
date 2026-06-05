@@ -7,6 +7,8 @@ import {
   CreatorStudioAssetListMaxLimit,
   CreatorStudioIpcChannel,
   isCreatorAssetAdoptionStatus,
+  isCreatorBoardCardKind,
+  isCreatorBoardMoveDirection,
   isCreatorProductionAssetSource,
 } from '../../../shared/creatorStudio/constants';
 import type { CreatorAssetStore } from '../../creatorAssetStore';
@@ -40,6 +42,26 @@ const normalizeListInput = (input: unknown) => {
 const normalizeStringArray = (value: unknown): string[] | undefined => {
   if (!Array.isArray(value)) return undefined;
   return value.filter((item): item is string => typeof item === 'string');
+};
+
+const normalizeObject = (value: unknown): Record<string, unknown> | null => (
+  value && typeof value === 'object' && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : null
+);
+
+const normalizeDirection = (value: unknown) => {
+  const record = normalizeObject(value);
+  const title = toTrimmedString(record?.title);
+  if (!record || !title) return null;
+  return {
+    id: toTrimmedString(record.id) ?? title,
+    title,
+    template: toTrimmedString(record.template) ?? '',
+    style: toTrimmedString(record.style) ?? '',
+    reason: toTrimmedString(record.reason) ?? '',
+    promptFocus: toTrimmedString(record.promptFocus) ?? '',
+  };
 };
 
 export const registerCreatorStudioIpcHandlers = (
@@ -302,6 +324,211 @@ export const registerCreatorStudioIpcHandlers = (
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Failed to add asset to collection',
+      };
+    }
+  });
+
+  ipcMain.handle(CreatorStudioIpcChannel.BoardWorkspaceGet, async (_event, input: unknown) => {
+    try {
+      return { success: true, workspace: getCreatorAssetStore().getBoardWorkspace(toTrimmedString(input) ?? undefined) };
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to load creator board',
+      };
+    }
+  });
+
+  ipcMain.handle(CreatorStudioIpcChannel.BoardCreate, async (_event, input: unknown) => {
+    try {
+      const record = normalizeObject(input) ?? {};
+      const projectId = toTrimmedString(record.projectId);
+      const name = toTrimmedString(record.name);
+      if (!projectId || !name) {
+        return { success: false, error: 'projectId and board name are required' };
+      }
+      return {
+        success: true,
+        workspace: getCreatorAssetStore().createBoard({
+          projectId,
+          name,
+          ...(toTrimmedString(record.description) ? { description: toTrimmedString(record.description)! } : {}),
+        }),
+      };
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to create creator board',
+      };
+    }
+  });
+
+  ipcMain.handle(CreatorStudioIpcChannel.BoardSetCurrent, async (_event, input: unknown) => {
+    try {
+      const record = normalizeObject(input) ?? {};
+      const projectId = toTrimmedString(record.projectId);
+      const boardId = toTrimmedString(record.boardId);
+      if (!projectId || !boardId) {
+        return { success: false, error: 'projectId and boardId are required' };
+      }
+      return { success: true, workspace: getCreatorAssetStore().setCurrentBoard(projectId, boardId) };
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to switch creator board',
+      };
+    }
+  });
+
+  ipcMain.handle(CreatorStudioIpcChannel.BoardCardAdd, async (_event, input: unknown) => {
+    try {
+      const record = normalizeObject(input) ?? {};
+      const boardId = toTrimmedString(record.boardId);
+      const title = toTrimmedString(record.title);
+      if (!boardId || !title || !isCreatorBoardCardKind(record.kind)) {
+        return { success: false, error: 'boardId, kind, and title are required' };
+      }
+      const card = getCreatorAssetStore().addBoardCard({
+        boardId,
+        kind: record.kind,
+        title,
+        ...(toTrimmedString(record.assetId) ? { assetId: toTrimmedString(record.assetId)! } : {}),
+        ...(toTrimmedString(record.caseId) ? { caseId: toTrimmedString(record.caseId)! } : {}),
+        ...(typeof record.promptText === 'string' ? { promptText: record.promptText } : {}),
+        ...(normalizeObject(record.promptSpec) ? { promptSpec: normalizeObject(record.promptSpec)! } : {}),
+        ...(normalizeDirection(record.direction) ? { direction: normalizeDirection(record.direction)! } : {}),
+        ...(record.groupName === null || typeof record.groupName === 'string' ? { groupName: record.groupName } : {}),
+        ...(record.notes === null || typeof record.notes === 'string' ? { notes: record.notes } : {}),
+      });
+      return { success: true, card };
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to add creator board card',
+      };
+    }
+  });
+
+  ipcMain.handle(CreatorStudioIpcChannel.BoardCardUpdate, async (_event, input: unknown) => {
+    try {
+      const record = normalizeObject(input) ?? {};
+      const cardId = toTrimmedString(record.cardId);
+      if (!cardId) {
+        return { success: false, error: 'cardId is required' };
+      }
+      const card = getCreatorAssetStore().updateBoardCard({
+        cardId,
+        ...(typeof record.title === 'string' ? { title: record.title } : {}),
+        ...(record.groupName === null || typeof record.groupName === 'string' ? { groupName: record.groupName } : {}),
+        ...(record.notes === null || typeof record.notes === 'string' ? { notes: record.notes } : {}),
+        ...(normalizeDirection(record.direction) ? { direction: normalizeDirection(record.direction)! } : {}),
+      });
+      if (!card) return { success: false, error: 'Card not found' };
+      return { success: true, card };
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to update creator board card',
+      };
+    }
+  });
+
+  ipcMain.handle(CreatorStudioIpcChannel.BoardCardRemove, async (_event, input: unknown) => {
+    try {
+      const cardId = toTrimmedString(input);
+      if (!cardId) return { success: false, error: 'cardId is required' };
+      const card = getCreatorAssetStore().removeBoardCard(cardId);
+      if (!card) return { success: false, error: 'Card not found' };
+      return { success: true, card };
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to remove creator board card',
+      };
+    }
+  });
+
+  ipcMain.handle(CreatorStudioIpcChannel.BoardCardMove, async (_event, input: unknown) => {
+    try {
+      const record = normalizeObject(input) ?? {};
+      const cardId = toTrimmedString(record.cardId);
+      if (!cardId || !isCreatorBoardMoveDirection(record.direction)) {
+        return { success: false, error: 'cardId and direction are required' };
+      }
+      const card = getCreatorAssetStore().moveBoardCard({ cardId, direction: record.direction });
+      if (!card) return { success: false, error: 'Card not found' };
+      return { success: true, card };
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to move creator board card',
+      };
+    }
+  });
+
+  ipcMain.handle(CreatorStudioIpcChannel.BoardCardSelect, async (_event, input: unknown) => {
+    try {
+      const record = normalizeObject(input) ?? {};
+      const cardId = toTrimmedString(record.cardId);
+      if (!cardId || typeof record.selected !== 'boolean') {
+        return { success: false, error: 'cardId and selected are required' };
+      }
+      const card = getCreatorAssetStore().selectBoardCard({ cardId, selected: record.selected });
+      if (!card) return { success: false, error: 'Card not found' };
+      return { success: true, card };
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to select creator board card',
+      };
+    }
+  });
+
+  ipcMain.handle(CreatorStudioIpcChannel.BoardBuildContextPack, async (_event, input: unknown) => {
+    try {
+      const record = normalizeObject(input) ?? {};
+      const boardId = toTrimmedString(record.boardId);
+      if (!boardId) {
+        return { success: false, error: 'boardId is required' };
+      }
+      return {
+        success: true,
+        contextPack: getCreatorAssetStore().buildBoardContextPack({
+          boardId,
+          ...(normalizeStringArray(record.cardIds) ? { cardIds: normalizeStringArray(record.cardIds)! } : {}),
+        }),
+      };
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to build creator board context pack',
+      };
+    }
+  });
+
+  ipcMain.handle(CreatorStudioIpcChannel.BrandKitUpdate, async (_event, input: unknown) => {
+    try {
+      const record = normalizeObject(input) ?? {};
+      const projectId = toTrimmedString(record.projectId);
+      if (!projectId) {
+        return { success: false, error: 'projectId is required' };
+      }
+      return {
+        success: true,
+        workspace: getCreatorAssetStore().updateBrandKit({
+          projectId,
+          ...(normalizeStringArray(record.colors) ? { colors: normalizeStringArray(record.colors)! } : {}),
+          ...(record.logoAssetId === null || typeof record.logoAssetId === 'string' ? { logoAssetId: record.logoAssetId } : {}),
+          ...(record.logoPath === null || typeof record.logoPath === 'string' ? { logoPath: record.logoPath } : {}),
+          ...(normalizeStringArray(record.bannedWords) ? { bannedWords: normalizeStringArray(record.bannedWords)! } : {}),
+          ...(typeof record.tone === 'string' ? { tone: record.tone } : {}),
+          ...(typeof record.visualPreferences === 'string' ? { visualPreferences: record.visualPreferences } : {}),
+        }),
+      };
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to update creator brand kit',
       };
     }
   });

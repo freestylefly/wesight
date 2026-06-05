@@ -1,5 +1,7 @@
 import type {
   CreatorAssetAdoptionStatus,
+  CreatorBoardCardKind,
+  CreatorBoardMoveDirection,
   CreatorProductionAssetKind,
   CreatorProductionAssetSource,
   CreatorProductionAssetStatus,
@@ -211,4 +213,120 @@ export interface CreatorCaseAssetCreateInput {
   styles?: string[];
   scenes?: string[];
   tags?: string[];
+}
+
+export interface CreatorBoardRecord {
+  id: string;
+  projectId: string;
+  name: string;
+  description: string | null;
+  createdAt: number;
+  updatedAt: number;
+}
+
+export interface CreatorBoardDirectionSnapshot {
+  id: string;
+  title: string;
+  template: string;
+  style: string;
+  reason: string;
+  promptFocus: string;
+}
+
+export interface CreatorBoardCardRecord {
+  id: string;
+  boardId: string;
+  projectId: string;
+  kind: CreatorBoardCardKind;
+  title: string;
+  assetId: string | null;
+  caseId: string | null;
+  promptText: string;
+  promptSpec: CreatorPromptSpecSnapshot | null;
+  direction: CreatorBoardDirectionSnapshot | null;
+  groupName: string | null;
+  notes: string | null;
+  position: number;
+  selected: boolean;
+  createdAt: number;
+  updatedAt: number;
+}
+
+export interface CreatorBrandKitRecord {
+  projectId: string;
+  colors: string[];
+  logoAssetId: string | null;
+  logoPath: string | null;
+  bannedWords: string[];
+  tone: string;
+  visualPreferences: string;
+  createdAt: number;
+  updatedAt: number;
+}
+
+export interface CreatorBoardWorkspaceSnapshot {
+  projectId: string;
+  currentBoardId: string;
+  boards: CreatorBoardRecord[];
+  cards: CreatorBoardCardRecord[];
+  selectedCardIds: string[];
+  brandKit: CreatorBrandKitRecord;
+}
+
+export interface CreatorBoardCreateInput {
+  projectId: string;
+  name: string;
+  description?: string;
+}
+
+export interface CreatorBoardCardCreateInput {
+  boardId: string;
+  kind: CreatorBoardCardKind;
+  title: string;
+  assetId?: string | null;
+  caseId?: string | null;
+  promptText?: string;
+  promptSpec?: CreatorPromptSpecSnapshot | null;
+  direction?: CreatorBoardDirectionSnapshot | null;
+  groupName?: string | null;
+  notes?: string | null;
+}
+
+export interface CreatorBoardCardUpdateInput {
+  cardId: string;
+  title?: string;
+  groupName?: string | null;
+  notes?: string | null;
+  direction?: CreatorBoardDirectionSnapshot | null;
+}
+
+export interface CreatorBoardCardMoveInput {
+  cardId: string;
+  direction: CreatorBoardMoveDirection;
+}
+
+export interface CreatorBoardCardSelectInput {
+  cardId: string;
+  selected: boolean;
+}
+
+export interface CreatorBoardContextPackInput {
+  boardId: string;
+  cardIds?: string[];
+}
+
+export interface CreatorBoardContextPackResult {
+  boardId: string;
+  cardIds: string[];
+  contextPack: string;
+}
+
+export interface CreatorBrandKitUpdateInput {
+  projectId: string;
+  colors?: string[];
+  logoAssetId?: string | null;
+  logoPath?: string | null;
+  bannedWords?: string[];
+  tone?: string;
+  visualPreferences?: string;
 }

@@ -19,6 +19,16 @@ import type {
   CreatorAssetCollectionAddInput,
   CreatorAssetCollectionCreateInput,
   CreatorAssetUpdateInput,
+  CreatorBoardCardCreateInput,
+  CreatorBoardCardMoveInput,
+  CreatorBoardCardRecord,
+  CreatorBoardCardSelectInput,
+  CreatorBoardCardUpdateInput,
+  CreatorBoardContextPackInput,
+  CreatorBoardContextPackResult,
+  CreatorBoardCreateInput,
+  CreatorBoardWorkspaceSnapshot,
+  CreatorBrandKitUpdateInput,
   CreatorCaseAssetCreateInput,
   CreatorProductionAssetListInput,
   CreatorProductionAssetListResult,
@@ -834,6 +844,56 @@ interface IElectronAPI {
     addAssetToCollection: (input: CreatorAssetCollectionAddInput) => Promise<{
       success: boolean;
       asset?: CreatorProductionAssetRecord;
+      error?: string;
+    }>;
+    getBoardWorkspace: (projectId?: string) => Promise<{
+      success: boolean;
+      workspace?: CreatorBoardWorkspaceSnapshot;
+      error?: string;
+    }>;
+    createBoard: (input: CreatorBoardCreateInput) => Promise<{
+      success: boolean;
+      workspace?: CreatorBoardWorkspaceSnapshot;
+      error?: string;
+    }>;
+    setCurrentBoard: (input: { projectId: string; boardId: string }) => Promise<{
+      success: boolean;
+      workspace?: CreatorBoardWorkspaceSnapshot;
+      error?: string;
+    }>;
+    addBoardCard: (input: CreatorBoardCardCreateInput) => Promise<{
+      success: boolean;
+      card?: CreatorBoardCardRecord;
+      error?: string;
+    }>;
+    updateBoardCard: (input: CreatorBoardCardUpdateInput) => Promise<{
+      success: boolean;
+      card?: CreatorBoardCardRecord;
+      error?: string;
+    }>;
+    removeBoardCard: (cardId: string) => Promise<{
+      success: boolean;
+      card?: CreatorBoardCardRecord;
+      error?: string;
+    }>;
+    moveBoardCard: (input: CreatorBoardCardMoveInput) => Promise<{
+      success: boolean;
+      card?: CreatorBoardCardRecord;
+      error?: string;
+    }>;
+    selectBoardCard: (input: CreatorBoardCardSelectInput) => Promise<{
+      success: boolean;
+      card?: CreatorBoardCardRecord;
+      error?: string;
+    }>;
+    buildBoardContextPack: (input: CreatorBoardContextPackInput) => Promise<{
+      success: boolean;
+      contextPack?: CreatorBoardContextPackResult;
+      error?: string;
+    }>;
+    updateBrandKit: (input: CreatorBrandKitUpdateInput) => Promise<{
+      success: boolean;
+      workspace?: CreatorBoardWorkspaceSnapshot;
       error?: string;
     }>;
   };

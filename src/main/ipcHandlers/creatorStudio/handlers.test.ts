@@ -34,6 +34,16 @@ const createStore = () => ({
   setCurrentProject: vi.fn(() => ({ currentProjectId: 'project-1', projects: [], collections: [] })),
   createCollection: vi.fn(() => ({ currentProjectId: 'project-1', projects: [], collections: [] })),
   addAssetToCollection: vi.fn(),
+  getBoardWorkspace: vi.fn(() => ({ projectId: 'project-1', currentBoardId: 'board-1', boards: [], cards: [], selectedCardIds: [], brandKit: null })),
+  createBoard: vi.fn(() => ({ projectId: 'project-1', currentBoardId: 'board-2', boards: [], cards: [], selectedCardIds: [], brandKit: null })),
+  setCurrentBoard: vi.fn(() => ({ projectId: 'project-1', currentBoardId: 'board-1', boards: [], cards: [], selectedCardIds: [], brandKit: null })),
+  addBoardCard: vi.fn(),
+  updateBoardCard: vi.fn(),
+  removeBoardCard: vi.fn(),
+  moveBoardCard: vi.fn(),
+  selectBoardCard: vi.fn(),
+  buildBoardContextPack: vi.fn(() => ({ boardId: 'board-1', cardIds: [], contextPack: '' })),
+  updateBrandKit: vi.fn(() => ({ projectId: 'project-1', currentBoardId: 'board-1', boards: [], cards: [], selectedCardIds: [], brandKit: null })),
 }) as unknown as CreatorAssetStore;
 
 beforeEach(() => {
@@ -56,6 +66,16 @@ test('registers creator studio asset IPC handlers with constant channels', () =>
   expect(ipcMain.handle).toHaveBeenCalledWith(CreatorStudioIpcChannel.ProjectSetCurrent, expect.any(Function));
   expect(ipcMain.handle).toHaveBeenCalledWith(CreatorStudioIpcChannel.CollectionCreate, expect.any(Function));
   expect(ipcMain.handle).toHaveBeenCalledWith(CreatorStudioIpcChannel.CollectionAddAsset, expect.any(Function));
+  expect(ipcMain.handle).toHaveBeenCalledWith(CreatorStudioIpcChannel.BoardWorkspaceGet, expect.any(Function));
+  expect(ipcMain.handle).toHaveBeenCalledWith(CreatorStudioIpcChannel.BoardCreate, expect.any(Function));
+  expect(ipcMain.handle).toHaveBeenCalledWith(CreatorStudioIpcChannel.BoardSetCurrent, expect.any(Function));
+  expect(ipcMain.handle).toHaveBeenCalledWith(CreatorStudioIpcChannel.BoardCardAdd, expect.any(Function));
+  expect(ipcMain.handle).toHaveBeenCalledWith(CreatorStudioIpcChannel.BoardCardUpdate, expect.any(Function));
+  expect(ipcMain.handle).toHaveBeenCalledWith(CreatorStudioIpcChannel.BoardCardRemove, expect.any(Function));
+  expect(ipcMain.handle).toHaveBeenCalledWith(CreatorStudioIpcChannel.BoardCardMove, expect.any(Function));
+  expect(ipcMain.handle).toHaveBeenCalledWith(CreatorStudioIpcChannel.BoardCardSelect, expect.any(Function));
+  expect(ipcMain.handle).toHaveBeenCalledWith(CreatorStudioIpcChannel.BoardBuildContextPack, expect.any(Function));
+  expect(ipcMain.handle).toHaveBeenCalledWith(CreatorStudioIpcChannel.BrandKitUpdate, expect.any(Function));
 });
 
 test('clamps asset list parameters before reaching the store', async () => {

@@ -17,6 +17,8 @@ import {
   CreatorStudioDefaultProjectId,
 } from '@shared/creatorStudio/constants';
 import type {
+  CreatorBoardWorkspaceSnapshot,
+  CreatorBrandKitRecord,
   CreatorProductionAssetRecord,
   CreatorWorkspaceSnapshot,
 } from '@shared/creatorStudio/types';
@@ -54,6 +56,7 @@ import {
   selectCreatorCreativeDirection,
 } from '../../utils/creatorStudio';
 import { CreatorAssetGrid } from './CreatorAssetGrid';
+import { CreatorBoard } from './CreatorBoard';
 
 const cases = casesData as CreatorStudioCase[];
 const styleLibrary = styleLibraryData as CreatorStudioStyleLibrary;
@@ -64,6 +67,7 @@ const CreatorStudioTab = {
   Templates: 'templates',
   Builder: 'builder',
   Assets: 'assets',
+  Board: 'board',
 } as const;
 
 type CreatorStudioTab = typeof CreatorStudioTab[keyof typeof CreatorStudioTab];
@@ -174,6 +178,8 @@ const CreatorStudioView: React.FC<CreatorStudioViewProps> = ({
   const [isSendingToCowork, setIsSendingToCowork] = useState(false);
   const [workspace, setWorkspace] = useState<CreatorWorkspaceSnapshot | null>(null);
   const [currentProjectId, setCurrentProjectId] = useState('');
+  const [boardWorkspace, setBoardWorkspace] = useState<CreatorBoardWorkspaceSnapshot | null>(null);
+  const [boardContextPack, setBoardContextPack] = useState('');
 
   useEffect(() => {
     void skillService.loadSkills().then((loadedSkills) => {
@@ -187,11 +193,24 @@ const CreatorStudioView: React.FC<CreatorStudioViewProps> = ({
     setCurrentProjectId(nextWorkspace.currentProjectId);
   }, []);
 
+  const loadBoardWorkspace = useCallback(async (projectId: string) => {
+    const nextWorkspace = await creatorStudioAssetService.getBoardWorkspace(projectId);
+    setBoardWorkspace(nextWorkspace);
+    return nextWorkspace;
+  }, []);
+
   useEffect(() => {
     void loadWorkspace().catch(() => {
       dispatchToast(i18nService.t('creatorWorkspaceLoadFailed'));
     });
   }, [loadWorkspace]);
+
+  useEffect(() => {
+    if (!currentProjectId) return;
+    void loadBoardWorkspace(currentProjectId).catch(() => {
+      dispatchToast(i18nService.t('creatorBoardLoadFailed'));
+    });
+  }, [currentProjectId, loadBoardWorkspace]);
 
   const searchableLabels = useMemo(() => {
     const labels = new Map<string, string[]>();
@@ -244,6 +263,15 @@ const CreatorStudioView: React.FC<CreatorStudioViewProps> = ({
     const installed = new Set(installedRecommendedSkillIds);
     return CREATOR_STUDIO_RECOMMENDED_SKILL_IDS.filter((skillId) => !installed.has(skillId));
   }, [installedRecommendedSkillIds]);
+  const builderPromptLanguage = useMemo(
+    () => normalizePromptLanguage(i18nService.getLanguage(), builderForm),
+    [builderForm]
+  );
+  const boardPromptSpec = useMemo(
+    () => buildPromptSpec(builderSeed, builderForm, builderPromptLanguage, i18nService.t('creatorBlankBuilder'), builderMaterials),
+    [builderForm, builderMaterials, builderPromptLanguage, builderSeed]
+  );
+  const boardPromptText = useMemo(() => renderCreatorPrompt(boardPromptSpec), [boardPromptSpec]);
 
   useEffect(() => {
     let cancelled = false;
@@ -549,6 +577,9 @@ const CreatorStudioView: React.FC<CreatorStudioViewProps> = ({
         <TabButton active={activeTab === CreatorStudioTab.Assets} onClick={() => setActiveTab(CreatorStudioTab.Assets)}>
           {i18nService.t('creatorAssetsTab')}
         </TabButton>
+        <TabButton active={activeTab === CreatorStudioTab.Board} onClick={() => setActiveTab(CreatorStudioTab.Board)}>
+          {i18nService.t('creatorBoardTab')}
+        </TabButton>
       </div>
 
       <main className="min-h-0 flex-1 overflow-y-auto">
@@ -601,6 +632,8 @@ const CreatorStudioView: React.FC<CreatorStudioViewProps> = ({
             onCreateProject={() => void createProject()}
             onSendToCowork={sendToCowork}
             onSavePromptAsset={(promptSpec, promptText) => void savePromptAsset(promptSpec, promptText)}
+            brandKit={boardWorkspace?.brandKit ?? null}
+            boardContextPack={boardContextPack}
           />
         )}
         {activeTab === CreatorStudioTab.Assets && (
@@ -608,6 +641,29 @@ const CreatorStudioView: React.FC<CreatorStudioViewProps> = ({
             onOpenCoworkSession={onOpenCoworkSession}
             onUseAssetAsReference={useAssetAsReference}
             onSendAssetToCowork={sendAssetToCowork}
+          />
+        )}
+        {activeTab === CreatorStudioTab.Board && (
+          <CreatorBoard
+            projectId={currentProjectId}
+            workspace={boardWorkspace}
+            currentPromptSpec={boardPromptSpec}
+            currentPromptText={boardPromptText}
+            directions={boardPromptSpec.creativeDirections ?? []}
+            onWorkspaceChange={setBoardWorkspace}
+            onUseContextPack={(contextPack) => {
+              setBoardContextPack(contextPack);
+              setActiveTab(CreatorStudioTab.Builder);
+            }}
+            onUseDirection={(direction) => {
+              setBuilderForm((form) => ({
+                ...form,
+                visualStyle: [form.visualStyle, direction.style, direction.promptFocus]
+                  .filter((item) => item.trim())
+                  .join(', '),
+              }));
+              setActiveTab(CreatorStudioTab.Builder);
+            }}
           />
         )}
       </main>
@@ -866,6 +922,8 @@ const PromptBuilder: React.FC<{
   currentProjectId: string;
   onProjectChange: (projectId: string) => void;
   onCreateProject: () => void;
+  brandKit: CreatorBrandKitRecord | null;
+  boardContextPack: string;
   onSendToCowork: (
     promptSpec: CreatorPromptSpec,
     promptText: string,
@@ -887,12 +945,15 @@ const PromptBuilder: React.FC<{
   currentProjectId,
   onProjectChange,
   onCreateProject,
+  brandKit,
+  boardContextPack,
   onSendToCowork,
   onSavePromptAsset,
 }) => {
   const [selectedDirectionId, setSelectedDirectionId] = useState<string | null>(null);
   const promptLanguage = normalizePromptLanguage(i18nService.getLanguage(), form);
-  const basePromptSpec: CreatorPromptSpec = buildPromptSpec(seed, form, promptLanguage, i18nService.t('creatorBlankBuilder'), materials);
+  const rawPromptSpec: CreatorPromptSpec = buildPromptSpec(seed, form, promptLanguage, i18nService.t('creatorBlankBuilder'), materials);
+  const basePromptSpec = applyBoardAndBrandKit(rawPromptSpec, brandKit, boardContextPack);
   const promptSpec = selectCreatorCreativeDirection(basePromptSpec, selectedDirectionId);
   const prompt = renderCreatorPrompt(promptSpec);
   const seedreamReady = seedreamStatus === SeedreamStatus.Configured;
@@ -1091,6 +1152,56 @@ const getSeedreamStatusHint = (status: SeedreamStatus): string => {
     default:
       return i18nService.t('creatorSeedreamMissingHint');
   }
+};
+
+const applyBoardAndBrandKit = (
+  spec: CreatorPromptSpec,
+  brandKit: CreatorBrandKitRecord | null,
+  boardContextPack: string
+): CreatorPromptSpec => {
+  const brandKitLines = brandKit && (
+    brandKit.colors.length > 0
+    || brandKit.logoPath
+    || brandKit.logoAssetId
+    || brandKit.bannedWords.length > 0
+    || brandKit.tone
+    || brandKit.visualPreferences
+  )
+    ? [
+      i18nService.t('creatorBrandKitContextHeader'),
+      brandKit.colors.length > 0 ? `${i18nService.t('creatorBrandColors')}: ${brandKit.colors.join(', ')}` : '',
+      brandKit.logoPath || brandKit.logoAssetId ? `${i18nService.t('creatorBrandLogoPath')}: ${brandKit.logoPath || brandKit.logoAssetId}` : '',
+      brandKit.tone ? `${i18nService.t('creatorBrandTone')}: ${brandKit.tone}` : '',
+      brandKit.visualPreferences ? `${i18nService.t('creatorBrandVisualPreferences')}: ${brandKit.visualPreferences}` : '',
+      brandKit.bannedWords.length > 0 ? `${i18nService.t('creatorBrandBannedWords')}: ${brandKit.bannedWords.join(', ')}` : '',
+    ].filter(Boolean).join('\n')
+    : '';
+  const contextPack = [
+    spec.contextPack,
+    boardContextPack ? `${i18nService.t('creatorBoardContextPackHeader')}\n${boardContextPack}` : '',
+    brandKitLines,
+  ].filter(Boolean).join('\n\n');
+  const brandNegative = brandKit?.bannedWords.length
+    ? `${i18nService.t('creatorBrandBannedWords')}: ${brandKit.bannedWords.join(', ')}`
+    : '';
+  const visualStyle = [
+    spec.visualStyle,
+    brandKit?.visualPreferences,
+    brandKit?.colors.length ? `${i18nService.t('creatorBrandColors')}: ${brandKit.colors.join(', ')}` : '',
+    brandKit?.tone ? `${i18nService.t('creatorBrandTone')}: ${brandKit.tone}` : '',
+  ].filter(Boolean).join('; ');
+  return {
+    ...spec,
+    visualStyle,
+    constraints: {
+      ...spec.constraints,
+      negativeRequirements: [
+        spec.constraints.negativeRequirements,
+        brandNegative,
+      ].filter(Boolean).join('\n'),
+    },
+    contextPack,
+  };
 };
 
 const createMaterialId = (): string => (
