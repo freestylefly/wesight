@@ -40,6 +40,7 @@ import { RootState } from '../../store';
 import { setActiveSkillIds, setSkills } from '../../store/slices/skillSlice';
 import type {
   CreatorBuilderMaterial,
+  CreatorMaterialImageAnalysis,
   CreatorPromptReferenceAnalysis,
   CreatorPromptSpec,
   CreatorStudioCase,
@@ -1799,12 +1800,61 @@ const encodeLocalFileSrc = (filePath: string): string => {
     .replace(/^file:\/\//i, 'localfile://');
 };
 
+const colorChannelToHex = (value: number): string => value.toString(16).padStart(2, '0');
+
+const rgbToHex = (red: number, green: number, blue: number): string => (
+  `#${colorChannelToHex(red)}${colorChannelToHex(green)}${colorChannelToHex(blue)}`
+);
+
+const analyzeImageDataUrl = (dataUrl: string): Promise<CreatorMaterialImageAnalysis | undefined> => new Promise((resolve) => {
+  if (typeof Image === 'undefined' || typeof document === 'undefined') {
+    resolve(undefined);
+    return;
+  }
+  const image = new Image();
+  image.onload = () => {
+    const canvas = document.createElement('canvas');
+    const sampleSize = 24;
+    canvas.width = sampleSize;
+    canvas.height = sampleSize;
+    const context = canvas.getContext('2d');
+    if (!context) {
+      resolve(undefined);
+      return;
+    }
+    context.drawImage(image, 0, 0, sampleSize, sampleSize);
+    const pixels = context.getImageData(0, 0, sampleSize, sampleSize).data;
+    const colorBuckets = new Map<string, number>();
+    for (let index = 0; index < pixels.length; index += 4) {
+      const alpha = pixels[index + 3];
+      if (alpha < 180) continue;
+      const red = Math.round(pixels[index] / 32) * 32;
+      const green = Math.round(pixels[index + 1] / 32) * 32;
+      const blue = Math.round(pixels[index + 2] / 32) * 32;
+      const color = rgbToHex(Math.min(red, 255), Math.min(green, 255), Math.min(blue, 255));
+      colorBuckets.set(color, (colorBuckets.get(color) ?? 0) + 1);
+    }
+    const dominantColors = [...colorBuckets.entries()]
+      .sort((left, right) => right[1] - left[1])
+      .slice(0, 4)
+      .map(([color]) => color);
+    resolve({
+      width: image.naturalWidth,
+      height: image.naturalHeight,
+      dominantColors,
+    });
+  };
+  image.onerror = () => resolve(undefined);
+  image.src = dataUrl;
+});
+
 const createMaterialFromFile = async (
   file: File,
   source: CreatorMaterialSource,
   role: CreatorMaterialRole = CreatorMaterialRole.Reference
 ): Promise<CreatorBuilderMaterial> => {
   const dataUrl = await readFileAsDataUrl(file);
+  const imageAnalysis = await analyzeImageDataUrl(dataUrl);
   return {
     id: createMaterialId(),
     role,
@@ -1815,6 +1865,7 @@ const createMaterialFromFile = async (
     size: file.size,
     previewUrl: dataUrl,
     dataUrl,
+    imageAnalysis,
     addedAt: Date.now(),
   };
 };
@@ -1892,6 +1943,19 @@ const MaterialTray: React.FC<{
               <div className="min-w-0">
                 <div className="truncate text-xs font-medium">{material.name}</div>
                 <div className="truncate text-[11px] text-muted">{material.path}</div>
+                {material.imageAnalysis && (
+                  <div className="mt-1 flex flex-wrap items-center gap-1.5 text-[11px] text-muted">
+                    <span>{material.imageAnalysis.width}x{material.imageAnalysis.height}</span>
+                    {material.imageAnalysis.dominantColors.map((color) => (
+                      <span
+                        key={color}
+                        className="h-3 w-3 rounded-sm border border-border"
+                        style={{ backgroundColor: color }}
+                        title={color}
+                      />
+                    ))}
+                  </div>
+                )}
                 <select
                   value={material.role}
                   onChange={(event) => updateRole(material.id, event.target.value as CreatorMaterialRole)}

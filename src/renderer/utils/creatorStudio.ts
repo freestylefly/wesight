@@ -396,6 +396,7 @@ const toPromptMaterial = (material: CreatorBuilderMaterial): CreatorPromptMateri
   mimeType: material.mimeType,
   hasImageAttachment: hasImageAttachment(material),
   localPathAvailable: hasUsableLocalPath(material.path),
+  imageAnalysis: material.imageAnalysis,
 });
 
 export const renderCreatorContextPack = (
@@ -414,6 +415,13 @@ export const renderCreatorContextPack = (
     ...materials.map((material, index) => {
       const attachment = material.hasImageAttachment ? 'base64' : 'none';
       const localPath = material.localPathAvailable ? 'available' : 'unavailable';
+      const imageSummary = material.imageAnalysis
+        ? (
+          language === 'zh'
+            ? `；image=${material.imageAnalysis.width}x${material.imageAnalysis.height}；colors=${material.imageAnalysis.dominantColors.join(', ')}`
+            : `; image=${material.imageAnalysis.width}x${material.imageAnalysis.height}; colors=${material.imageAnalysis.dominantColors.join(', ')}`
+        )
+        : '';
       const fallbackNote = !material.localPathAvailable && material.hasImageAttachment
         ? (
           language === 'zh'
@@ -422,8 +430,8 @@ export const renderCreatorContextPack = (
         )
         : '';
       return language === 'zh'
-        ? `${index + 1}. role=${material.role}（${roleText(material.role)}）；name=${material.name}；path=${material.path}；mime=${material.mimeType}；attachment=${attachment}；localPath=${localPath}${fallbackNote}`
-        : `${index + 1}. role=${material.role} (${roleText(material.role)}); name=${material.name}; path=${material.path}; mime=${material.mimeType}; attachment=${attachment}; localPath=${localPath}${fallbackNote}`;
+        ? `${index + 1}. role=${material.role}（${roleText(material.role)}）；name=${material.name}；path=${material.path}；mime=${material.mimeType}；attachment=${attachment}；localPath=${localPath}${imageSummary}${fallbackNote}`
+        : `${index + 1}. role=${material.role} (${roleText(material.role)}); name=${material.name}; path=${material.path}; mime=${material.mimeType}; attachment=${attachment}; localPath=${localPath}${imageSummary}${fallbackNote}`;
     }),
   ].join('\n');
 };

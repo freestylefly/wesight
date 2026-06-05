@@ -133,6 +133,11 @@ describe('creator studio prompt utilities', () => {
       size: 1234,
       previewUrl: 'data:image/png;base64,AAAA',
       dataUrl: 'data:image/png;base64,AAAA',
+      imageAnalysis: {
+        width: 1200,
+        height: 800,
+        dominantColors: ['#202020', '#e0e0e0'],
+      },
       addedAt: 1,
     }, {
       id: 'material-2',
@@ -159,6 +164,8 @@ describe('creator studio prompt utilities', () => {
     expect(spec.contextPack).toContain('/Users/demo/brand/logo.png');
     expect(spec.contextPack).toContain('attachment=base64');
     expect(spec.contextPack).toContain('localPath=available');
+    expect(spec.contextPack).toContain('image=1200x800');
+    expect(spec.contextPack).toContain('colors=#202020, #e0e0e0');
     expect(spec.contextPack).toContain('role=negative');
     expect(spec.creativeDirections).toHaveLength(4);
     expect(new Set(spec.creativeDirections?.map((direction) => direction.id)).size).toBe(4);

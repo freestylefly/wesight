@@ -184,7 +184,14 @@ export interface CreatorBuilderMaterial {
   size: number;
   previewUrl: string;
   dataUrl?: string;
+  imageAnalysis?: CreatorMaterialImageAnalysis;
   addedAt: number;
+}
+
+export interface CreatorMaterialImageAnalysis {
+  width: number;
+  height: number;
+  dominantColors: string[];
 }
 
 export interface CreatorPromptMaterial {
@@ -196,6 +203,7 @@ export interface CreatorPromptMaterial {
   mimeType: string;
   hasImageAttachment: boolean;
   localPathAvailable: boolean;
+  imageAnalysis?: CreatorMaterialImageAnalysis;
 }
 
 export interface CreatorCreativeDirection {
