@@ -49,6 +49,7 @@ import type {
   CreatorTemplateFieldSchema,
 } from '../../types/creatorStudio';
 import { CreatorMaterialRole, CreatorMaterialSource, CreatorPromptSourceMode, CreatorStudioSourceType, CreatorTemplateFieldKind } from '../../types/creatorStudio';
+import { applyCreatorBriefAutofill } from '../../utils/creatorBriefAutofill';
 import { compileCreatorPrompt, CreatorPromptCompileTarget } from '../../utils/creatorPromptCompiler';
 import { CreatorPromptLintSeverity, lintCreatorPromptSpec } from '../../utils/creatorPromptLint';
 import { reverseEngineerCreatorPrompt } from '../../utils/creatorPromptReverseEngineer';
@@ -1309,6 +1310,8 @@ const PromptBuilder: React.FC<{
   const [projectNameDraft, setProjectNameDraft] = useState('');
   const [isProjectFormOpen, setIsProjectFormOpen] = useState(false);
   const [isCreatingProject, setIsCreatingProject] = useState(false);
+  const [briefAutofillText, setBriefAutofillText] = useState('');
+  const [briefAutofillMessage, setBriefAutofillMessage] = useState('');
   const promptLanguage = normalizePromptLanguage(i18nService.getLanguage(), form);
   const rawPromptSpec: CreatorPromptSpec = buildPromptSpec(seed, form, promptLanguage, i18nService.t('creatorBlankBuilder'), materials);
   const basePromptSpec = applyBoardAndBrandKit(rawPromptSpec, brandKit, boardContextPack);
@@ -1345,6 +1348,16 @@ const PromptBuilder: React.FC<{
         [fieldId]: value,
       },
     });
+  };
+
+  const applyBriefAutofill = () => {
+    const result = applyCreatorBriefAutofill(form, briefAutofillText);
+    onFormChange(result.form);
+    setBriefAutofillMessage(
+      result.changedFields.length > 0
+        ? i18nService.t('creatorBriefAutofillApplied').replace('{count}', String(result.changedFields.length))
+        : i18nService.t('creatorBriefAutofillNoEmptyFields')
+    );
   };
 
   const submitProject = async () => {
@@ -1456,6 +1469,30 @@ const PromptBuilder: React.FC<{
           )}
         </div>
         <BuilderSection title={i18nService.t('creatorBuilderSectionBrief')}>
+          <label className="block">
+            <span className="text-xs font-medium text-secondary">{i18nService.t('creatorBriefAutofill')}</span>
+            <textarea
+              value={briefAutofillText}
+              onChange={(event) => {
+                setBriefAutofillText(event.target.value);
+                setBriefAutofillMessage('');
+              }}
+              rows={3}
+              placeholder={i18nService.t('creatorBriefAutofillPlaceholder')}
+              className="mt-1 w-full resize-none rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none focus:border-primary"
+            />
+          </label>
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              disabled={!briefAutofillText.trim()}
+              onClick={applyBriefAutofill}
+              className="rounded-lg border border-border px-3 py-2 text-xs font-medium text-secondary transition-colors hover:bg-surface-raised hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {i18nService.t('creatorBriefAutofillApply')}
+            </button>
+            {briefAutofillMessage && <span className="text-xs text-muted">{briefAutofillMessage}</span>}
+          </div>
           <BuilderInput label={i18nService.t('creatorFieldTaskType')} value={form.taskType} onChange={(value) => updateField('taskType', value)} />
           <BuilderInput label={i18nService.t('creatorFieldSubject')} value={form.subject} onChange={(value) => updateField('subject', value)} />
           <BuilderInput label={i18nService.t('creatorFieldPlatform')} value={form.platform} onChange={(value) => updateField('platform', value)} />
