@@ -18,12 +18,14 @@ import type {
   CreatorAssetCollectionCreateInput,
   CreatorAssetCollectionRecord,
   CreatorAssetUpdateInput,
+  CreatorCaseAssetCreateInput,
   CreatorProductionAssetListInput,
   CreatorProductionAssetListResult,
   CreatorProductionAssetRecord,
   CreatorProductionAssetSourceLookup,
   CreatorProductionRunRecord,
   CreatorProjectCreateInput,
+  CreatorPromptAssetCreateInput,
   CreatorPromptSpecSnapshot,
   CreatorStudioSourceContext,
   CreatorWorkspaceSnapshot,
@@ -313,6 +315,123 @@ export class CreatorAssetStore {
       VALUES (?, ?, ?)
     `).run(collection.id, asset.id, Date.now());
     return this.getAsset(asset.id);
+  }
+
+  createPromptAsset(input: CreatorPromptAssetCreateInput): CreatorProductionAssetRecord {
+    const projectId = input.projectId.trim() || this.getCurrentProjectId();
+    const project = this.db.prepare('SELECT id FROM creator_projects WHERE id = ?').get(projectId);
+    if (!project) {
+      throw new Error('Project not found');
+    }
+    const title = input.title.trim().slice(0, 120) || 'Creator Prompt';
+    const promptText = input.promptText.trim();
+    if (!promptText) {
+      throw new Error('Prompt text is required');
+    }
+    const now = Date.now();
+    const id = uuidv4();
+    const caseIds = normalizeTags(input.caseIds ?? []);
+    const tags = normalizeTags(input.tags ?? []);
+    const promptSpecJson = JSON.stringify(input.promptSpec);
+    const caseIdsJson = JSON.stringify(caseIds);
+    this.db.prepare(`
+      INSERT INTO production_assets (
+        id, project_id, kind, title, status, source, run_id, source_run_id, variant_of_asset_id, session_id,
+        source_session_id, message_id, source_message_id, template_id,
+        case_ids, case_ids_json, prompt_spec, prompt_spec_json, prompt_text, file_path, file_name, mime_type,
+        favorite, adoption_status, tags_json, license_note, usage_note, metadata, created_at, updated_at
+      )
+      VALUES (?, ?, ?, ?, ?, ?, NULL, NULL, NULL, NULL, NULL, NULL, NULL, ?, ?, ?, ?, ?, ?, ?, ?, NULL, 0, ?, ?, NULL, NULL, ?, ?, ?)
+    `).run(
+      id,
+      projectId,
+      CreatorProductionAssetKind.Prompt,
+      title,
+      CreatorProductionAssetStatus.Ready,
+      CreatorProductionAssetSource.CreatorPrompt,
+      input.templateId ?? null,
+      caseIdsJson,
+      caseIdsJson,
+      promptSpecJson,
+      promptSpecJson,
+      promptText,
+      `creator://prompt/${id}`,
+      `${title}.prompt.txt`,
+      CreatorAssetAdoptionStatus.Unset,
+      JSON.stringify(tags),
+      JSON.stringify({ sourceTitle: input.promptSpec.sourceTitle ?? title }),
+      now,
+      now
+    );
+    return this.getAsset(id)!;
+  }
+
+  createCaseAsset(input: CreatorCaseAssetCreateInput): CreatorProductionAssetRecord {
+    const projectId = input.projectId.trim() || this.getCurrentProjectId();
+    const project = this.db.prepare('SELECT id FROM creator_projects WHERE id = ?').get(projectId);
+    if (!project) {
+      throw new Error('Project not found');
+    }
+    const caseId = input.caseId.trim();
+    const title = input.title.trim().slice(0, 120) || 'Creator Case';
+    const promptText = input.promptText.trim();
+    if (!caseId || !promptText) {
+      throw new Error('Case id and prompt text are required');
+    }
+    const now = Date.now();
+    const id = uuidv4();
+    const caseIds = [caseId];
+    const tags = normalizeTags([
+      input.category ?? '',
+      ...(input.styles ?? []),
+      ...(input.scenes ?? []),
+      ...(input.tags ?? []),
+    ]);
+    const promptSpec = {
+      sourceType: 'case',
+      sourceId: caseId,
+      sourceTitle: title,
+      category: input.category ?? undefined,
+      caseIds,
+      styles: normalizeTags(input.styles ?? []),
+      scenes: normalizeTags(input.scenes ?? []),
+      referencePrompt: promptText,
+    };
+    const promptSpecJson = JSON.stringify(promptSpec);
+    const caseIdsJson = JSON.stringify(caseIds);
+    this.db.prepare(`
+      INSERT INTO production_assets (
+        id, project_id, kind, title, status, source, run_id, source_run_id, variant_of_asset_id, session_id,
+        source_session_id, message_id, source_message_id, template_id,
+        case_ids, case_ids_json, prompt_spec, prompt_spec_json, prompt_text, file_path, file_name, mime_type,
+        favorite, adoption_status, tags_json, license_note, usage_note, metadata, created_at, updated_at
+      )
+      VALUES (?, ?, ?, ?, ?, ?, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, ?, ?, ?, ?, ?, ?, ?, NULL, 0, ?, ?, NULL, NULL, ?, ?, ?)
+    `).run(
+      id,
+      projectId,
+      CreatorProductionAssetKind.Case,
+      title,
+      CreatorProductionAssetStatus.Ready,
+      CreatorProductionAssetSource.CreatorCase,
+      caseIdsJson,
+      caseIdsJson,
+      promptSpecJson,
+      promptSpecJson,
+      promptText,
+      `creator://case/${caseId}`,
+      `${title}.case.txt`,
+      CreatorAssetAdoptionStatus.Unset,
+      JSON.stringify(tags),
+      JSON.stringify({
+        sourceLabel: input.sourceLabel ?? null,
+        sourceUrl: input.sourceUrl ?? null,
+        githubUrl: input.githubUrl ?? null,
+      }),
+      now,
+      now
+    );
+    return this.getAsset(id)!;
   }
 
   listAssets(input: CreatorProductionAssetListInput = {}): CreatorProductionAssetListResult {
@@ -779,11 +898,12 @@ export class CreatorAssetStore {
     const adoptionStatus = isAdoptionStatus(row.adoption_status)
       ? row.adoption_status
       : CreatorAssetAdoptionStatus.Unset;
+    const isFileBackedImage = row.kind === CreatorProductionAssetKind.Image;
     return {
       id: row.id,
       projectId,
       kind: row.kind as CreatorProductionAssetKind,
-      status: exists
+      status: !isFileBackedImage || exists
         ? row.status as CreatorProductionAssetStatus
         : CreatorProductionAssetStatus.Missing,
       source: row.source as CreatorProductionAssetSource,

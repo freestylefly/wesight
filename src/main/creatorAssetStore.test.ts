@@ -3,6 +3,8 @@ import { afterEach, beforeEach, describe, expect, test } from 'vitest';
 
 import {
   CreatorAssetAdoptionStatus,
+  CreatorProductionAssetKind,
+  CreatorProductionAssetSource,
   CreatorProductionAssetStatus,
   CreatorProductionRunStatus,
   CreatorStudioDefaultProjectId,
@@ -305,5 +307,53 @@ describe('CreatorAssetStore', () => {
     expect(store.listAssets({ projectId, collectionId: collection.id }).total).toBe(1);
     expect(store.listAssets({ projectId, tag: 'hero' }).total).toBe(1);
     expect(store.listAssets({ projectId, adoptionStatus: CreatorAssetAdoptionStatus.Shortlisted }).total).toBe(1);
+  });
+
+  test('stores prompt and case assets in the current project without local file backing', () => {
+    const workspace = store.createProject({ name: 'Prompt Library' });
+    const projectId = workspace.currentProjectId;
+
+    const promptAsset = store.createPromptAsset({
+      projectId,
+      title: 'Hero Prompt',
+      promptText: 'Generate a launch poster.',
+      promptSpec: {
+        sourceType: 'template',
+        sourceId: 'poster-system',
+        sourceTitle: 'Poster System',
+        templateId: 'poster-system',
+        caseIds: ['case-1'],
+      },
+      templateId: 'poster-system',
+      caseIds: ['case-1'],
+      tags: ['poster'],
+    });
+
+    const caseAsset = store.createCaseAsset({
+      projectId,
+      caseId: 'case-2',
+      title: 'Reference Case',
+      promptText: 'Generate a reference composition.',
+      sourceLabel: 'awesome-gpt-image-2',
+      sourceUrl: 'https://example.com/case',
+      githubUrl: 'https://github.com/example/repo',
+      category: 'poster',
+      styles: ['typography'],
+      scenes: ['campaign'],
+    });
+
+    expect(promptAsset.kind).toBe(CreatorProductionAssetKind.Prompt);
+    expect(promptAsset.status).toBe(CreatorProductionAssetStatus.Ready);
+    expect(promptAsset.source).toBe(CreatorProductionAssetSource.CreatorPrompt);
+    expect(promptAsset.filePath).toMatch(/^creator:\/\/prompt\//);
+
+    expect(caseAsset.kind).toBe(CreatorProductionAssetKind.Case);
+    expect(caseAsset.status).toBe(CreatorProductionAssetStatus.Ready);
+    expect(caseAsset.source).toBe(CreatorProductionAssetSource.CreatorCase);
+    expect(caseAsset.caseIds).toEqual(['case-2']);
+
+    expect(store.listAssets({ projectId }).total).toBe(2);
+    expect(store.listAssets({ projectId, source: CreatorProductionAssetSource.CreatorPrompt }).total).toBe(1);
+    expect(store.listAssets({ projectId, tag: 'typography' }).total).toBe(1);
   });
 });

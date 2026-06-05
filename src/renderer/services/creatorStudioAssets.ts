@@ -2,11 +2,13 @@ import type {
   CreatorAssetCollectionAddInput,
   CreatorAssetCollectionCreateInput,
   CreatorAssetUpdateInput,
+  CreatorCaseAssetCreateInput,
   CreatorProductionAssetListInput,
   CreatorProductionAssetListResult,
   CreatorProductionAssetRecord,
   CreatorProductionAssetSourceLookup,
   CreatorProjectCreateInput,
+  CreatorPromptAssetCreateInput,
   CreatorWorkspaceSnapshot,
 } from '@shared/creatorStudio/types';
 
@@ -42,6 +44,22 @@ class CreatorStudioAssetService {
     const result = await window.electron.creatorStudio.updateAsset(input);
     if (!result.success) {
       throw new Error(result.error || 'Failed to update creator asset');
+    }
+    return result.asset ?? null;
+  }
+
+  async createPromptAsset(input: CreatorPromptAssetCreateInput): Promise<CreatorProductionAssetRecord | null> {
+    const result = await window.electron.creatorStudio.createPromptAsset(input);
+    if (!result.success) {
+      throw new Error(result.error || 'Failed to save creator prompt asset');
+    }
+    return result.asset ?? null;
+  }
+
+  async createCaseAsset(input: CreatorCaseAssetCreateInput): Promise<CreatorProductionAssetRecord | null> {
+    const result = await window.electron.creatorStudio.createCaseAsset(input);
+    if (!result.success) {
+      throw new Error(result.error || 'Failed to save creator case asset');
     }
     return result.asset ?? null;
   }

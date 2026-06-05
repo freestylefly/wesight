@@ -12,13 +12,21 @@ import {
   TrashIcon,
   XMarkIcon,
 } from '@heroicons/react/24/outline';
-import type { CreatorProductionAssetRecord } from '@shared/creatorStudio/types';
+import {
+  CreatorProductionAssetKind,
+  CreatorStudioDefaultProjectId,
+} from '@shared/creatorStudio/constants';
+import type {
+  CreatorProductionAssetRecord,
+  CreatorWorkspaceSnapshot,
+} from '@shared/creatorStudio/types';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 
 import casesData from '../../data/creatorStudio/cases.json';
 import manifestData from '../../data/creatorStudio/manifest.json';
 import styleLibraryData from '../../data/creatorStudio/style-library.json';
+import { creatorStudioAssetService } from '../../services/creatorStudioAssets';
 import { i18nService } from '../../services/i18n';
 import { skillService } from '../../services/skill';
 import { RootState } from '../../store';
@@ -108,6 +116,10 @@ const dispatchToast = (message: string) => {
 
 const getText = (value: { zh: string; en: string }) => value[i18nService.getLanguage()];
 
+const getCreatorProjectLabel = (projectId: string, name: string): string => (
+  projectId === CreatorStudioDefaultProjectId ? i18nService.t('creatorDefaultProject') : name
+);
+
 const copyText = async (text: string) => {
   await navigator.clipboard.writeText(text);
   dispatchToast(i18nService.t('copied'));
@@ -160,12 +172,26 @@ const CreatorStudioView: React.FC<CreatorStudioViewProps> = ({
   const [visibleCaseCount, setVisibleCaseCount] = useState(CASE_PAGE_SIZE);
   const [seedreamStatus, setSeedreamStatus] = useState<SeedreamStatus>(SeedreamStatus.Missing);
   const [isSendingToCowork, setIsSendingToCowork] = useState(false);
+  const [workspace, setWorkspace] = useState<CreatorWorkspaceSnapshot | null>(null);
+  const [currentProjectId, setCurrentProjectId] = useState('');
 
   useEffect(() => {
     void skillService.loadSkills().then((loadedSkills) => {
       dispatch(setSkills(loadedSkills));
     });
   }, [dispatch]);
+
+  const loadWorkspace = useCallback(async () => {
+    const nextWorkspace = await creatorStudioAssetService.getWorkspace();
+    setWorkspace(nextWorkspace);
+    setCurrentProjectId(nextWorkspace.currentProjectId);
+  }, []);
+
+  useEffect(() => {
+    void loadWorkspace().catch(() => {
+      dispatchToast(i18nService.t('creatorWorkspaceLoadFailed'));
+    });
+  }, [loadWorkspace]);
 
   const searchableLabels = useMemo(() => {
     const labels = new Map<string, string[]>();
@@ -320,17 +346,19 @@ const CreatorStudioView: React.FC<CreatorStudioViewProps> = ({
       aspectRatio: asset.promptSpec?.constraints?.aspectRatio ?? '1:1',
       negativeRequirements: asset.promptSpec?.constraints?.negativeRequirements ?? '',
     });
-    setBuilderMaterials((items) => [{
-      id: createMaterialId(),
-      role: CreatorMaterialRole.Reference,
-      source: CreatorMaterialSource.File,
-      name: asset.fileName,
-      path: asset.filePath,
-      mimeType: asset.mimeType || 'image/png',
-      size: 0,
-      previewUrl: encodeLocalFileSrc(asset.filePath),
-      addedAt: Date.now(),
-    }, ...items]);
+    if (asset.kind === CreatorProductionAssetKind.Image) {
+      setBuilderMaterials((items) => [{
+        id: createMaterialId(),
+        role: CreatorMaterialRole.Reference,
+        source: CreatorMaterialSource.File,
+        name: asset.fileName,
+        path: asset.filePath,
+        mimeType: asset.mimeType || 'image/png',
+        size: 0,
+        previewUrl: encodeLocalFileSrc(asset.filePath),
+        addedAt: Date.now(),
+      }, ...items]);
+    }
     setActiveTab(CreatorStudioTab.Builder);
   };
 
@@ -406,6 +434,81 @@ const CreatorStudioView: React.FC<CreatorStudioViewProps> = ({
       dispatchToast(i18nService.t('creatorSendToCoworkFailed'));
     } finally {
       setIsSendingToCowork(false);
+    }
+  };
+
+  const createProject = async () => {
+    const name = window.prompt(i18nService.t('creatorProjectNamePrompt'));
+    if (!name?.trim()) return;
+    try {
+      const nextWorkspace = await creatorStudioAssetService.createProject({ name: name.trim() });
+      setWorkspace(nextWorkspace);
+      setCurrentProjectId(nextWorkspace.currentProjectId);
+    } catch (error) {
+      dispatchToast(error instanceof Error ? error.message : i18nService.t('creatorProjectCreateFailed'));
+    }
+  };
+
+  const switchProject = async (projectId: string) => {
+    try {
+      const nextWorkspace = await creatorStudioAssetService.setCurrentProject(projectId);
+      setWorkspace(nextWorkspace);
+      setCurrentProjectId(nextWorkspace.currentProjectId);
+    } catch (error) {
+      dispatchToast(error instanceof Error ? error.message : i18nService.t('creatorProjectSwitchFailed'));
+    }
+  };
+
+  const savePromptAsset = async (promptSpec: CreatorPromptSpec, promptText: string) => {
+    const projectId = currentProjectId || workspace?.currentProjectId;
+    if (!projectId) {
+      dispatchToast(i18nService.t('creatorWorkspaceLoadFailed'));
+      return;
+    }
+    try {
+      const title = (promptSpec.subject || promptSpec.sourceTitle || i18nService.t('creatorPromptAssetDefaultTitle')).trim();
+      await creatorStudioAssetService.createPromptAsset({
+        projectId,
+        title,
+        promptText,
+        promptSpec: { ...promptSpec },
+        templateId: promptSpec.templateId ?? null,
+        caseIds: promptSpec.caseIds,
+        tags: [
+          promptSpec.category,
+          ...(promptSpec.styles ?? []),
+          ...(promptSpec.scenes ?? []),
+        ].filter((item): item is string => Boolean(item?.trim())),
+      });
+      dispatchToast(i18nService.t('creatorPromptAssetSaved'));
+    } catch (error) {
+      dispatchToast(error instanceof Error ? error.message : i18nService.t('creatorPromptAssetSaveFailed'));
+    }
+  };
+
+  const saveCaseAsset = async (item: CreatorStudioCase) => {
+    const projectId = currentProjectId || workspace?.currentProjectId;
+    if (!projectId) {
+      dispatchToast(i18nService.t('creatorWorkspaceLoadFailed'));
+      return;
+    }
+    try {
+      await creatorStudioAssetService.createCaseAsset({
+        projectId,
+        caseId: item.id,
+        title: item.title,
+        promptText: item.prompt,
+        sourceLabel: item.sourceLabel,
+        sourceUrl: item.sourceUrl,
+        githubUrl: item.githubUrl,
+        category: item.category,
+        styles: item.styles,
+        scenes: item.scenes,
+        tags: item.tags,
+      });
+      dispatchToast(i18nService.t('creatorCaseAssetSaved'));
+    } catch (error) {
+      dispatchToast(error instanceof Error ? error.message : i18nService.t('creatorCaseAssetSaveFailed'));
     }
   };
 
@@ -492,7 +595,12 @@ const CreatorStudioView: React.FC<CreatorStudioViewProps> = ({
             missingSkillIds={missingRecommendedSkillIds}
             seedreamStatus={seedreamStatus}
             isSendingToCowork={isSendingToCowork}
+            workspace={workspace}
+            currentProjectId={currentProjectId}
+            onProjectChange={(projectId) => void switchProject(projectId)}
+            onCreateProject={() => void createProject()}
             onSendToCowork={sendToCowork}
+            onSavePromptAsset={(promptSpec, promptText) => void savePromptAsset(promptSpec, promptText)}
           />
         )}
         {activeTab === CreatorStudioTab.Assets && (
@@ -509,6 +617,7 @@ const CreatorStudioView: React.FC<CreatorStudioViewProps> = ({
           item={selectedCase}
           onClose={() => setSelectedCase(null)}
           onUseCase={startFromCase}
+          onSaveCase={(item) => void saveCaseAsset(item)}
         />
       )}
       {selectedTemplate && (
@@ -753,12 +862,17 @@ const PromptBuilder: React.FC<{
   missingSkillIds: readonly string[];
   seedreamStatus: SeedreamStatus;
   isSendingToCowork: boolean;
+  workspace: CreatorWorkspaceSnapshot | null;
+  currentProjectId: string;
+  onProjectChange: (projectId: string) => void;
+  onCreateProject: () => void;
   onSendToCowork: (
     promptSpec: CreatorPromptSpec,
     promptText: string,
     materials: CreatorBuilderMaterial[],
     requestImageGeneration?: boolean
   ) => void;
+  onSavePromptAsset: (promptSpec: CreatorPromptSpec, promptText: string) => void;
 }> = ({
   seed,
   form,
@@ -769,7 +883,12 @@ const PromptBuilder: React.FC<{
   missingSkillIds,
   seedreamStatus,
   isSendingToCowork,
+  workspace,
+  currentProjectId,
+  onProjectChange,
+  onCreateProject,
   onSendToCowork,
+  onSavePromptAsset,
 }) => {
   const [selectedDirectionId, setSelectedDirectionId] = useState<string | null>(null);
   const promptLanguage = normalizePromptLanguage(i18nService.getLanguage(), form);
@@ -794,6 +913,31 @@ const PromptBuilder: React.FC<{
           <div className="text-xs font-medium uppercase text-muted">{i18nService.t('creatorBuilderSource')}</div>
           <div className="mt-1 text-sm font-semibold">{promptSpec.sourceTitle}</div>
         </div>
+        <div className="rounded-lg border border-border bg-background p-3">
+          <div className="text-xs font-medium text-secondary">{i18nService.t('creatorBuilderProject')}</div>
+          <div className="mt-2 flex gap-2">
+            <select
+              value={currentProjectId}
+              onChange={(event) => onProjectChange(event.target.value)}
+              className="h-9 min-w-0 flex-1 rounded-lg border border-border bg-surface px-2 text-xs outline-none focus:border-primary"
+              aria-label={i18nService.t('creatorProjectSelect')}
+            >
+              {!workspace && <option value="">{i18nService.t('loading')}</option>}
+              {workspace?.projects.map((project) => (
+                <option key={project.id} value={project.id}>
+                  {getCreatorProjectLabel(project.id, project.name)}
+                </option>
+              ))}
+            </select>
+            <button
+              type="button"
+              onClick={onCreateProject}
+              className="rounded-lg border border-border px-3 text-xs font-medium text-secondary transition-colors hover:bg-surface-raised hover:text-foreground"
+            >
+              {i18nService.t('creatorProjectCreate')}
+            </button>
+          </div>
+        </div>
         <BuilderInput label={i18nService.t('creatorFieldSubject')} value={form.subject} onChange={(value) => updateField('subject', value)} />
         <BuilderInput label={i18nService.t('creatorFieldPlatform')} value={form.platform} onChange={(value) => updateField('platform', value)} />
         <BuilderInput label={i18nService.t('creatorFieldMainObject')} value={form.mainObject} onChange={(value) => updateField('mainObject', value)} />
@@ -815,6 +959,15 @@ const PromptBuilder: React.FC<{
               >
                 <ClipboardDocumentIcon className="h-4 w-4" />
                 {i18nService.t('creatorCopyPrompt')}
+              </button>
+              <button
+                type="button"
+                disabled={!currentProjectId}
+                onClick={() => onSavePromptAsset(promptSpec, prompt)}
+                className="inline-flex items-center gap-2 rounded-lg border border-border px-3 py-2 text-sm font-medium text-secondary transition-colors hover:bg-surface-raised hover:text-foreground disabled:cursor-not-allowed disabled:opacity-55"
+              >
+                <DocumentDuplicateIcon className="h-4 w-4" />
+                {i18nService.t('creatorSavePromptAsset')}
               </button>
               <button
                 type="button"
@@ -1151,7 +1304,8 @@ const CaseDrawer: React.FC<{
   item: CreatorStudioCase;
   onClose: () => void;
   onUseCase: (item: CreatorStudioCase) => void;
-}> = ({ item, onClose, onUseCase }) => (
+  onSaveCase: (item: CreatorStudioCase) => void;
+}> = ({ item, onClose, onUseCase, onSaveCase }) => (
   <Drawer onClose={onClose} title={item.title}>
     <PlaceholderImage src={item.image} alt={item.imageAlt} className="aspect-[4/3] w-full rounded-lg" />
     <div className="mt-4 flex flex-wrap gap-1.5">
@@ -1159,12 +1313,15 @@ const CaseDrawer: React.FC<{
         <span key={tag} className="rounded-md bg-surface-raised px-2 py-0.5 text-xs text-secondary">{tag}</span>
       ))}
     </div>
-    <div className="mt-4 flex gap-2">
+    <div className="mt-4 flex flex-wrap gap-2">
       <button type="button" onClick={() => void copyText(item.prompt)} className="flex-1 rounded-lg bg-primary px-3 py-2 text-sm font-medium text-white">
         {i18nService.t('creatorCopyPrompt')}
       </button>
       <button type="button" onClick={() => onUseCase(item)} className="flex-1 rounded-lg border border-border px-3 py-2 text-sm font-medium text-secondary">
         {i18nService.t('creatorUseCase')}
+      </button>
+      <button type="button" onClick={() => onSaveCase(item)} className="flex-1 rounded-lg border border-border px-3 py-2 text-sm font-medium text-secondary">
+        {i18nService.t('creatorSaveCaseAsset')}
       </button>
     </div>
     <InfoLinks sourceUrl={item.sourceUrl} githubUrl={item.githubUrl} />

@@ -19,11 +19,13 @@ import type {
   CreatorAssetCollectionAddInput,
   CreatorAssetCollectionCreateInput,
   CreatorAssetUpdateInput,
+  CreatorCaseAssetCreateInput,
   CreatorProductionAssetListInput,
   CreatorProductionAssetListResult,
   CreatorProductionAssetRecord,
   CreatorProductionAssetSourceLookup,
   CreatorProjectCreateInput,
+  CreatorPromptAssetCreateInput,
   CreatorWorkspaceSnapshot,
 } from '@shared/creatorStudio/types';
 import type { FeishuEngineKeyType, FeishuManagementModeType, FeishuRuntimeOwnershipType, WeixinOwnershipType } from '@shared/im/constants';
@@ -794,6 +796,16 @@ interface IElectronAPI {
       error?: string;
     }>;
     updateAsset: (input: CreatorAssetUpdateInput) => Promise<{
+      success: boolean;
+      asset?: CreatorProductionAssetRecord;
+      error?: string;
+    }>;
+    createPromptAsset: (input: CreatorPromptAssetCreateInput) => Promise<{
+      success: boolean;
+      asset?: CreatorProductionAssetRecord;
+      error?: string;
+    }>;
+    createCaseAsset: (input: CreatorCaseAssetCreateInput) => Promise<{
       success: boolean;
       asset?: CreatorProductionAssetRecord;
       error?: string;

@@ -3,6 +3,8 @@ export const CreatorStudioIpcChannel = {
   AssetGetSource: 'creatorStudio:asset:getSource',
   AssetSetFavorite: 'creatorStudio:asset:setFavorite',
   AssetUpdate: 'creatorStudio:asset:update',
+  AssetCreatePrompt: 'creatorStudio:asset:createPrompt',
+  AssetCreateCase: 'creatorStudio:asset:createCase',
   AssetRevealInFolder: 'creatorStudio:asset:revealInFolder',
   WorkspaceGet: 'creatorStudio:workspace:get',
   ProjectCreate: 'creatorStudio:project:create',
@@ -16,6 +18,8 @@ export type CreatorStudioIpcChannel =
 
 export const CreatorProductionAssetKind = {
   Image: 'image',
+  Prompt: 'prompt',
+  Case: 'case',
 } as const;
 
 export type CreatorProductionAssetKind =
@@ -23,6 +27,8 @@ export type CreatorProductionAssetKind =
 
 export const CreatorProductionAssetKindValues = [
   CreatorProductionAssetKind.Image,
+  CreatorProductionAssetKind.Prompt,
+  CreatorProductionAssetKind.Case,
 ] as const;
 
 export const CreatorProductionAssetStatus = {
@@ -40,6 +46,8 @@ export const CreatorProductionAssetStatusValues = [
 
 export const CreatorProductionAssetSource = {
   CoworkGeneratedImage: 'cowork_generated_image',
+  CreatorPrompt: 'creator_prompt',
+  CreatorCase: 'creator_case',
 } as const;
 
 export type CreatorProductionAssetSource =
@@ -47,6 +55,8 @@ export type CreatorProductionAssetSource =
 
 export const CreatorProductionAssetSourceValues = [
   CreatorProductionAssetSource.CoworkGeneratedImage,
+  CreatorProductionAssetSource.CreatorPrompt,
+  CreatorProductionAssetSource.CreatorCase,
 ] as const;
 
 export const CreatorProductionRunStatus = {

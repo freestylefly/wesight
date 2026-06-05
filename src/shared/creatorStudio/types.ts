@@ -188,3 +188,27 @@ export interface CreatorAssetCollectionAddInput {
   assetId: string;
   collectionId: string;
 }
+
+export interface CreatorPromptAssetCreateInput {
+  projectId: string;
+  title: string;
+  promptText: string;
+  promptSpec: CreatorPromptSpecSnapshot;
+  templateId?: string | null;
+  caseIds?: string[];
+  tags?: string[];
+}
+
+export interface CreatorCaseAssetCreateInput {
+  projectId: string;
+  caseId: string;
+  title: string;
+  promptText: string;
+  sourceLabel?: string | null;
+  sourceUrl?: string | null;
+  githubUrl?: string | null;
+  category?: string | null;
+  styles?: string[];
+  scenes?: string[];
+  tags?: string[];
+}

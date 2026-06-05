@@ -542,6 +542,10 @@ contextBridge.exposeInMainWorld('electron', {
       ipcRenderer.invoke(CreatorStudioIpcChannel.AssetSetFavorite, input),
     updateAsset: (input: Record<string, unknown>) =>
       ipcRenderer.invoke(CreatorStudioIpcChannel.AssetUpdate, input),
+    createPromptAsset: (input: Record<string, unknown>) =>
+      ipcRenderer.invoke(CreatorStudioIpcChannel.AssetCreatePrompt, input),
+    createCaseAsset: (input: Record<string, unknown>) =>
+      ipcRenderer.invoke(CreatorStudioIpcChannel.AssetCreateCase, input),
     revealAssetInFolder: (assetId: string) =>
       ipcRenderer.invoke(CreatorStudioIpcChannel.AssetRevealInFolder, assetId),
     getWorkspace: () =>

@@ -1,5 +1,6 @@
 import {
   ArrowTopRightOnSquareIcon,
+  CheckCircleIcon,
   ClipboardDocumentIcon,
   FolderOpenIcon,
   InformationCircleIcon,
@@ -14,6 +15,7 @@ import {
 import {
   CreatorAssetAdoptionStatus,
   type CreatorAssetAdoptionStatus as CreatorAssetAdoptionStatusType,
+  CreatorProductionAssetKind,
   CreatorProductionAssetSource,
   CreatorProductionAssetStatus,
   CreatorStudioDefaultProjectId,
@@ -24,8 +26,10 @@ import type {
 } from '@shared/creatorStudio/types';
 import React, { useEffect, useMemo, useState } from 'react';
 
+import casesData from '../../data/creatorStudio/cases.json';
 import { creatorStudioAssetService } from '../../services/creatorStudioAssets';
 import { i18nService } from '../../services/i18n';
+import type { CreatorStudioCase } from '../../types/creatorStudio';
 
 interface CreatorAssetGridProps {
   onOpenCoworkSession: (sessionId: string) => Promise<boolean>;
@@ -90,6 +94,39 @@ const getAdoptionStatusLabel = (status: CreatorAssetAdoptionStatusType): string 
 
 const getProjectLabel = (projectId: string, name: string): string => (
   projectId === CreatorStudioDefaultProjectId ? i18nService.t('creatorDefaultProject') : name
+);
+
+const creatorCases = casesData as CreatorStudioCase[];
+const creatorCaseMap = new Map<string, CreatorStudioCase>();
+for (const item of creatorCases) {
+  creatorCaseMap.set(item.id, item);
+  creatorCaseMap.set(`case-${item.sourceCaseId}`, item);
+}
+
+const isFileBackedImage = (asset: CreatorProductionAssetRecord): boolean => (
+  asset.kind === CreatorProductionAssetKind.Image
+);
+
+const isRenderableImage = (asset: CreatorProductionAssetRecord): boolean => (
+  isFileBackedImage(asset) && asset.status === CreatorProductionAssetStatus.Ready
+);
+
+const getAssetSourceLabel = (source: CreatorProductionAssetSource): string => {
+  switch (source) {
+    case CreatorProductionAssetSource.CreatorPrompt:
+      return i18nService.t('creatorAssetSourcePrompt');
+    case CreatorProductionAssetSource.CreatorCase:
+      return i18nService.t('creatorAssetSourceCase');
+    case CreatorProductionAssetSource.CoworkGeneratedImage:
+    default:
+      return i18nService.t('creatorAssetSourceCowork');
+  }
+};
+
+const getAssetCases = (asset: CreatorProductionAssetRecord): CreatorStudioCase[] => (
+  asset.caseIds
+    .map((caseId) => creatorCaseMap.get(caseId))
+    .filter((item): item is CreatorStudioCase => Boolean(item))
 );
 
 export const CreatorAssetGrid: React.FC<CreatorAssetGridProps> = ({
@@ -273,6 +310,17 @@ export const CreatorAssetGrid: React.FC<CreatorAssetGridProps> = ({
     }
   };
 
+  const handleToggleSelected = async (asset: CreatorProductionAssetRecord) => {
+    try {
+      updateAssetInList(await creatorStudioAssetService.updateAsset({
+        assetId: asset.id,
+        selected: !asset.selected,
+      }));
+    } catch {
+      dispatchToast(i18nService.t('creatorAssetUpdateFailed'));
+    }
+  };
+
   const handleChangeAdoptionStatus = async (
     asset: CreatorProductionAssetRecord,
     nextStatus: CreatorAssetAdoptionStatusType
@@ -327,6 +375,12 @@ export const CreatorAssetGrid: React.FC<CreatorAssetGridProps> = ({
     setSource('');
     setFavoriteOnly(false);
   };
+
+  const selectedAssetCases = useMemo(
+    () => selectedAsset ? getAssetCases(selectedAsset) : [],
+    [selectedAsset]
+  );
+  const selectedAssetCanReveal = Boolean(selectedAsset && isFileBackedImage(selectedAsset));
 
   return (
     <section className="grid min-h-full gap-4 p-4 xl:grid-cols-[minmax(0,1fr)_360px]">
@@ -423,6 +477,12 @@ export const CreatorAssetGrid: React.FC<CreatorAssetGridProps> = ({
               <option value={CreatorProductionAssetSource.CoworkGeneratedImage}>
                 {i18nService.t('creatorAssetSourceCowork')}
               </option>
+              <option value={CreatorProductionAssetSource.CreatorPrompt}>
+                {i18nService.t('creatorAssetSourcePrompt')}
+              </option>
+              <option value={CreatorProductionAssetSource.CreatorCase}>
+                {i18nService.t('creatorAssetSourceCase')}
+              </option>
             </select>
             <button
               type="button"
@@ -461,7 +521,7 @@ export const CreatorAssetGrid: React.FC<CreatorAssetGridProps> = ({
             {assets.map((asset) => (
               <article key={asset.id} className="overflow-hidden rounded-lg border border-border bg-surface">
                 <div className="relative aspect-[4/3] bg-surface-raised">
-                  {asset.status === CreatorProductionAssetStatus.Ready ? (
+                  {isRenderableImage(asset) ? (
                     <img
                       src={encodeLocalFileSrc(asset.filePath)}
                       alt={asset.fileName}
@@ -471,6 +531,17 @@ export const CreatorAssetGrid: React.FC<CreatorAssetGridProps> = ({
                   ) : (
                     <PlaceholderImage className="h-full w-full" />
                   )}
+                  <button
+                    type="button"
+                    onClick={() => void handleToggleSelected(asset)}
+                    className={`absolute left-2 top-2 inline-flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-background/90 transition-colors hover:bg-surface ${
+                      asset.selected ? 'text-primary' : 'text-muted'
+                    }`}
+                    aria-label={asset.selected ? i18nService.t('creatorAssetUnselect') : i18nService.t('creatorAssetSelect')}
+                    title={asset.selected ? i18nService.t('creatorAssetUnselect') : i18nService.t('creatorAssetSelect')}
+                  >
+                    <CheckCircleIcon className="h-4 w-4" />
+                  </button>
                   <button
                     type="button"
                     onClick={() => void handleToggleFavorite(asset)}
@@ -488,6 +559,14 @@ export const CreatorAssetGrid: React.FC<CreatorAssetGridProps> = ({
                     <span className="rounded-md bg-surface-raised px-2 py-0.5 text-[11px] text-secondary">
                       {getAdoptionStatusLabel(asset.adoptionStatus)}
                     </span>
+                    <span className="rounded-md bg-surface-raised px-2 py-0.5 text-[11px] text-secondary">
+                      {getAssetSourceLabel(asset.source)}
+                    </span>
+                    {asset.selected && (
+                      <span className="rounded-md bg-primary/10 px-2 py-0.5 text-[11px] text-primary">
+                        {i18nService.t('creatorAssetSelected')}
+                      </span>
+                    )}
                     {asset.templateId && (
                       <span className="rounded-md bg-surface-raised px-2 py-0.5 text-[11px] text-secondary">
                         {asset.templateId}
@@ -553,7 +632,7 @@ export const CreatorAssetGrid: React.FC<CreatorAssetGridProps> = ({
               </button>
             </div>
             <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-4">
-              {selectedAsset.status === CreatorProductionAssetStatus.Ready ? (
+              {isRenderableImage(selectedAsset) ? (
                 <img
                   src={encodeLocalFileSrc(selectedAsset.filePath)}
                   alt={selectedAsset.fileName}
@@ -564,12 +643,43 @@ export const CreatorAssetGrid: React.FC<CreatorAssetGridProps> = ({
               )}
               <ProvenanceRow label={i18nService.t('creatorAssetFileName')} value={selectedAsset.fileName} />
               <ProvenanceRow label={i18nService.t('creatorAssetLocalPath')} value={selectedAsset.filePath} />
-              <ProvenanceRow label={i18nService.t('creatorAssetSource')} value={selectedAsset.source} />
+              <ProvenanceRow label={i18nService.t('creatorAssetSource')} value={getAssetSourceLabel(selectedAsset.source)} />
               <ProvenanceRow label="templateId" value={selectedAsset.templateId || 'none'} />
               <ProvenanceRow label="caseIds" value={selectedAsset.caseIds.length > 0 ? selectedAsset.caseIds.join(', ') : 'none'} />
               <ProvenanceRow label="sessionId" value={selectedAsset.sessionId || 'none'} />
               <ProvenanceRow label="messageId" value={selectedAsset.messageId || 'none'} />
               <ProvenanceRow label="variantOfAssetId" value={selectedAsset.variantOfAssetId || 'none'} />
+              <button
+                type="button"
+                onClick={() => void handleToggleSelected(selectedAsset)}
+                className={`inline-flex w-full items-center justify-center gap-2 rounded-lg border px-3 py-2 text-sm font-medium transition-colors ${
+                  selectedAsset.selected
+                    ? 'border-primary bg-primary/10 text-primary'
+                    : 'border-border text-secondary hover:bg-surface-raised hover:text-foreground'
+                }`}
+              >
+                <CheckCircleIcon className="h-4 w-4" />
+                {selectedAsset.selected ? i18nService.t('creatorAssetUnselect') : i18nService.t('creatorAssetSelect')}
+              </button>
+
+              {selectedAssetCases.length > 0 && (
+                <section className="rounded-lg border border-border p-3">
+                  <h3 className="text-xs font-medium text-secondary">{i18nService.t('creatorAssetSourceCases')}</h3>
+                  <div className="mt-2 space-y-3">
+                    {selectedAssetCases.map((item) => (
+                      <div key={item.id} className="rounded-lg bg-surface-raised p-3">
+                        <div className="text-xs font-semibold text-foreground">{item.title}</div>
+                        <div className="mt-1 text-[11px] text-muted">{item.sourceLabel || i18nService.t('creatorUnknownSource')}</div>
+                        <div className="mt-2 flex flex-wrap gap-2">
+                          {item.sourceUrl && <ExternalCaseLink href={item.sourceUrl} label={i18nService.t('creatorSourceUrl')} />}
+                          {item.githubUrl && <ExternalCaseLink href={item.githubUrl} label={i18nService.t('creatorGithubUrl')} />}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  <p className="mt-3 text-[11px] leading-5 text-muted">{i18nService.t('creatorDisclaimer')}</p>
+                </section>
+              )}
 
               <label className="block">
                 <span className="text-xs font-medium text-secondary">{i18nService.t('creatorAssetTags')}</span>
@@ -639,7 +749,7 @@ export const CreatorAssetGrid: React.FC<CreatorAssetGridProps> = ({
                 <button type="button" onClick={() => void handleOpenSource(selectedAsset)} disabled={!selectedAsset.sourceSessionAvailable} className="rounded-lg border border-border px-3 py-2 text-sm font-medium text-secondary transition-colors hover:bg-surface-raised hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50">
                   {i18nService.t('creatorAssetSource')}
                 </button>
-                <button type="button" onClick={() => void handleRevealAsset(selectedAsset)} className="inline-flex items-center justify-center gap-2 rounded-lg border border-border px-3 py-2 text-sm font-medium text-secondary transition-colors hover:bg-surface-raised hover:text-foreground">
+                <button type="button" onClick={() => void handleRevealAsset(selectedAsset)} disabled={!selectedAssetCanReveal} className="inline-flex items-center justify-center gap-2 rounded-lg border border-border px-3 py-2 text-sm font-medium text-secondary transition-colors hover:bg-surface-raised hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50">
                   <FolderOpenIcon className="h-4 w-4" />
                   {i18nService.t('creatorAssetReveal')}
                 </button>
@@ -681,6 +791,21 @@ const IconAction: React.FC<{
     {children}
     <span className="sr-only">{label}</span>
   </button>
+);
+
+const ExternalCaseLink: React.FC<{
+  href: string;
+  label: string;
+}> = ({ href, label }) => (
+  <a
+    href={href}
+    target="_blank"
+    rel="noreferrer"
+    className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"
+  >
+    {label}
+    <ArrowTopRightOnSquareIcon className="h-3 w-3" />
+  </a>
 );
 
 const ProvenanceRow: React.FC<{

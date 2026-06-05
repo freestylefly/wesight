@@ -128,6 +128,68 @@ export const registerCreatorStudioIpcHandlers = (
     }
   });
 
+  ipcMain.handle(CreatorStudioIpcChannel.AssetCreatePrompt, async (_event, input: unknown) => {
+    try {
+      const record = input && typeof input === 'object' ? input as Record<string, unknown> : {};
+      const projectId = toTrimmedString(record.projectId);
+      const title = toTrimmedString(record.title);
+      const promptText = toTrimmedString(record.promptText);
+      const promptSpec = record.promptSpec && typeof record.promptSpec === 'object'
+        ? record.promptSpec as Record<string, unknown>
+        : null;
+      if (!projectId || !title || !promptText || !promptSpec) {
+        return { success: false, error: 'projectId, title, promptText, and promptSpec are required' };
+      }
+      const asset = getCreatorAssetStore().createPromptAsset({
+        projectId,
+        title,
+        promptText,
+        promptSpec,
+        ...(toTrimmedString(record.templateId) ? { templateId: toTrimmedString(record.templateId)! } : {}),
+        ...(normalizeStringArray(record.caseIds) ? { caseIds: normalizeStringArray(record.caseIds)! } : {}),
+        ...(normalizeStringArray(record.tags) ? { tags: normalizeStringArray(record.tags)! } : {}),
+      });
+      return { success: true, asset };
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to save creator prompt asset',
+      };
+    }
+  });
+
+  ipcMain.handle(CreatorStudioIpcChannel.AssetCreateCase, async (_event, input: unknown) => {
+    try {
+      const record = input && typeof input === 'object' ? input as Record<string, unknown> : {};
+      const projectId = toTrimmedString(record.projectId);
+      const caseId = toTrimmedString(record.caseId);
+      const title = toTrimmedString(record.title);
+      const promptText = toTrimmedString(record.promptText);
+      if (!projectId || !caseId || !title || !promptText) {
+        return { success: false, error: 'projectId, caseId, title, and promptText are required' };
+      }
+      const asset = getCreatorAssetStore().createCaseAsset({
+        projectId,
+        caseId,
+        title,
+        promptText,
+        ...(toTrimmedString(record.sourceLabel) ? { sourceLabel: toTrimmedString(record.sourceLabel)! } : {}),
+        ...(toTrimmedString(record.sourceUrl) ? { sourceUrl: toTrimmedString(record.sourceUrl)! } : {}),
+        ...(toTrimmedString(record.githubUrl) ? { githubUrl: toTrimmedString(record.githubUrl)! } : {}),
+        ...(toTrimmedString(record.category) ? { category: toTrimmedString(record.category)! } : {}),
+        ...(normalizeStringArray(record.styles) ? { styles: normalizeStringArray(record.styles)! } : {}),
+        ...(normalizeStringArray(record.scenes) ? { scenes: normalizeStringArray(record.scenes)! } : {}),
+        ...(normalizeStringArray(record.tags) ? { tags: normalizeStringArray(record.tags)! } : {}),
+      });
+      return { success: true, asset };
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to save creator case asset',
+      };
+    }
+  });
+
   ipcMain.handle(CreatorStudioIpcChannel.AssetRevealInFolder, async (_event, input: unknown) => {
     try {
       const assetId = toTrimmedString(input);
