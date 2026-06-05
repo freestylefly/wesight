@@ -774,6 +774,15 @@ export class CreatorAssetStore {
     const card = this.getBoardCard(input.cardId);
     if (!card) return null;
     const now = Date.now();
+    const nextTitle = input.title === undefined ? card.title : input.title.trim().slice(0, 120) || card.title;
+    const nextDirection = input.direction === undefined
+      ? card.direction
+        ? {
+          ...card.direction,
+          title: input.title === undefined ? card.direction.title : nextTitle,
+        }
+        : null
+      : input.direction;
     this.db.prepare(`
       UPDATE creator_board_cards
       SET title = ?,
@@ -783,10 +792,10 @@ export class CreatorAssetStore {
         updated_at = ?
       WHERE id = ?
     `).run(
-      input.title === undefined ? card.title : input.title.trim().slice(0, 120) || card.title,
+      nextTitle,
       input.groupName === undefined ? card.groupName : normalizeOptionalText(input.groupName),
       input.notes === undefined ? card.notes : normalizeOptionalText(input.notes),
-      input.direction === undefined ? (card.direction ? JSON.stringify(card.direction) : null) : input.direction ? JSON.stringify(input.direction) : null,
+      nextDirection ? JSON.stringify(nextDirection) : null,
       now,
       card.id
     );
@@ -845,12 +854,14 @@ export class CreatorAssetStore {
     const requested = Array.isArray(input.cardIds) ? new Set(input.cardIds.filter((id) => id.trim())) : null;
     const cards = this.listBoardCards(board.id)
       .filter((card) => requested ? requested.has(card.id) : card.selected);
-    const selectedCards = cards.length > 0 ? cards : this.listBoardCards(board.id);
+    if (cards.length === 0) {
+      throw new Error('Board selection is empty');
+    }
     const brandKit = this.getBrandKit(board.project_id);
-    const contextPack = this.renderBoardContextPack(board, selectedCards, brandKit);
+    const contextPack = this.renderBoardContextPack(board, cards, brandKit);
     return {
       boardId: board.id,
-      cardIds: selectedCards.map((card) => card.id),
+      cardIds: cards.map((card) => card.id),
       contextPack,
     };
   }
@@ -1318,11 +1329,23 @@ export class CreatorAssetStore {
     ];
     cards.forEach((card, index) => {
       lines.push(`${index + 1}. kind=${card.kind}; title=${card.title}; group=${card.groupName || 'none'}`);
-      if (card.assetId) lines.push(`   assetId=${card.assetId}`);
+      if (card.assetId) {
+        lines.push(`   assetId=${card.assetId}`);
+        const asset = this.getAsset(card.assetId);
+        if (asset) {
+          lines.push(`   assetKind=${asset.kind}; assetSource=${asset.source}; fileName=${asset.fileName}`);
+          lines.push(`   filePath=${asset.filePath}`);
+          lines.push(`   assetRole=${card.groupName || asset.kind}`);
+          if (asset.templateId) lines.push(`   templateId=${asset.templateId}`);
+          if (asset.caseIds.length > 0) lines.push(`   caseIds=${asset.caseIds.join(', ')}`);
+          if (asset.tags.length > 0) lines.push(`   tags=${asset.tags.join(', ')}`);
+          if (asset.promptText) lines.push(`   assetPrompt=${asset.promptText.slice(0, 1200)}`);
+        }
+      }
       if (card.caseId) lines.push(`   caseId=${card.caseId}`);
       if (card.notes) lines.push(`   notes=${card.notes}`);
       if (card.direction) {
-        lines.push(`   direction=${card.direction.title}; template=${card.direction.template}; style=${card.direction.style}; focus=${card.direction.promptFocus}`);
+        lines.push(`   direction=${card.direction.title}; template=${card.direction.template}; style=${card.direction.style}; reason=${card.direction.reason}; focus=${card.direction.promptFocus}`);
       }
       if (card.promptText) lines.push(`   prompt=${card.promptText.slice(0, 1200)}`);
     });

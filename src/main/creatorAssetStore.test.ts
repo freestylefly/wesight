@@ -367,6 +367,19 @@ describe('CreatorAssetStore', () => {
     expect(boardWorkspace.projectId).toBe(projectId);
     expect(boardWorkspace.boards).toHaveLength(1);
     expect(boardWorkspace.cards).toHaveLength(0);
+    const asset = store.createPromptAsset({
+      projectId,
+      title: 'Reference prompt asset',
+      promptText: 'Generate a reusable reference image.',
+      promptSpec: {
+        sourceTitle: 'Reference prompt asset',
+        templateId: 'poster-system',
+        caseIds: ['case-9'],
+      },
+      templateId: 'poster-system',
+      caseIds: ['case-9'],
+      tags: ['reference', 'poster'],
+    });
 
     const promptCard = store.addBoardCard({
       boardId: boardWorkspace.currentBoardId,
@@ -375,6 +388,14 @@ describe('CreatorAssetStore', () => {
       promptText: 'Generate a launch visual.',
       promptSpec: { sourceTitle: 'Launch prompt', caseIds: [] },
       groupName: 'Round 1',
+    });
+    const assetCard = store.addBoardCard({
+      boardId: boardWorkspace.currentBoardId,
+      kind: CreatorBoardCardKind.Asset,
+      title: 'Reference asset',
+      assetId: asset.id,
+      groupName: 'style-reference',
+      notes: 'Use as a visual system reference.',
     });
     const directionCard = store.addBoardCard({
       boardId: boardWorkspace.currentBoardId,
@@ -389,8 +410,14 @@ describe('CreatorAssetStore', () => {
         promptFocus: 'Increase visual contrast.',
       },
     });
+    const renamedDirection = store.updateBoardCard({
+      cardId: directionCard.id,
+      title: 'Renamed bold route',
+    });
+    expect(renamedDirection?.direction?.title).toBe('Renamed bold route');
 
     store.selectBoardCard({ cardId: promptCard.id, selected: true });
+    store.selectBoardCard({ cardId: assetCard.id, selected: true });
     store.selectBoardCard({ cardId: directionCard.id, selected: true });
     store.moveBoardCard({ cardId: directionCard.id, direction: CreatorBoardMoveDirection.Up });
 
@@ -405,14 +432,34 @@ describe('CreatorAssetStore', () => {
     expect(updated.brandKit.bannedWords).toEqual(['cheap']);
 
     const context = store.buildBoardContextPack({ boardId: boardWorkspace.currentBoardId });
-    expect(context.cardIds).toHaveLength(2);
+    expect(context.cardIds).toHaveLength(3);
     expect(context.contextPack).toContain('Board: Creative Board');
     expect(context.contextPack).toContain('Launch prompt');
-    expect(context.contextPack).toContain('Bold route');
+    expect(context.contextPack).toContain('Renamed bold route');
+    expect(context.contextPack).toContain('assetKind=prompt');
+    expect(context.contextPack).toContain('assetSource=creator_prompt');
+    expect(context.contextPack).toContain('filePath=creator://prompt/');
+    expect(context.contextPack).toContain('assetRole=style-reference');
+    expect(context.contextPack).toContain('templateId=poster-system');
+    expect(context.contextPack).toContain('tags=reference, poster');
     expect(context.contextPack).toContain('cheap');
 
     const secondBoard = store.createBoard({ projectId, name: 'Round 2' });
     expect(secondBoard.currentBoardId).not.toBe(boardWorkspace.currentBoardId);
     expect(store.setCurrentBoard(projectId, boardWorkspace.currentBoardId).currentBoardId).toBe(boardWorkspace.currentBoardId);
+  });
+
+  test('requires explicit board selection before building context pack', () => {
+    const workspace = store.createProject({ name: 'Empty Selection Project' });
+    const boardWorkspace = store.getBoardWorkspace(workspace.currentProjectId);
+    store.addBoardCard({
+      boardId: boardWorkspace.currentBoardId,
+      kind: CreatorBoardCardKind.Prompt,
+      title: 'Unselected prompt',
+      promptText: 'Keep this unselected.',
+    });
+
+    expect(() => store.buildBoardContextPack({ boardId: boardWorkspace.currentBoardId }))
+      .toThrow('Board selection is empty');
   });
 });

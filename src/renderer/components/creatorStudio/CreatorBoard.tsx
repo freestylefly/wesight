@@ -220,6 +220,10 @@ export const CreatorBoard: React.FC<CreatorBoardProps> = ({
 
   const buildContextPack = async () => {
     if (!workspace?.currentBoardId) return;
+    if (selectedCards.length === 0) {
+      dispatchToast(i18nService.t('creatorBoardSelectionRequired'));
+      return;
+    }
     try {
       const result = await creatorStudioAssetService.buildBoardContextPack({
         boardId: workspace.currentBoardId,
@@ -373,7 +377,13 @@ export const CreatorBoard: React.FC<CreatorBoardProps> = ({
               ))
             )}
           </div>
-          <button type="button" onClick={() => void buildContextPack()} className="mt-3 w-full rounded-lg bg-primary px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-primary-hover">
+          <button
+            type="button"
+            disabled={selectedCards.length === 0}
+            title={selectedCards.length === 0 ? i18nService.t('creatorBoardSelectionRequired') : undefined}
+            onClick={() => void buildContextPack()}
+            className="mt-3 w-full rounded-lg bg-primary px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-primary-hover disabled:cursor-not-allowed disabled:opacity-55"
+          >
             {i18nService.t('creatorBoardBuildContextPack')}
           </button>
           {contextPack && (
