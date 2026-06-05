@@ -174,6 +174,41 @@ describe('creator studio prompt utilities', () => {
     expect(draft).toContain('materials marked attachment=base64');
   });
 
+  test('uses template-aware creative directions for major categories', () => {
+    const uiSpec = buildPromptSpec({
+      sourceType: CreatorStudioSourceType.Template,
+      sourceId: 'ui-screenshot-system',
+      sourceTitle: 'UI Screenshot System',
+      category: 'UI & Interfaces',
+      caseIds: [],
+      styles: ['UI'],
+      scenes: ['Tech'],
+    }, createPromptForm({ subject: 'Analytics workspace' }), 'en', 'Blank builder');
+    const posterSpec = buildPromptSpec({
+      sourceType: CreatorStudioSourceType.Template,
+      sourceId: 'poster-layout-system',
+      sourceTitle: 'Poster Layout System',
+      category: 'Posters & Typography',
+      caseIds: [],
+      styles: ['Poster'],
+      scenes: ['Campaign'],
+    }, createPromptForm({ subject: 'Spring launch' }), 'en', 'Blank builder');
+    const infographicSpec = buildPromptSpec({
+      sourceType: CreatorStudioSourceType.Template,
+      sourceId: 'infographic-engine',
+      sourceTitle: 'Infographic Engine',
+      category: 'Charts & Infographics',
+      caseIds: [],
+      styles: ['Infographic'],
+      scenes: ['Education'],
+    }, createPromptForm({ subject: 'Climate timeline' }), 'en', 'Blank builder');
+
+    expect(uiSpec.creativeDirections?.map((direction) => direction.id)).toContain('ui-product-flow');
+    expect(posterSpec.creativeDirections?.map((direction) => direction.id)).toContain('poster-type-hero');
+    expect(infographicSpec.creativeDirections?.map((direction) => direction.id)).toContain('info-step-system');
+    expect(uiSpec.creativeDirections?.map((direction) => direction.id)).not.toEqual(posterSpec.creativeDirections?.map((direction) => direction.id));
+  });
+
   test('selects one creative direction into prompt and draft metadata', () => {
     const spec = buildPromptSpec({
       sourceType: CreatorStudioSourceType.Template,

@@ -36,6 +36,7 @@ export interface CreatorPromptSpecSnapshot {
   templatePitfalls?: string[];
   templateFieldValues?: Record<string, string>;
   templateFields?: CreatorPromptSpecTemplateFieldSnapshot[];
+  referenceAnalysis?: CreatorPromptSpecReferenceAnalysis;
   referencePrompt?: string;
   templateId?: string;
   materials?: Array<{
@@ -88,6 +89,15 @@ export interface CreatorPromptSpecSourceV1 {
   caseIds: string[];
   variantOfAssetId: string | null;
   referencePrompt: string | null;
+  referenceAnalysis?: CreatorPromptSpecReferenceAnalysis;
+}
+
+export interface CreatorPromptSpecReferenceAnalysis {
+  aspectRatio: string;
+  structure: string[];
+  styleNotes: string[];
+  textNotes: string[];
+  constraintNotes: string[];
 }
 
 export interface CreatorPromptSpecBriefV1 {

@@ -42,6 +42,7 @@ export const toCreatorPromptSpecSnapshot = (
       caseIds: spec.caseIds,
       variantOfAssetId: spec.variantOfAssetId ?? null,
       referencePrompt: spec.referencePrompt ?? null,
+      referenceAnalysis: spec.referenceAnalysis,
     },
     brief: {
       taskType: spec.taskType,

@@ -40,6 +40,7 @@ import { RootState } from '../../store';
 import { setActiveSkillIds, setSkills } from '../../store/slices/skillSlice';
 import type {
   CreatorBuilderMaterial,
+  CreatorPromptReferenceAnalysis,
   CreatorPromptSpec,
   CreatorStudioCase,
   CreatorStudioManifest,
@@ -50,6 +51,7 @@ import type {
 import { CreatorMaterialRole, CreatorMaterialSource, CreatorPromptSourceMode, CreatorStudioSourceType, CreatorTemplateFieldKind } from '../../types/creatorStudio';
 import { compileCreatorPrompt, CreatorPromptCompileTarget } from '../../utils/creatorPromptCompiler';
 import { CreatorPromptLintSeverity, lintCreatorPromptSpec } from '../../utils/creatorPromptLint';
+import { reverseEngineerCreatorPrompt } from '../../utils/creatorPromptReverseEngineer';
 import { toCreatorPromptSpecSnapshot } from '../../utils/creatorPromptSpecAdapter';
 import {
   buildPromptSpec,
@@ -380,6 +382,7 @@ const CreatorStudioView: React.FC<CreatorStudioViewProps> = ({
   }, [category, query, scene, style]);
 
   const startFromCase = (item: CreatorStudioCase) => {
+    const reverseEngineeredPrompt = reverseEngineerCreatorPrompt(item.prompt, item.title);
     setBuilderSeed({
       sourceType: CreatorStudioSourceType.Case,
       sourceMode: CreatorPromptSourceMode.CaseRemix,
@@ -390,11 +393,16 @@ const CreatorStudioView: React.FC<CreatorStudioViewProps> = ({
       category: item.category,
       styles: item.styles,
       scenes: item.scenes,
+      referenceAnalysis: reverseEngineeredPrompt.analysis,
     });
     setBuilderForm({
       ...defaultBuilderForm,
-      subject: item.title,
-      visualStyle: [...item.styles, ...item.scenes].join(', '),
+      ...reverseEngineeredPrompt.formDraft,
+      visualStyle: [
+        ...item.styles,
+        ...item.scenes,
+        reverseEngineeredPrompt.formDraft.visualStyle,
+      ].filter(Boolean).join(', '),
     });
     setActiveTab(CreatorStudioTab.Builder);
   };
@@ -1367,6 +1375,14 @@ const PromptBuilder: React.FC<{
               </div>
               <div className="mt-2 break-words text-sm font-semibold">{promptSpec.sourceTitle}</div>
               <p className="mt-1 text-xs leading-5 text-muted">{getSourceModeHint(sourceMode)}</p>
+              {promptSpec.referenceAnalysis && (
+                <div className="mt-3 rounded-lg border border-border bg-surface p-3">
+                  <div className="text-[11px] font-semibold uppercase text-muted">
+                    {i18nService.t('creatorReferenceAnalysis')}
+                  </div>
+                  <ReferenceAnalysisSummary analysis={promptSpec.referenceAnalysis} />
+                </div>
+              )}
             </div>
             {sourceMode !== CreatorPromptSourceMode.Blank && (
               <button
@@ -1911,6 +1927,30 @@ const BuilderSection: React.FC<{
     {children}
   </section>
 );
+
+const ReferenceAnalysisSummary: React.FC<{
+  analysis: CreatorPromptReferenceAnalysis;
+}> = ({ analysis }) => {
+  const rows = [
+    analysis.aspectRatio ? `${i18nService.t('creatorReferenceAnalysisAspectRatio')}: ${analysis.aspectRatio}` : '',
+    ...analysis.structure.slice(0, 2),
+    ...analysis.styleNotes.slice(0, 2),
+    ...analysis.textNotes.slice(0, 1),
+    ...analysis.constraintNotes.slice(0, 1),
+  ].filter(Boolean);
+  if (rows.length === 0) {
+    return <p className="mt-2 text-xs leading-5 text-muted">{i18nService.t('creatorReferenceAnalysisEmpty')}</p>;
+  }
+  return (
+    <ul className="mt-2 space-y-1">
+      {rows.map((row, index) => (
+        <li key={`${index}-${row}`} className="break-words text-xs leading-5 text-secondary">
+          {row}
+        </li>
+      ))}
+    </ul>
+  );
+};
 
 const BuilderTextarea: React.FC<{
   label: string;

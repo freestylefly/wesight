@@ -207,6 +207,14 @@ export interface CreatorCreativeDirection {
   promptFocus: string;
 }
 
+export interface CreatorPromptReferenceAnalysis {
+  aspectRatio: string;
+  structure: string[];
+  styleNotes: string[];
+  textNotes: string[];
+  constraintNotes: string[];
+}
+
 export interface CreatorPromptSpec {
   sourceType: CreatorStudioSourceType;
   sourceMode?: CreatorPromptSourceMode;
@@ -234,6 +242,7 @@ export interface CreatorPromptSpec {
   templatePitfalls: string[];
   templateFieldValues: Record<string, string>;
   templateFieldSchema?: CreatorTemplateFieldSchema[];
+  referenceAnalysis?: CreatorPromptReferenceAnalysis;
   referencePrompt?: string;
   templateId?: string;
   materials?: CreatorPromptMaterial[];
