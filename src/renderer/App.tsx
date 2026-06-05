@@ -32,7 +32,7 @@ import { matchesShortcut } from './services/shortcuts';
 import { themeService } from './services/theme';
 import { RootState, store } from './store';
 import { setCurrentAgentId } from './store/slices/agentSlice';
-import { setDraftPrompt } from './store/slices/coworkSlice';
+import { type DraftAttachment, setDraftAttachments, setDraftPrompt } from './store/slices/coworkSlice';
 import { setAvailableModels, setSelectedModel } from './store/slices/modelSlice';
 import { clearSelection } from './store/slices/quickActionSlice';
 import { setActiveSkillIds } from './store/slices/skillSlice';
@@ -44,6 +44,7 @@ const CreatorStudioView = React.lazy(() => import('./components/creatorStudio/Cr
 interface CreatorCoworkSendOptions {
   activeSkillIds: string[];
   preferCreativeProducer?: boolean;
+  attachments?: DraftAttachment[];
 }
 
 const App: React.FC = () => {
@@ -373,6 +374,7 @@ const App: React.FC = () => {
     }
     dispatch(setActiveSkillIds(options.activeSkillIds));
     dispatch(setDraftPrompt({ sessionId: '__home__', draft }));
+    dispatch(setDraftAttachments({ draftKey: '__home__', attachments: options.attachments ?? [] }));
     setMainView(MainView.Cowork);
     window.setTimeout(() => {
       window.dispatchEvent(new CustomEvent('cowork:focus-input', {

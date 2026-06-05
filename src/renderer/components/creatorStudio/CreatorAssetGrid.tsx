@@ -3,6 +3,7 @@ import {
   ClipboardDocumentIcon,
   FolderOpenIcon,
   PhotoIcon,
+  SparklesIcon,
   StarIcon,
 } from '@heroicons/react/24/outline';
 import { CreatorProductionAssetStatus } from '@shared/creatorStudio/constants';
@@ -14,6 +15,7 @@ import { i18nService } from '../../services/i18n';
 
 interface CreatorAssetGridProps {
   onOpenCoworkSession: (sessionId: string) => Promise<boolean>;
+  onUseAssetAsReference: (asset: CreatorProductionAssetRecord) => void;
 }
 
 const dispatchToast = (message: string) => {
@@ -48,7 +50,7 @@ const PlaceholderImage: React.FC<{
   </div>
 );
 
-export const CreatorAssetGrid: React.FC<CreatorAssetGridProps> = ({ onOpenCoworkSession }) => {
+export const CreatorAssetGrid: React.FC<CreatorAssetGridProps> = ({ onOpenCoworkSession, onUseAssetAsReference }) => {
   const [assets, setAssets] = useState<CreatorProductionAssetRecord[]>([]);
   const [total, setTotal] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
@@ -204,7 +206,15 @@ export const CreatorAssetGrid: React.FC<CreatorAssetGridProps> = ({ onOpenCowork
                   <div className="text-xs text-muted">{i18nService.t('creatorAssetSourceMissing')}</div>
                 )}
               </div>
-              <div className="grid grid-cols-3 gap-1 border-t border-border p-2">
+              <div className="grid grid-cols-4 gap-1 border-t border-border p-2">
+                <button
+                  type="button"
+                  onClick={() => onUseAssetAsReference(asset)}
+                  className="inline-flex items-center justify-center gap-1 rounded-lg px-2 py-2 text-xs font-medium text-secondary transition-colors hover:bg-surface-raised hover:text-foreground"
+                >
+                  <SparklesIcon className="h-4 w-4" />
+                  {i18nService.t('creatorAssetUseAsReference')}
+                </button>
                 <button
                   type="button"
                   onClick={() => void handleCopyPrompt(asset)}

@@ -1,5 +1,7 @@
 import {
+  ArrowDownIcon,
   ArrowTopRightOnSquareIcon,
+  ArrowUpIcon,
   Bars3Icon,
   ClipboardDocumentIcon,
   DocumentDuplicateIcon,
@@ -7,9 +9,11 @@ import {
   PhotoIcon,
   RocketLaunchIcon,
   SparklesIcon,
+  TrashIcon,
   XMarkIcon,
 } from '@heroicons/react/24/outline';
-import React, { useEffect, useMemo, useState } from 'react';
+import type { CreatorProductionAssetRecord } from '@shared/creatorStudio/types';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 
 import casesData from '../../data/creatorStudio/cases.json';
@@ -20,15 +24,17 @@ import { skillService } from '../../services/skill';
 import { RootState } from '../../store';
 import { setActiveSkillIds, setSkills } from '../../store/slices/skillSlice';
 import type {
+  CreatorBuilderMaterial,
   CreatorPromptSpec,
   CreatorStudioCase,
   CreatorStudioManifest,
   CreatorStudioStyleLibrary,
   CreatorStudioTemplate,
 } from '../../types/creatorStudio';
-import { CreatorStudioSourceType } from '../../types/creatorStudio';
+import { CreatorMaterialRole, CreatorMaterialSource, CreatorStudioSourceType } from '../../types/creatorStudio';
 import {
   buildPromptSpec,
+  CREATOR_MATERIAL_ROLE_LABELS,
   CREATOR_STUDIO_RECOMMENDED_SKILL_IDS,
   type CreatorPromptForm,
   type CreatorPromptSeed,
@@ -37,6 +43,7 @@ import {
   normalizePromptLanguage,
   renderCreatorCoworkDraft,
   renderCreatorPrompt,
+  selectCreatorCreativeDirection,
 } from '../../utils/creatorStudio';
 import { CreatorAssetGrid } from './CreatorAssetGrid';
 
@@ -64,6 +71,14 @@ interface CreatorStudioViewProps {
 interface CreatorCoworkSendOptions {
   activeSkillIds: string[];
   preferCreativeProducer?: boolean;
+  attachments?: CreatorCoworkDraftAttachment[];
+}
+
+interface CreatorCoworkDraftAttachment {
+  path: string;
+  name: string;
+  isImage?: boolean;
+  dataUrl?: string;
 }
 
 const SeedreamStatus = {
@@ -141,6 +156,7 @@ const CreatorStudioView: React.FC<CreatorStudioViewProps> = ({
   const [selectedTemplate, setSelectedTemplate] = useState<CreatorStudioTemplate | null>(null);
   const [builderSeed, setBuilderSeed] = useState<CreatorPromptSeed | null>(null);
   const [builderForm, setBuilderForm] = useState<CreatorPromptForm>(defaultBuilderForm);
+  const [builderMaterials, setBuilderMaterials] = useState<CreatorBuilderMaterial[]>([]);
   const [visibleCaseCount, setVisibleCaseCount] = useState(CASE_PAGE_SIZE);
   const [seedreamStatus, setSeedreamStatus] = useState<SeedreamStatus>(SeedreamStatus.Missing);
   const [isSendingToCowork, setIsSendingToCowork] = useState(false);
@@ -280,9 +296,48 @@ const CreatorStudioView: React.FC<CreatorStudioViewProps> = ({
     setActiveTab(CreatorStudioTab.Gallery);
   };
 
+  const useAssetAsReference = (asset: CreatorProductionAssetRecord) => {
+    setBuilderSeed({
+      sourceType: CreatorStudioSourceType.Template,
+      sourceId: asset.id,
+      sourceTitle: asset.fileName,
+      referencePrompt: asset.promptText || (asset.promptSpec ? JSON.stringify(asset.promptSpec, null, 2) : undefined),
+      templateId: asset.templateId ?? undefined,
+      caseIds: asset.caseIds,
+      category: typeof asset.promptSpec?.category === 'string' ? asset.promptSpec.category : undefined,
+      styles: Array.isArray(asset.promptSpec?.styles) ? asset.promptSpec.styles : [],
+      scenes: Array.isArray(asset.promptSpec?.scenes) ? asset.promptSpec.scenes : [],
+      templateGuidance: Array.isArray(asset.promptSpec?.templateGuidance) ? asset.promptSpec.templateGuidance : [],
+      templatePitfalls: Array.isArray(asset.promptSpec?.templatePitfalls) ? asset.promptSpec.templatePitfalls : [],
+      variantOfAssetId: asset.id,
+    });
+    setBuilderForm({
+      subject: asset.promptSpec?.subject ?? asset.fileName,
+      platform: asset.promptSpec?.platform ?? '',
+      mainObject: asset.promptSpec?.mainObject ?? '',
+      requiredText: asset.promptSpec?.constraints?.requiredText ?? '',
+      visualStyle: asset.promptSpec?.visualStyle ?? '',
+      aspectRatio: asset.promptSpec?.constraints?.aspectRatio ?? '1:1',
+      negativeRequirements: asset.promptSpec?.constraints?.negativeRequirements ?? '',
+    });
+    setBuilderMaterials((items) => [{
+      id: createMaterialId(),
+      role: CreatorMaterialRole.Reference,
+      source: CreatorMaterialSource.File,
+      name: asset.fileName,
+      path: asset.filePath,
+      mimeType: asset.mimeType || 'image/png',
+      size: 0,
+      previewUrl: encodeLocalFileSrc(asset.filePath),
+      addedAt: Date.now(),
+    }, ...items]);
+    setActiveTab(CreatorStudioTab.Builder);
+  };
+
   const sendToCowork = async (
     promptSpec: CreatorPromptSpec,
     promptText: string,
+    materials: CreatorBuilderMaterial[],
     requestImageGeneration = false
   ) => {
     setIsSendingToCowork(true);
@@ -297,6 +352,12 @@ const CreatorStudioView: React.FC<CreatorStudioViewProps> = ({
       }), {
         activeSkillIds: installedRecommendedSkillIds,
         preferCreativeProducer: true,
+        attachments: materials.filter((material) => material.dataUrl?.startsWith('data:image/')).map((material) => ({
+          path: material.path,
+          name: material.name,
+          isImage: true,
+          dataUrl: material.dataUrl,
+        })),
       });
     } catch {
       dispatchToast(i18nService.t('creatorSendToCoworkFailed'));
@@ -382,6 +443,8 @@ const CreatorStudioView: React.FC<CreatorStudioViewProps> = ({
             seed={builderSeed}
             form={builderForm}
             onFormChange={setBuilderForm}
+            materials={builderMaterials}
+            onMaterialsChange={setBuilderMaterials}
             installedSkillIds={installedRecommendedSkillIds}
             missingSkillIds={missingRecommendedSkillIds}
             seedreamStatus={seedreamStatus}
@@ -390,7 +453,10 @@ const CreatorStudioView: React.FC<CreatorStudioViewProps> = ({
           />
         )}
         {activeTab === CreatorStudioTab.Assets && (
-          <CreatorAssetGrid onOpenCoworkSession={onOpenCoworkSession} />
+          <CreatorAssetGrid
+            onOpenCoworkSession={onOpenCoworkSession}
+            onUseAssetAsReference={useAssetAsReference}
+          />
         )}
       </main>
 
@@ -637,26 +703,41 @@ const PromptBuilder: React.FC<{
   seed: CreatorPromptSeed | null;
   form: CreatorPromptForm;
   onFormChange: (form: CreatorPromptForm) => void;
+  materials: CreatorBuilderMaterial[];
+  onMaterialsChange: (materials: CreatorBuilderMaterial[]) => void;
   installedSkillIds: readonly string[];
   missingSkillIds: readonly string[];
   seedreamStatus: SeedreamStatus;
   isSendingToCowork: boolean;
-  onSendToCowork: (promptSpec: CreatorPromptSpec, promptText: string, requestImageGeneration?: boolean) => void;
+  onSendToCowork: (
+    promptSpec: CreatorPromptSpec,
+    promptText: string,
+    materials: CreatorBuilderMaterial[],
+    requestImageGeneration?: boolean
+  ) => void;
 }> = ({
   seed,
   form,
   onFormChange,
+  materials,
+  onMaterialsChange,
   installedSkillIds,
   missingSkillIds,
   seedreamStatus,
   isSendingToCowork,
   onSendToCowork,
 }) => {
+  const [selectedDirectionId, setSelectedDirectionId] = useState<string | null>(null);
   const promptLanguage = normalizePromptLanguage(i18nService.getLanguage(), form);
-  const promptSpec: CreatorPromptSpec = buildPromptSpec(seed, form, promptLanguage, i18nService.t('creatorBlankBuilder'));
+  const basePromptSpec: CreatorPromptSpec = buildPromptSpec(seed, form, promptLanguage, i18nService.t('creatorBlankBuilder'), materials);
+  const promptSpec = selectCreatorCreativeDirection(basePromptSpec, selectedDirectionId);
   const prompt = renderCreatorPrompt(promptSpec);
   const seedreamReady = seedreamStatus === SeedreamStatus.Configured;
   const seedreamHint = getSeedreamStatusHint(seedreamStatus);
+
+  useEffect(() => {
+    setSelectedDirectionId(null);
+  }, [seed?.sourceId]);
 
   const updateField = (field: keyof CreatorPromptForm, value: string) => {
     onFormChange({ ...form, [field]: value });
@@ -676,6 +757,7 @@ const PromptBuilder: React.FC<{
         <BuilderInput label={i18nService.t('creatorFieldVisualStyle')} value={form.visualStyle} onChange={(value) => updateField('visualStyle', value)} />
         <BuilderInput label={i18nService.t('creatorFieldAspectRatio')} value={form.aspectRatio} onChange={(value) => updateField('aspectRatio', value)} />
         <BuilderTextarea label={i18nService.t('creatorFieldNegative')} value={form.negativeRequirements} onChange={(value) => updateField('negativeRequirements', value)} />
+        <MaterialTray materials={materials} onMaterialsChange={onMaterialsChange} />
       </div>
       <div className="space-y-4">
         <div className="rounded-lg border border-border bg-surface">
@@ -693,7 +775,7 @@ const PromptBuilder: React.FC<{
               <button
                 type="button"
                 disabled={isSendingToCowork}
-                onClick={() => onSendToCowork(promptSpec, prompt)}
+                onClick={() => onSendToCowork(promptSpec, prompt, materials)}
                 className="inline-flex items-center gap-2 rounded-lg border border-primary bg-primary/10 px-3 py-2 text-sm font-medium text-primary transition-colors hover:bg-primary/15 disabled:cursor-not-allowed disabled:opacity-60"
               >
                 <RocketLaunchIcon className="h-4 w-4" />
@@ -703,7 +785,7 @@ const PromptBuilder: React.FC<{
                 type="button"
                 disabled={!seedreamReady || isSendingToCowork}
                 title={seedreamHint}
-                onClick={() => onSendToCowork(promptSpec, prompt, true)}
+                onClick={() => onSendToCowork(promptSpec, prompt, materials, true)}
                 className="inline-flex items-center gap-2 rounded-lg border border-border px-3 py-2 text-sm font-medium text-secondary transition-colors hover:bg-surface-raised hover:text-foreground disabled:cursor-not-allowed disabled:opacity-55"
               >
                 <SparklesIcon className="h-4 w-4" />
@@ -712,6 +794,52 @@ const PromptBuilder: React.FC<{
             </div>
           </div>
           <pre className="max-h-[420px] whitespace-pre-wrap overflow-auto p-4 text-sm leading-6 text-foreground">{prompt}</pre>
+        </div>
+        <div className="rounded-lg border border-border bg-surface">
+          <div className="border-b border-border px-4 py-3">
+            <h2 className="text-sm font-semibold">{i18nService.t('creatorContextPack')}</h2>
+          </div>
+          <pre className="max-h-56 whitespace-pre-wrap overflow-auto p-4 text-xs leading-5 text-secondary">
+            {promptSpec.contextPack || i18nService.t('creatorContextPackEmpty')}
+          </pre>
+        </div>
+        <div className="rounded-lg border border-border bg-surface">
+          <div className="border-b border-border px-4 py-3">
+            <h2 className="text-sm font-semibold">{i18nService.t('creatorCreativeDirections')}</h2>
+          </div>
+          <div className="grid gap-2 p-4 md:grid-cols-2">
+            {basePromptSpec.creativeDirections?.map((direction) => {
+              const selected = direction.id === selectedDirectionId;
+              return (
+                <div
+                  key={direction.id}
+                  className={`rounded-lg border p-3 ${
+                    selected
+                      ? 'border-primary bg-primary/5'
+                      : 'border-border bg-surface-raised'
+                  }`}
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <h3 className="text-sm font-semibold">{direction.title}</h3>
+                    <button
+                      type="button"
+                      onClick={() => setSelectedDirectionId(direction.id)}
+                      className={`shrink-0 rounded-md px-2 py-1 text-[11px] font-medium transition-colors ${
+                        selected
+                          ? 'bg-primary text-white'
+                          : 'border border-border text-secondary hover:bg-surface hover:text-foreground'
+                      }`}
+                    >
+                      {selected ? i18nService.t('creatorDirectionSelected') : i18nService.t('creatorUseDirection')}
+                    </button>
+                  </div>
+                  <p className="mt-1 text-xs text-secondary">{direction.template}</p>
+                  <p className="mt-2 text-xs text-muted">{direction.reason}</p>
+                  <p className="mt-2 text-xs text-secondary">{direction.promptFocus}</p>
+                </div>
+              );
+            })}
+          </div>
         </div>
         <div className="rounded-lg border border-border bg-surface p-4">
           <h2 className="text-sm font-semibold">{i18nService.t('creatorRecommendedRuntime')}</h2>
@@ -766,6 +894,182 @@ const getSeedreamStatusHint = (status: SeedreamStatus): string => {
     default:
       return i18nService.t('creatorSeedreamMissingHint');
   }
+};
+
+const createMaterialId = (): string => (
+  typeof crypto !== 'undefined' && 'randomUUID' in crypto
+    ? crypto.randomUUID()
+    : `material-${Date.now()}-${Math.random().toString(16).slice(2)}`
+);
+
+const readFileAsDataUrl = (file: File): Promise<string> => new Promise((resolve, reject) => {
+  const reader = new FileReader();
+  reader.onload = () => resolve(typeof reader.result === 'string' ? reader.result : '');
+  reader.onerror = () => reject(reader.error ?? new Error('Failed to read file'));
+  reader.readAsDataURL(file);
+});
+
+const getFilePath = (file: File, source: CreatorMaterialSource): string => {
+  const fileWithPath = file as File & { path?: string };
+  if (fileWithPath.path?.trim()) {
+    return fileWithPath.path.trim();
+  }
+  return `${source}:${file.name || `image-${Date.now()}`}`;
+};
+
+const encodeLocalFileSrc = (filePath: string): string => {
+  const raw = filePath.trim();
+  const normalized = raw.replace(/\\/g, '/');
+  const fileUrl = /^file:\/\//i.test(normalized)
+    ? normalized
+    : normalized.startsWith('/')
+      ? `file://${normalized}`
+      : `file:///${normalized}`;
+  return encodeURI(fileUrl)
+    .replace(/\(/g, '%28')
+    .replace(/\)/g, '%29')
+    .replace(/^file:\/\//i, 'localfile://');
+};
+
+const createMaterialFromFile = async (
+  file: File,
+  source: CreatorMaterialSource,
+  role: CreatorMaterialRole = CreatorMaterialRole.Reference
+): Promise<CreatorBuilderMaterial> => {
+  const dataUrl = await readFileAsDataUrl(file);
+  return {
+    id: createMaterialId(),
+    role,
+    source,
+    name: file.name || `image-${Date.now()}.png`,
+    path: getFilePath(file, source),
+    mimeType: file.type || 'image/png',
+    size: file.size,
+    previewUrl: dataUrl,
+    dataUrl,
+    addedAt: Date.now(),
+  };
+};
+
+const MaterialTray: React.FC<{
+  materials: CreatorBuilderMaterial[];
+  onMaterialsChange: (materials: CreatorBuilderMaterial[]) => void;
+}> = ({ materials, onMaterialsChange }) => {
+  const language = i18nService.getLanguage();
+  const roleOptions = Object.values(CreatorMaterialRole);
+
+  const addFiles = useCallback(async (files: FileList | File[], source: CreatorMaterialSource) => {
+    const imageFiles = Array.from(files).filter((file) => file.type.startsWith('image/'));
+    if (imageFiles.length === 0) return;
+    const newMaterials = await Promise.all(imageFiles.map((file) => createMaterialFromFile(file, source)));
+    onMaterialsChange([...materials, ...newMaterials]);
+  }, [materials, onMaterialsChange]);
+
+  useEffect(() => {
+    const handlePaste = (event: ClipboardEvent) => {
+      const files = Array.from(event.clipboardData?.files ?? []).filter((file) => file.type.startsWith('image/'));
+      if (files.length === 0) return;
+      event.preventDefault();
+      void addFiles(files, CreatorMaterialSource.Clipboard);
+    };
+    window.addEventListener('paste', handlePaste);
+    return () => window.removeEventListener('paste', handlePaste);
+  }, [addFiles]);
+
+  const updateRole = (id: string, role: CreatorMaterialRole) => {
+    onMaterialsChange(materials.map((material) => material.id === id ? { ...material, role } : material));
+  };
+
+  const removeMaterial = (id: string) => {
+    onMaterialsChange(materials.filter((material) => material.id !== id));
+  };
+
+  const moveMaterial = (id: string, direction: -1 | 1) => {
+    const index = materials.findIndex((material) => material.id === id);
+    const nextIndex = index + direction;
+    if (index < 0 || nextIndex < 0 || nextIndex >= materials.length) return;
+    const nextMaterials = [...materials];
+    const [item] = nextMaterials.splice(index, 1);
+    nextMaterials.splice(nextIndex, 0, item);
+    onMaterialsChange(nextMaterials);
+  };
+
+  const handleDrop = (event: React.DragEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    void addFiles(event.dataTransfer.files, CreatorMaterialSource.File);
+  };
+
+  return (
+    <div className="space-y-3">
+      <div>
+        <div className="text-xs font-medium text-secondary">{i18nService.t('creatorMaterialTray')}</div>
+        <div
+          onDragOver={(event) => event.preventDefault()}
+          onDrop={handleDrop}
+          className="mt-2 flex min-h-28 flex-col items-center justify-center rounded-lg border border-dashed border-border bg-surface-raised px-3 py-4 text-center"
+        >
+          <PhotoIcon className="h-8 w-8 text-muted" />
+          <p className="mt-2 text-xs leading-5 text-muted">{i18nService.t('creatorMaterialDropHint')}</p>
+        </div>
+      </div>
+      {materials.length > 0 && (
+        <div className="space-y-2">
+          {materials.map((material, index) => (
+            <div key={material.id} className="grid grid-cols-[56px_1fr_auto] gap-2 rounded-lg border border-border bg-background p-2">
+              <img
+                src={material.previewUrl}
+                alt={material.name}
+                className="h-14 w-14 rounded-md bg-surface-raised object-cover"
+              />
+              <div className="min-w-0">
+                <div className="truncate text-xs font-medium">{material.name}</div>
+                <div className="truncate text-[11px] text-muted">{material.path}</div>
+                <select
+                  value={material.role}
+                  onChange={(event) => updateRole(material.id, event.target.value as CreatorMaterialRole)}
+                  className="mt-2 w-full rounded-md border border-border bg-surface px-2 py-1 text-xs"
+                >
+                  {roleOptions.map((role) => (
+                    <option key={role} value={role}>
+                      {CREATOR_MATERIAL_ROLE_LABELS[role][language]}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="flex flex-col gap-1">
+                <button
+                  type="button"
+                  disabled={index === 0}
+                  onClick={() => moveMaterial(material.id, -1)}
+                  className="inline-flex h-7 w-7 items-center justify-center rounded-md text-muted transition-colors hover:bg-surface-raised hover:text-foreground disabled:opacity-30"
+                  aria-label={i18nService.t('creatorMaterialMoveUp')}
+                >
+                  <ArrowUpIcon className="h-4 w-4" />
+                </button>
+                <button
+                  type="button"
+                  disabled={index === materials.length - 1}
+                  onClick={() => moveMaterial(material.id, 1)}
+                  className="inline-flex h-7 w-7 items-center justify-center rounded-md text-muted transition-colors hover:bg-surface-raised hover:text-foreground disabled:opacity-30"
+                  aria-label={i18nService.t('creatorMaterialMoveDown')}
+                >
+                  <ArrowDownIcon className="h-4 w-4" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => removeMaterial(material.id)}
+                  className="inline-flex h-7 w-7 items-center justify-center rounded-md text-muted transition-colors hover:bg-red-500/10 hover:text-red-600"
+                  aria-label={i18nService.t('creatorMaterialRemove')}
+                >
+                  <TrashIcon className="h-4 w-4" />
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
 };
 
 const BuilderInput: React.FC<{

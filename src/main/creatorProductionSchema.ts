@@ -29,6 +29,7 @@ export const ensureCreatorProductionSchema = (db: Database.Database): void => {
       input_asset_ids_json TEXT NOT NULL DEFAULT '[]',
       output_asset_ids_json TEXT NOT NULL DEFAULT '[]',
       template_id TEXT,
+      variant_of_asset_id TEXT,
       case_ids TEXT NOT NULL DEFAULT '[]',
       prompt_spec TEXT,
       prompt_text TEXT NOT NULL DEFAULT '',
@@ -58,6 +59,7 @@ export const ensureCreatorProductionSchema = (db: Database.Database): void => {
       source TEXT NOT NULL,
       run_id TEXT,
       source_run_id TEXT,
+      variant_of_asset_id TEXT,
       session_id TEXT,
       source_session_id TEXT,
       message_id TEXT,
@@ -94,6 +96,11 @@ export const ensureCreatorProductionSchema = (db: Database.Database): void => {
     ON production_assets(run_id);
   `);
 
+  db.exec(`
+    CREATE INDEX IF NOT EXISTS idx_production_assets_variant_of_asset_id
+    ON production_assets(variant_of_asset_id);
+  `);
+
   addColumnIfMissing(db, 'production_runs', 'domain', "TEXT NOT NULL DEFAULT 'creator_studio'");
   addColumnIfMissing(db, 'production_runs', 'provider', 'TEXT');
   addColumnIfMissing(db, 'production_runs', 'model', 'TEXT');
@@ -102,9 +109,16 @@ export const ensureCreatorProductionSchema = (db: Database.Database): void => {
   addColumnIfMissing(db, 'production_runs', 'runtime_call_id', 'TEXT');
   addColumnIfMissing(db, 'production_runs', 'input_asset_ids_json', "TEXT NOT NULL DEFAULT '[]'");
   addColumnIfMissing(db, 'production_runs', 'output_asset_ids_json', "TEXT NOT NULL DEFAULT '[]'");
+  addColumnIfMissing(db, 'production_runs', 'variant_of_asset_id', 'TEXT');
+
+  db.exec(`
+    CREATE INDEX IF NOT EXISTS idx_production_runs_variant_of_asset_id
+    ON production_runs(variant_of_asset_id);
+  `);
 
   addColumnIfMissing(db, 'production_assets', 'title', 'TEXT');
   addColumnIfMissing(db, 'production_assets', 'source_run_id', 'TEXT');
+  addColumnIfMissing(db, 'production_assets', 'variant_of_asset_id', 'TEXT');
   addColumnIfMissing(db, 'production_assets', 'source_session_id', 'TEXT');
   addColumnIfMissing(db, 'production_assets', 'source_message_id', 'TEXT');
   addColumnIfMissing(db, 'production_assets', 'case_ids_json', "TEXT NOT NULL DEFAULT '[]'");

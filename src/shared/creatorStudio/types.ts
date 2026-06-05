@@ -24,6 +24,35 @@ export interface CreatorPromptSpecSnapshot {
   templatePitfalls?: string[];
   referencePrompt?: string;
   templateId?: string;
+  materials?: Array<{
+    id: string;
+    role: string;
+    source: string;
+    name: string;
+    path: string;
+    mimeType: string;
+    hasImageAttachment?: boolean;
+    localPathAvailable?: boolean;
+  }>;
+  contextPack?: string;
+  creativeDirections?: Array<{
+    id: string;
+    title: string;
+    template: string;
+    style: string;
+    reason: string;
+    promptFocus: string;
+  }>;
+  selectedCreativeDirectionId?: string;
+  selectedCreativeDirection?: {
+    id: string;
+    title: string;
+    template: string;
+    style: string;
+    reason: string;
+    promptFocus: string;
+  };
+  variantOfAssetId?: string;
   [key: string]: unknown;
 }
 
@@ -33,6 +62,7 @@ export interface CreatorStudioSourceContext {
   promptSpec: CreatorPromptSpecSnapshot | null;
   promptText: string;
   sourceTitle: string | null;
+  variantOfAssetId: string | null;
 }
 
 export interface CreatorProductionRunRecord {
@@ -44,6 +74,7 @@ export interface CreatorProductionRunRecord {
   caseIds: string[];
   promptSpec: CreatorPromptSpecSnapshot | null;
   promptText: string;
+  variantOfAssetId: string | null;
   createdAt: number;
   updatedAt: number;
   completedAt: number | null;
@@ -55,6 +86,7 @@ export interface CreatorProductionAssetRecord {
   status: CreatorProductionAssetStatus;
   source: CreatorProductionAssetSource;
   runId: string | null;
+  variantOfAssetId: string | null;
   sessionId: string | null;
   messageId: string | null;
   templateId: string | null;

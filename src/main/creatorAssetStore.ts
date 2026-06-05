@@ -29,6 +29,7 @@ interface ProductionAssetRow {
   source: string;
   run_id: string | null;
   source_run_id: string | null;
+  variant_of_asset_id: string | null;
   session_id: string | null;
   source_session_id: string | null;
   message_id: string | null;
@@ -54,6 +55,7 @@ interface ProductionRunRow {
   status: string;
   session_id: string | null;
   template_id: string | null;
+  variant_of_asset_id: string | null;
   case_ids: string;
   prompt_spec: string | null;
   prompt_text: string;
@@ -135,6 +137,7 @@ export const parseCreatorStudioSourceContext = (text: string): CreatorStudioSour
     promptSpec,
     promptText: promptTextMatch?.[1]?.trim() || '',
     sourceTitle: firstNonEmptyString(promptSpec?.sourceTitle),
+    variantOfAssetId: firstNonEmptyString(promptSpec?.variantOfAssetId),
   };
 };
 
@@ -254,26 +257,29 @@ export class CreatorAssetStore {
         caseIds: run.caseIds,
         promptSpec: run.promptSpec,
         promptText: run.promptText,
+        variantOfAssetId: run.variantOfAssetId,
       }
       : {
         templateId: null,
         caseIds: [],
         promptSpec: null,
         promptText: '',
+        variantOfAssetId: null,
       };
     const now = message.timestamp || Date.now();
     const insertAsset = this.db.prepare(`
       INSERT INTO production_assets (
-        id, kind, title, status, source, run_id, source_run_id, session_id,
+        id, kind, title, status, source, run_id, source_run_id, variant_of_asset_id, session_id,
         source_session_id, message_id, source_message_id, template_id,
         case_ids, case_ids_json, prompt_spec, prompt_spec_json, prompt_text, file_path, file_name, mime_type,
         favorite, metadata, created_at, updated_at
       )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       ON CONFLICT(session_id, message_id, file_path) DO UPDATE SET
         status = excluded.status,
         run_id = COALESCE(production_assets.run_id, excluded.run_id),
         source_run_id = COALESCE(production_assets.source_run_id, excluded.source_run_id),
+        variant_of_asset_id = COALESCE(production_assets.variant_of_asset_id, excluded.variant_of_asset_id),
         source_session_id = COALESCE(production_assets.source_session_id, excluded.source_session_id),
         source_message_id = COALESCE(production_assets.source_message_id, excluded.source_message_id),
         template_id = COALESCE(production_assets.template_id, excluded.template_id),
@@ -309,6 +315,7 @@ export class CreatorAssetStore {
           CreatorProductionAssetSource.CoworkGeneratedImage,
           run?.id ?? null,
           run?.id ?? null,
+          context.variantOfAssetId,
           sessionId,
           sessionId,
           message.id,
@@ -322,6 +329,7 @@ export class CreatorAssetStore {
           filePath,
           getImageName(image),
           image.mimeType || null,
+          0,
           JSON.stringify({ generatedImageSource: image.source || null }),
           now,
           now,
@@ -371,10 +379,10 @@ export class CreatorAssetStore {
       INSERT INTO production_runs (
         id, source, domain, status, session_id, provider, model, agent_id,
         skill_ids_json, runtime_call_id, input_asset_ids_json, output_asset_ids_json,
-        template_id, case_ids, prompt_spec, prompt_text, metadata,
+        template_id, variant_of_asset_id, case_ids, prompt_spec, prompt_text, metadata,
         created_at, updated_at, completed_at
       )
-      VALUES (?, ?, ?, ?, ?, NULL, NULL, NULL, ?, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)
+      VALUES (?, ?, ?, ?, ?, NULL, NULL, NULL, ?, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)
     `).run(
       id,
       CreatorProductionRunSource.CreatorStudio,
@@ -385,6 +393,7 @@ export class CreatorAssetStore {
       '[]',
       '[]',
       context.templateId,
+      context.variantOfAssetId,
       caseIdsJson,
       promptSpecJson,
       context.promptText,
@@ -397,7 +406,7 @@ export class CreatorAssetStore {
 
   private getLatestPendingRunForSession(sessionId: string): CreatorProductionRunRecord | null {
     const row = this.db.prepare(`
-      SELECT id, source, status, session_id, template_id, case_ids, prompt_spec,
+      SELECT id, source, status, session_id, template_id, variant_of_asset_id, case_ids, prompt_spec,
         prompt_text, created_at, updated_at, completed_at
       FROM production_runs
       WHERE session_id = ?
@@ -410,7 +419,7 @@ export class CreatorAssetStore {
 
   private getRun(id: string): CreatorProductionRunRecord | null {
     const row = this.db.prepare(`
-      SELECT id, source, status, session_id, template_id, case_ids, prompt_spec,
+      SELECT id, source, status, session_id, template_id, variant_of_asset_id, case_ids, prompt_spec,
         prompt_text, created_at, updated_at, completed_at
       FROM production_runs
       WHERE id = ?
@@ -428,6 +437,7 @@ export class CreatorAssetStore {
       caseIds: parseJsonArray(row.case_ids),
       promptSpec: parsePromptSpec(row.prompt_spec),
       promptText: row.prompt_text,
+      variantOfAssetId: row.variant_of_asset_id,
       createdAt: row.created_at,
       updatedAt: row.updated_at,
       completedAt: row.completed_at,
@@ -444,6 +454,7 @@ export class CreatorAssetStore {
         : CreatorProductionAssetStatus.Missing,
       source: row.source as CreatorProductionAssetSource,
       runId: row.source_run_id ?? row.run_id,
+      variantOfAssetId: row.variant_of_asset_id,
       sessionId: row.source_session_id ?? row.session_id,
       messageId: row.source_message_id ?? row.message_id,
       templateId: row.template_id,

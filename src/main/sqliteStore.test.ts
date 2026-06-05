@@ -90,7 +90,9 @@ test('initializes creator production asset tables', () => {
   expect(runColumnNames.has('domain')).toBe(true);
   expect(runColumnNames.has('provider')).toBe(true);
   expect(runColumnNames.has('output_asset_ids_json')).toBe(true);
+  expect(runColumnNames.has('variant_of_asset_id')).toBe(true);
   expect(assetColumnNames.has('title')).toBe(true);
+  expect(assetColumnNames.has('variant_of_asset_id')).toBe(true);
   expect(assetColumnNames.has('source_session_id')).toBe(true);
   expect(assetColumnNames.has('prompt_spec_json')).toBe(true);
 });

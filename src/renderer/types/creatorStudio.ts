@@ -114,6 +114,56 @@ export const CreatorStudioSourceType = {
 
 export type CreatorStudioSourceType = typeof CreatorStudioSourceType[keyof typeof CreatorStudioSourceType];
 
+export const CreatorMaterialRole = {
+  Reference: 'reference',
+  Style: 'style',
+  Brand: 'brand',
+  Source: 'source',
+  Negative: 'negative',
+} as const;
+
+export type CreatorMaterialRole = typeof CreatorMaterialRole[keyof typeof CreatorMaterialRole];
+
+export const CreatorMaterialSource = {
+  File: 'file',
+  Clipboard: 'clipboard',
+} as const;
+
+export type CreatorMaterialSource = typeof CreatorMaterialSource[keyof typeof CreatorMaterialSource];
+
+export interface CreatorBuilderMaterial {
+  id: string;
+  role: CreatorMaterialRole;
+  source: CreatorMaterialSource;
+  name: string;
+  path: string;
+  mimeType: string;
+  size: number;
+  previewUrl: string;
+  dataUrl?: string;
+  addedAt: number;
+}
+
+export interface CreatorPromptMaterial {
+  id: string;
+  role: CreatorMaterialRole;
+  source: CreatorMaterialSource;
+  name: string;
+  path: string;
+  mimeType: string;
+  hasImageAttachment: boolean;
+  localPathAvailable: boolean;
+}
+
+export interface CreatorCreativeDirection {
+  id: string;
+  title: string;
+  template: string;
+  style: string;
+  reason: string;
+  promptFocus: string;
+}
+
 export interface CreatorPromptSpec {
   sourceType: CreatorStudioSourceType;
   sourceId: string;
@@ -136,4 +186,10 @@ export interface CreatorPromptSpec {
   templatePitfalls: string[];
   referencePrompt?: string;
   templateId?: string;
+  materials?: CreatorPromptMaterial[];
+  contextPack?: string;
+  creativeDirections?: CreatorCreativeDirection[];
+  selectedCreativeDirectionId?: string;
+  selectedCreativeDirection?: CreatorCreativeDirection;
+  variantOfAssetId?: string;
 }

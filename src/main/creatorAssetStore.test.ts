@@ -42,7 +42,8 @@ PromptSpec:
 {
   "templateId": "poster-system",
   "caseIds": ["case-1", "case-2"],
-  "sourceTitle": "Poster System"
+  "sourceTitle": "Poster System",
+  "variantOfAssetId": "asset-parent"
 }
 \`\`\`
 
@@ -91,6 +92,7 @@ describe('CreatorAssetStore', () => {
     expect(context?.caseIds).toEqual(['case-1', 'case-2']);
     expect(context?.promptText).toBe('Generate a poster.');
     expect(context?.promptSpec?.sourceTitle).toBe('Poster System');
+    expect(context?.variantOfAssetId).toBe('asset-parent');
   });
 
   test('creates run from creator draft and ingests generated image asset', () => {
@@ -132,10 +134,15 @@ describe('CreatorAssetStore', () => {
     expect(result.assets[0].templateId).toBe('poster-system');
     expect(result.assets[0].caseIds).toEqual(['case-1', 'case-2']);
     expect(result.assets[0].messageId).toBe('message-assistant');
+    expect(result.assets[0].variantOfAssetId).toBe('asset-parent');
     expect(result.assets[0].status).toBe(CreatorProductionAssetStatus.Missing);
 
-    const run = db.prepare('SELECT status FROM production_runs WHERE session_id = ?').get('session-1') as { status: string };
+    const run = db.prepare('SELECT status, variant_of_asset_id FROM production_runs WHERE session_id = ?').get('session-1') as {
+      status: string;
+      variant_of_asset_id: string | null;
+    };
     expect(run.status).toBe(CreatorProductionRunStatus.Completed);
+    expect(run.variant_of_asset_id).toBe('asset-parent');
   });
 
   test('creates a separate run for each creator draft in one session', () => {
