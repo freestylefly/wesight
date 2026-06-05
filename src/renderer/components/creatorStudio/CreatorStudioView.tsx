@@ -1129,7 +1129,7 @@ const TemplateLibrary: React.FC<{
         .map((sourceCaseId) => templateCasesById.get(sourceCaseId))
         .filter((item): item is CreatorStudioCase => Boolean(item));
       return (
-        <article key={template.id} className="h-52 max-h-52 overflow-hidden rounded-lg border border-border bg-surface">
+        <article key={template.id} className="h-64 max-h-64 overflow-hidden rounded-lg border border-border bg-surface">
           <div className="grid h-full grid-cols-[42%_1fr]">
             <PlaceholderImage src={template.cover} alt={getText(template.title)} className="h-full w-full" />
             <div className="flex min-h-0 min-w-0 flex-col p-3">
