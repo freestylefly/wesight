@@ -12,6 +12,7 @@ import {
   buildPromptSpec,
   type CreatorPromptForm,
   hasSeedreamApiConfig,
+  renderCreatorContextPack,
   renderCreatorCoworkDraft,
   renderCreatorPrompt,
   selectCreatorCreativeDirection,
@@ -158,6 +159,11 @@ describe('creator studio prompt utilities', () => {
         width: 1200,
         height: 800,
         dominantColors: ['#202020', '#e0e0e0'],
+        orientation: 'landscape',
+        aspectRatio: '3:2',
+        brightness: 'balanced',
+        contrast: 'high',
+        colorMood: 'neutral',
       },
       addedAt: 1,
     }, {
@@ -199,6 +205,7 @@ describe('creator studio prompt utilities', () => {
     expect(spec.contextPack).toContain('attachment=base64');
     expect(spec.contextPack).toContain('localPath=available');
     expect(spec.contextPack).toContain('image=1200x800');
+    expect(spec.contextPack).toContain('summary=landscape composition, 3:2, balanced exposure, high contrast, neutral palette');
     expect(spec.contextPack).toContain('colors=#202020, #e0e0e0');
     expect(spec.contextPack).toContain('role=negative');
     expect(spec.contextPack).toContain('priority=avoid');
@@ -221,6 +228,28 @@ describe('creator studio prompt utilities', () => {
     expect(draft).toContain('Context Pack:');
     expect(draft).toContain('Creative Directions:');
     expect(draft).toContain('materials marked attachment=base64');
+  });
+
+  test('derives image context summary for legacy material analysis', () => {
+    const contextPack = renderCreatorContextPack([{
+      id: 'material-legacy',
+      role: CreatorMaterialRole.Reference,
+      source: CreatorMaterialSource.File,
+      name: 'legacy.png',
+      path: '/Users/demo/legacy.png',
+      mimeType: 'image/png',
+      hasImageAttachment: true,
+      localPathAvailable: true,
+      imageAnalysis: {
+        width: 1080,
+        height: 1080,
+        dominantColors: ['#404040'],
+      },
+    }], 'zh');
+
+    expect(contextPack).toContain('image=1080x1080');
+    expect(contextPack).toContain('summary=方形构图，1:1');
+    expect(contextPack).toContain('colors=#404040');
   });
 
   test('uses template-aware creative directions for major categories', () => {

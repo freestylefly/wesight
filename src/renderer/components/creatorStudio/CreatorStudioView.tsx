@@ -2447,6 +2447,54 @@ const rgbToHex = (red: number, green: number, blue: number): string => (
   `#${colorChannelToHex(red)}${colorChannelToHex(green)}${colorChannelToHex(blue)}`
 );
 
+const getCommonDivisor = (left: number, right: number): number => {
+  let a = Math.max(1, Math.round(left));
+  let b = Math.max(1, Math.round(right));
+  while (b) {
+    const next = a % b;
+    a = b;
+    b = next;
+  }
+  return a;
+};
+
+const getImageOrientation = (width: number, height: number): CreatorMaterialImageAnalysis['orientation'] => (
+  Math.abs(width - height) <= Math.max(width, height) * 0.04
+    ? 'square'
+    : width > height ? 'landscape' : 'portrait'
+);
+
+const getImageAspectRatio = (width: number, height: number): string => {
+  const divisor = getCommonDivisor(width, height);
+  return `${Math.round(width / divisor)}:${Math.round(height / divisor)}`;
+};
+
+const getImageBrightness = (averageLuminance: number): CreatorMaterialImageAnalysis['brightness'] => {
+  if (averageLuminance < 82) return 'dark';
+  if (averageLuminance > 174) return 'bright';
+  return 'balanced';
+};
+
+const getImageContrast = (luminanceDeviation: number): CreatorMaterialImageAnalysis['contrast'] => {
+  if (luminanceDeviation < 28) return 'low';
+  if (luminanceDeviation > 60) return 'high';
+  return 'medium';
+};
+
+const getImageColorMood = (
+  warmPixelCount: number,
+  coolPixelCount: number,
+  sampleCount: number
+): CreatorMaterialImageAnalysis['colorMood'] => {
+  if (sampleCount === 0) return 'neutral';
+  const warmRatio = warmPixelCount / sampleCount;
+  const coolRatio = coolPixelCount / sampleCount;
+  if (warmRatio > 0.25 && coolRatio > 0.25) return 'mixed';
+  if (warmRatio > coolRatio + 0.12) return 'warm';
+  if (coolRatio > warmRatio + 0.12) return 'cool';
+  return 'neutral';
+};
+
 const analyzeImageDataUrl = (dataUrl: string): Promise<CreatorMaterialImageAnalysis | undefined> => new Promise((resolve) => {
   if (typeof Image === 'undefined' || typeof document === 'undefined') {
     resolve(undefined);
@@ -2466,9 +2514,22 @@ const analyzeImageDataUrl = (dataUrl: string): Promise<CreatorMaterialImageAnaly
     context.drawImage(image, 0, 0, sampleSize, sampleSize);
     const pixels = context.getImageData(0, 0, sampleSize, sampleSize).data;
     const colorBuckets = new Map<string, number>();
+    const luminanceValues: number[] = [];
+    let warmPixelCount = 0;
+    let coolPixelCount = 0;
     for (let index = 0; index < pixels.length; index += 4) {
       const alpha = pixels[index + 3];
       if (alpha < 180) continue;
+      const originalRed = pixels[index];
+      const originalGreen = pixels[index + 1];
+      const originalBlue = pixels[index + 2];
+      const luminance = originalRed * 0.2126 + originalGreen * 0.7152 + originalBlue * 0.0722;
+      luminanceValues.push(luminance);
+      if (originalRed - originalBlue > 24) {
+        warmPixelCount += 1;
+      } else if (originalBlue - originalRed > 24) {
+        coolPixelCount += 1;
+      }
       const red = Math.round(pixels[index] / 32) * 32;
       const green = Math.round(pixels[index + 1] / 32) * 32;
       const blue = Math.round(pixels[index + 2] / 32) * 32;
@@ -2479,10 +2540,21 @@ const analyzeImageDataUrl = (dataUrl: string): Promise<CreatorMaterialImageAnaly
       .sort((left, right) => right[1] - left[1])
       .slice(0, 4)
       .map(([color]) => color);
+    const averageLuminance = luminanceValues.length > 0
+      ? luminanceValues.reduce((sum, value) => sum + value, 0) / luminanceValues.length
+      : 128;
+    const luminanceDeviation = luminanceValues.length > 0
+      ? Math.sqrt(luminanceValues.reduce((sum, value) => sum + ((value - averageLuminance) ** 2), 0) / luminanceValues.length)
+      : 0;
     resolve({
       width: image.naturalWidth,
       height: image.naturalHeight,
       dominantColors,
+      orientation: getImageOrientation(image.naturalWidth, image.naturalHeight),
+      aspectRatio: getImageAspectRatio(image.naturalWidth, image.naturalHeight),
+      brightness: getImageBrightness(averageLuminance),
+      contrast: getImageContrast(luminanceDeviation),
+      colorMood: getImageColorMood(warmPixelCount, coolPixelCount, luminanceValues.length),
     });
   };
   image.onerror = () => resolve(undefined);

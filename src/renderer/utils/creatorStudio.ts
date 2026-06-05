@@ -1,6 +1,7 @@
 import type {
   CreatorBuilderMaterial,
   CreatorCreativeDirection,
+  CreatorMaterialImageAnalysis,
   CreatorPromptMaterial,
   CreatorPromptReferenceAnalysis,
   CreatorPromptSpec,
@@ -464,6 +465,93 @@ const renderCreatorContextPackConflicts = (
   return conflicts;
 };
 
+const getCreatorImageAnalysisSummary = (
+  imageAnalysis: CreatorMaterialImageAnalysis,
+  language: 'zh' | 'en'
+): string => {
+  if (imageAnalysis.summary && imageAnalysis.summary.trim()) {
+    return imageAnalysis.summary.trim();
+  }
+  const derivedOrientation = imageAnalysis.orientation
+    ?? (Math.abs(imageAnalysis.width - imageAnalysis.height) <= Math.max(imageAnalysis.width, imageAnalysis.height) * 0.04
+      ? 'square'
+      : imageAnalysis.width > imageAnalysis.height ? 'landscape' : 'portrait');
+  const commonDivisor = (left: number, right: number): number => {
+    let a = Math.max(1, Math.round(left));
+    let b = Math.max(1, Math.round(right));
+    while (b) {
+      const next = a % b;
+      a = b;
+      b = next;
+    }
+    return a;
+  };
+  const divisor = commonDivisor(imageAnalysis.width, imageAnalysis.height);
+  const derivedAspectRatio = imageAnalysis.aspectRatio
+    ?? `${Math.round(imageAnalysis.width / divisor)}:${Math.round(imageAnalysis.height / divisor)}`;
+  const orientationText = derivedOrientation
+    ? {
+      zh: {
+        landscape: '横向构图',
+        portrait: '纵向构图',
+        square: '方形构图',
+      },
+      en: {
+        landscape: 'landscape composition',
+        portrait: 'portrait composition',
+        square: 'square composition',
+      },
+    }[language][derivedOrientation]
+    : '';
+  const brightnessText = imageAnalysis.brightness
+    ? {
+      zh: {
+        dark: '偏暗',
+        balanced: '明暗均衡',
+        bright: '偏亮',
+      },
+      en: {
+        dark: 'dark exposure',
+        balanced: 'balanced exposure',
+        bright: 'bright exposure',
+      },
+    }[language][imageAnalysis.brightness]
+    : '';
+  const contrastText = imageAnalysis.contrast
+    ? {
+      zh: {
+        low: '低对比',
+        medium: '中等对比',
+        high: '高对比',
+      },
+      en: {
+        low: 'low contrast',
+        medium: 'medium contrast',
+        high: 'high contrast',
+      },
+    }[language][imageAnalysis.contrast]
+    : '';
+  const colorMoodText = imageAnalysis.colorMood
+    ? {
+      zh: {
+        warm: '暖色倾向',
+        cool: '冷色倾向',
+        neutral: '中性色倾向',
+        mixed: '冷暖混合',
+      },
+      en: {
+        warm: 'warm palette',
+        cool: 'cool palette',
+        neutral: 'neutral palette',
+        mixed: 'mixed warm/cool palette',
+      },
+    }[language][imageAnalysis.colorMood]
+    : '';
+  const parts = [orientationText, derivedAspectRatio, brightnessText, contrastText, colorMoodText]
+    .filter(Boolean);
+  return parts.join(language === 'zh' ? '，' : ', ');
+};
+
 export const renderCreatorContextPack = (
   materials: CreatorPromptMaterial[],
   language: 'zh' | 'en'
@@ -486,8 +574,8 @@ export const renderCreatorContextPack = (
       const imageSummary = material.imageAnalysis
         ? (
           language === 'zh'
-            ? `；image=${material.imageAnalysis.width}x${material.imageAnalysis.height}；colors=${material.imageAnalysis.dominantColors.join(', ')}`
-            : `; image=${material.imageAnalysis.width}x${material.imageAnalysis.height}; colors=${material.imageAnalysis.dominantColors.join(', ')}`
+            ? `；image=${material.imageAnalysis.width}x${material.imageAnalysis.height}；summary=${getCreatorImageAnalysisSummary(material.imageAnalysis, language)}；colors=${material.imageAnalysis.dominantColors.join(', ')}`
+            : `; image=${material.imageAnalysis.width}x${material.imageAnalysis.height}; summary=${getCreatorImageAnalysisSummary(material.imageAnalysis, language)}; colors=${material.imageAnalysis.dominantColors.join(', ')}`
         )
         : '';
       const fallbackNote = !material.localPathAvailable && material.hasImageAttachment

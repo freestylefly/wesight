@@ -54,6 +54,12 @@ export interface CreatorPromptSpecSnapshot {
       width: number;
       height: number;
       dominantColors: string[];
+      orientation?: 'landscape' | 'portrait' | 'square';
+      aspectRatio?: string;
+      brightness?: 'dark' | 'balanced' | 'bright';
+      contrast?: 'low' | 'medium' | 'high';
+      colorMood?: 'warm' | 'cool' | 'neutral' | 'mixed';
+      summary?: string;
     };
   }>;
   contextPack?: string;
