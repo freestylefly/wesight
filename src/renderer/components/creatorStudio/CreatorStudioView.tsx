@@ -57,6 +57,7 @@ import {
   buildCreatorProductionPackage,
   CreatorProductionPackageIssueSeverity,
   type CreatorProductionPackageSummary,
+  type CreatorProductionPerformanceGroup,
   summarizeCreatorProductionPackage,
 } from '../../utils/creatorProductionPackage';
 import { compileCreatorPrompt, CreatorPromptCompileTarget } from '../../utils/creatorPromptCompiler';
@@ -1958,6 +1959,23 @@ const PromptBuilder: React.FC<{
             <ProductionMetric label={i18nService.t('creatorProductionMetricCompletion')} value={`${productionPackageSummary.stats.completionRate}%`} />
           </div>
           <div className="mt-3 space-y-2">
+            <div className="text-[11px] font-semibold uppercase text-muted">{i18nService.t('creatorProductionPerformance')}</div>
+            <div className="grid gap-2">
+              <ProductionPerformanceList
+                title={i18nService.t('creatorProductionPerformanceTemplates')}
+                items={productionPackageSummary.performance.byTemplate}
+              />
+              <ProductionPerformanceList
+                title={i18nService.t('creatorProductionPerformanceModels')}
+                items={productionPackageSummary.performance.byModel}
+              />
+              <ProductionPerformanceList
+                title={i18nService.t('creatorProductionPerformanceDirections')}
+                items={productionPackageSummary.performance.byDirection}
+              />
+            </div>
+          </div>
+          <div className="mt-3 space-y-2">
             <div className="text-[11px] font-semibold uppercase text-muted">{i18nService.t('creatorProductionPackageGovernance')}</div>
             {productionPackageSummary.issues.length === 0 ? (
               <div className="rounded-lg border border-border bg-surface p-3 text-xs text-muted">
@@ -2550,6 +2568,45 @@ const ProductionMetric: React.FC<{
     <div className="mt-1 text-sm font-semibold text-foreground">{value}</div>
   </div>
 );
+
+const ProductionPerformanceList: React.FC<{
+  title: string;
+  items: CreatorProductionPerformanceGroup[];
+}> = ({ title, items }) => {
+  const visibleItems = items.slice(0, 3);
+  return (
+    <div className="rounded-lg border border-border bg-surface p-2">
+      <div className="flex items-center justify-between gap-2">
+        <div className="text-[11px] font-medium text-secondary">{title}</div>
+        <div className="text-[10px] text-muted">{i18nService.t('creatorProductionPerformanceScore')}</div>
+      </div>
+      {visibleItems.length === 0 ? (
+        <div className="mt-2 text-xs text-muted">{i18nService.t('creatorProductionPerformanceEmpty')}</div>
+      ) : (
+        <div className="mt-2 space-y-1.5">
+          {visibleItems.map((item) => (
+            <div key={item.id} className="min-w-0 rounded-md bg-background px-2 py-1.5">
+              <div className="flex items-center justify-between gap-2">
+                <div className="min-w-0 truncate text-xs font-medium text-secondary" title={item.label}>
+                  {item.label}
+                </div>
+                <div className="shrink-0 text-[11px] font-semibold text-primary">{item.score}</div>
+              </div>
+              <div className="mt-1 truncate text-[11px] text-muted">
+                {i18nService.t('creatorProductionPerformanceLine')
+                  .replace('{adopted}', String(item.adoptedAssets))
+                  .replace('{selected}', String(item.selectedAssets))
+                  .replace('{completed}', String(item.completedBatchTasks))
+                  .replace('{failed}', String(item.failedBatchTasks))
+                  .replace('{rate}', `${item.completionRate}%`)}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
 
 const BuilderInput: React.FC<{
   label: string;

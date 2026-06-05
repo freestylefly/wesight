@@ -56,8 +56,32 @@ export interface CreatorProductionPackageStats {
   completionRate: number;
 }
 
+export interface CreatorProductionPerformanceGroup {
+  id: string;
+  label: string;
+  totalAssets: number;
+  selectedAssets: number;
+  favoriteAssets: number;
+  adoptedAssets: number;
+  shortlistedAssets: number;
+  rejectedAssets: number;
+  batchTasks: number;
+  completedBatchTasks: number;
+  failedBatchTasks: number;
+  skippedBatchTasks: number;
+  completionRate: number;
+  score: number;
+}
+
+export interface CreatorProductionPerformanceSummary {
+  byTemplate: CreatorProductionPerformanceGroup[];
+  byModel: CreatorProductionPerformanceGroup[];
+  byDirection: CreatorProductionPerformanceGroup[];
+}
+
 export interface CreatorProductionPackageSummary {
   stats: CreatorProductionPackageStats;
+  performance: CreatorProductionPerformanceSummary;
   issues: CreatorProductionPackageIssue[];
   blockerCount: number;
   warningCount: number;
@@ -71,6 +95,7 @@ export interface CreatorProductionPackageManifest {
     name: string;
   };
   summary: CreatorProductionPackageStats;
+  performance: CreatorProductionPerformanceSummary;
   governance: {
     issues: CreatorProductionPackageIssue[];
   };
@@ -121,6 +146,112 @@ const isProductionCandidate = (asset: CreatorProductionAssetRecord): boolean => 
   || asset.adoptionStatus === CreatorAssetAdoptionStatus.Shortlisted
 );
 
+const createPerformanceGroup = (id: string, label = id): CreatorProductionPerformanceGroup => ({
+  id,
+  label,
+  totalAssets: 0,
+  selectedAssets: 0,
+  favoriteAssets: 0,
+  adoptedAssets: 0,
+  shortlistedAssets: 0,
+  rejectedAssets: 0,
+  batchTasks: 0,
+  completedBatchTasks: 0,
+  failedBatchTasks: 0,
+  skippedBatchTasks: 0,
+  completionRate: 0,
+  score: 0,
+});
+
+const getOrCreateGroup = (
+  groups: Map<string, CreatorProductionPerformanceGroup>,
+  id: string | null | undefined,
+  label?: string | null
+): CreatorProductionPerformanceGroup | null => {
+  const normalizedId = id?.trim();
+  if (!normalizedId) return null;
+  const existing = groups.get(normalizedId);
+  if (existing) {
+    if (label?.trim()) existing.label = label.trim();
+    return existing;
+  }
+  const group = createPerformanceGroup(normalizedId, label?.trim() || normalizedId);
+  groups.set(normalizedId, group);
+  return group;
+};
+
+const addAssetPerformance = (
+  group: CreatorProductionPerformanceGroup | null,
+  asset: CreatorProductionAssetRecord
+): void => {
+  if (!group) return;
+  group.totalAssets += 1;
+  if (asset.selected) group.selectedAssets += 1;
+  if (asset.favorite || asset.adoptionStatus === CreatorAssetAdoptionStatus.Favorite) group.favoriteAssets += 1;
+  if (asset.adoptionStatus === CreatorAssetAdoptionStatus.Adopted) group.adoptedAssets += 1;
+  if (asset.adoptionStatus === CreatorAssetAdoptionStatus.Shortlisted) group.shortlistedAssets += 1;
+  if (asset.adoptionStatus === CreatorAssetAdoptionStatus.Rejected) group.rejectedAssets += 1;
+};
+
+const addBatchTaskPerformance = (
+  group: CreatorProductionPerformanceGroup | null,
+  status: CreatorBatchTaskStatus
+): void => {
+  if (!group) return;
+  group.batchTasks += 1;
+  if (status === CreatorBatchTaskStatus.Completed) group.completedBatchTasks += 1;
+  if (status === CreatorBatchTaskStatus.Failed) group.failedBatchTasks += 1;
+  if (status === CreatorBatchTaskStatus.Skipped) group.skippedBatchTasks += 1;
+};
+
+const finalizePerformanceGroups = (
+  groups: Map<string, CreatorProductionPerformanceGroup>
+): CreatorProductionPerformanceGroup[] => (
+  [...groups.values()]
+    .map((group) => ({
+      ...group,
+      completionRate: group.batchTasks > 0
+        ? Math.round((group.completedBatchTasks / group.batchTasks) * 100)
+        : 0,
+      score: group.adoptedAssets * 10
+        + group.selectedAssets * 6
+        + group.shortlistedAssets * 4
+        + group.favoriteAssets * 3
+        + group.completedBatchTasks * 2
+        - group.rejectedAssets * 4
+        - group.failedBatchTasks * 3,
+    }))
+    .sort((a, b) => b.score - a.score || b.totalAssets - a.totalAssets || a.label.localeCompare(b.label))
+);
+
+export const buildCreatorProductionPerformance = ({
+  assets,
+  batchRuns,
+}: Pick<CreatorProductionPackageInput, 'assets' | 'batchRuns'>): CreatorProductionPerformanceSummary => {
+  const templateGroups = new Map<string, CreatorProductionPerformanceGroup>();
+  const modelGroups = new Map<string, CreatorProductionPerformanceGroup>();
+  const directionGroups = new Map<string, CreatorProductionPerformanceGroup>();
+
+  for (const asset of assets) {
+    addAssetPerformance(getOrCreateGroup(templateGroups, asset.templateId), asset);
+    addAssetPerformance(getOrCreateGroup(directionGroups, asset.selectedDirectionId), asset);
+  }
+
+  for (const run of batchRuns) {
+    for (const task of run.tasks) {
+      addBatchTaskPerformance(getOrCreateGroup(templateGroups, task.templateId), task.status);
+      addBatchTaskPerformance(getOrCreateGroup(modelGroups, task.modelId, task.modelName), task.status);
+      addBatchTaskPerformance(getOrCreateGroup(directionGroups, task.directionId, task.directionTitle), task.status);
+    }
+  }
+
+  return {
+    byTemplate: finalizePerformanceGroups(templateGroups),
+    byModel: finalizePerformanceGroups(modelGroups),
+    byDirection: finalizePerformanceGroups(directionGroups),
+  };
+};
+
 export const buildCreatorProductionPackage = ({
   projectId,
   project,
@@ -161,6 +292,7 @@ export const buildCreatorProductionPackage = ({
   ];
   const sensitivePromptRecords = promptRecords.filter((record) => containsPattern(record, SECRET_PATTERN)).length;
   const localPathPromptRecords = promptRecords.filter((record) => containsPattern(record, LOCAL_PATH_PATTERN)).length;
+  const performance = buildCreatorProductionPerformance({ assets, batchRuns });
 
   const stats: CreatorProductionPackageStats = {
     totalAssets: assets.length,
@@ -222,6 +354,7 @@ export const buildCreatorProductionPackage = ({
       name: project?.name ?? projectId,
     },
     summary: stats,
+    performance,
     governance: {
       issues,
     },
@@ -237,6 +370,7 @@ export const summarizeCreatorProductionPackage = (
   const manifest = buildCreatorProductionPackage(input);
   return {
     stats: manifest.summary,
+    performance: manifest.performance,
     issues: manifest.governance.issues,
     blockerCount: manifest.governance.issues.filter((issue) => (
       issue.severity === CreatorProductionPackageIssueSeverity.Blocker

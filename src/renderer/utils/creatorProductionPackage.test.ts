@@ -15,6 +15,7 @@ import { describe, expect, test } from 'vitest';
 
 import {
   buildCreatorProductionPackage,
+  buildCreatorProductionPerformance,
   CreatorProductionPackageIssueSeverity,
   CreatorProductionPackageSchemaVersion,
   summarizeCreatorProductionPackage,
@@ -155,7 +156,82 @@ describe('creator production package', () => {
     expect(manifest.summary.adoptedAssets).toBe(1);
     expect(manifest.summary.favoriteAssets).toBe(1);
     expect(manifest.summary.completionRate).toBe(50);
+    expect(manifest.performance.byTemplate[0]).toMatchObject({
+      id: 'poster',
+      totalAssets: 2,
+      batchTasks: 2,
+      completionRate: 50,
+    });
     expect(manifest.governance.issues.some((issue) => issue.code === 'failed_batch_tasks')).toBe(true);
+  });
+
+  test('aggregates performance by template, model, and direction', () => {
+    const performance = buildCreatorProductionPerformance({
+      assets: [
+        createAsset({
+          selected: true,
+          adoptionStatus: CreatorAssetAdoptionStatus.Adopted,
+          templateId: 'poster',
+          selectedDirectionId: 'direction-1',
+        }),
+        createAsset({
+          id: 'asset-2',
+          favorite: true,
+          adoptionStatus: CreatorAssetAdoptionStatus.Favorite,
+          templateId: 'story',
+          selectedDirectionId: 'direction-2',
+        }),
+      ],
+      batchRuns: [createBatchRun({
+        tasks: [
+          {
+            ...createBatchRun().tasks[0],
+            templateId: 'poster',
+            directionId: 'direction-1',
+            directionTitle: 'Hero direction',
+            modelId: 'seedream',
+            modelName: 'Seedream',
+            status: CreatorBatchTaskStatus.Completed,
+          },
+          {
+            ...createBatchRun().tasks[1],
+            templateId: 'story',
+            directionId: 'direction-2',
+            directionTitle: 'Story direction',
+            modelId: 'gpt-image',
+            modelName: 'GPT Image',
+            status: CreatorBatchTaskStatus.Failed,
+          },
+        ],
+      })],
+    });
+
+    expect(performance.byTemplate[0]).toMatchObject({
+      id: 'poster',
+      selectedAssets: 1,
+      adoptedAssets: 1,
+      completedBatchTasks: 1,
+      completionRate: 100,
+    });
+    expect(performance.byModel).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        id: 'seedream',
+        label: 'Seedream',
+        completedBatchTasks: 1,
+        completionRate: 100,
+      }),
+      expect.objectContaining({
+        id: 'gpt-image',
+        label: 'GPT Image',
+        failedBatchTasks: 1,
+        completionRate: 0,
+      }),
+    ]));
+    expect(performance.byDirection[0]).toMatchObject({
+      id: 'direction-1',
+      label: 'Hero direction',
+      adoptedAssets: 1,
+    });
   });
 
   test('flags blockers for secrets and missing production files', () => {
