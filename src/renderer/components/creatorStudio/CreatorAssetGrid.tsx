@@ -2,13 +2,27 @@ import {
   ArrowTopRightOnSquareIcon,
   ClipboardDocumentIcon,
   FolderOpenIcon,
+  InformationCircleIcon,
+  PaperAirplaneIcon,
   PhotoIcon,
+  PlusIcon,
   SparklesIcon,
   StarIcon,
+  TagIcon,
+  XMarkIcon,
 } from '@heroicons/react/24/outline';
-import { CreatorProductionAssetStatus } from '@shared/creatorStudio/constants';
-import type { CreatorProductionAssetRecord } from '@shared/creatorStudio/types';
-import React, { useEffect, useState } from 'react';
+import {
+  CreatorAssetAdoptionStatus,
+  type CreatorAssetAdoptionStatus as CreatorAssetAdoptionStatusType,
+  CreatorProductionAssetSource,
+  CreatorProductionAssetStatus,
+  CreatorStudioDefaultProjectId,
+} from '@shared/creatorStudio/constants';
+import type {
+  CreatorProductionAssetRecord,
+  CreatorWorkspaceSnapshot,
+} from '@shared/creatorStudio/types';
+import React, { useEffect, useMemo, useState } from 'react';
 
 import { creatorStudioAssetService } from '../../services/creatorStudioAssets';
 import { i18nService } from '../../services/i18n';
@@ -16,6 +30,7 @@ import { i18nService } from '../../services/i18n';
 interface CreatorAssetGridProps {
   onOpenCoworkSession: (sessionId: string) => Promise<boolean>;
   onUseAssetAsReference: (asset: CreatorProductionAssetRecord) => void;
+  onSendAssetToCowork: (asset: CreatorProductionAssetRecord) => void;
 }
 
 const dispatchToast = (message: string) => {
@@ -42,7 +57,6 @@ const encodeLocalFileSrc = (filePath: string): string => {
 };
 
 const PlaceholderImage: React.FC<{
-  alt: string;
   className?: string;
 }> = ({ className = '' }) => (
   <div className={`flex items-center justify-center bg-surface-raised text-muted ${className}`}>
@@ -50,19 +64,90 @@ const PlaceholderImage: React.FC<{
   </div>
 );
 
-export const CreatorAssetGrid: React.FC<CreatorAssetGridProps> = ({ onOpenCoworkSession, onUseAssetAsReference }) => {
+const adoptionStatusOptions = [
+  CreatorAssetAdoptionStatus.Unset,
+  CreatorAssetAdoptionStatus.Favorite,
+  CreatorAssetAdoptionStatus.Shortlisted,
+  CreatorAssetAdoptionStatus.Adopted,
+  CreatorAssetAdoptionStatus.Rejected,
+] as const;
+
+const getAdoptionStatusLabel = (status: CreatorAssetAdoptionStatusType): string => {
+  switch (status) {
+    case CreatorAssetAdoptionStatus.Favorite:
+      return i18nService.t('creatorAssetStatusFavorite');
+    case CreatorAssetAdoptionStatus.Shortlisted:
+      return i18nService.t('creatorAssetStatusShortlisted');
+    case CreatorAssetAdoptionStatus.Adopted:
+      return i18nService.t('creatorAssetStatusAdopted');
+    case CreatorAssetAdoptionStatus.Rejected:
+      return i18nService.t('creatorAssetStatusRejected');
+    case CreatorAssetAdoptionStatus.Unset:
+    default:
+      return i18nService.t('creatorAssetStatusUnset');
+  }
+};
+
+const getProjectLabel = (projectId: string, name: string): string => (
+  projectId === CreatorStudioDefaultProjectId ? i18nService.t('creatorDefaultProject') : name
+);
+
+export const CreatorAssetGrid: React.FC<CreatorAssetGridProps> = ({
+  onOpenCoworkSession,
+  onUseAssetAsReference,
+  onSendAssetToCowork,
+}) => {
+  const [workspace, setWorkspace] = useState<CreatorWorkspaceSnapshot | null>(null);
+  const [currentProjectId, setCurrentProjectId] = useState('');
+  const [collectionId, setCollectionId] = useState('');
+  const [templateId, setTemplateId] = useState('');
+  const [tag, setTag] = useState('');
+  const [adoptionStatus, setAdoptionStatus] = useState('');
+  const [source, setSource] = useState('');
+  const [favoriteOnly, setFavoriteOnly] = useState(false);
   const [assets, setAssets] = useState<CreatorProductionAssetRecord[]>([]);
   const [total, setTotal] = useState(0);
+  const [selectedAsset, setSelectedAsset] = useState<CreatorProductionAssetRecord | null>(null);
+  const [tagDraft, setTagDraft] = useState('');
+  const [licenseNoteDraft, setLicenseNoteDraft] = useState('');
+  const [usageNoteDraft, setUsageNoteDraft] = useState('');
+  const [collectionTargetId, setCollectionTargetId] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const currentCollections = useMemo(
+    () => workspace?.collections.filter((collection) => collection.projectId === currentProjectId) ?? [],
+    [currentProjectId, workspace?.collections]
+  );
+
+  const loadWorkspace = async () => {
+    const nextWorkspace = await creatorStudioAssetService.getWorkspace();
+    setWorkspace(nextWorkspace);
+    setCurrentProjectId((value) => value || nextWorkspace.currentProjectId);
+  };
+
   const loadAssets = async () => {
+    const projectId = currentProjectId || workspace?.currentProjectId;
+    if (!projectId) return;
     setIsLoading(true);
     setError(null);
     try {
-      const result = await creatorStudioAssetService.listAssets({ limit: 80 });
+      const result = await creatorStudioAssetService.listAssets({
+        projectId,
+        ...(collectionId ? { collectionId } : {}),
+        ...(templateId.trim() ? { templateId: templateId.trim() } : {}),
+        ...(tag.trim() ? { tag: tag.trim() } : {}),
+        ...(adoptionStatus ? { adoptionStatus: adoptionStatus as CreatorAssetAdoptionStatusType } : {}),
+        ...(source ? { source: source as CreatorProductionAssetSource } : {}),
+        ...(favoriteOnly ? { favorite: true } : {}),
+        limit: 120,
+      });
       setAssets(result.assets);
       setTotal(result.total);
+      setSelectedAsset((asset) => {
+        if (!asset) return null;
+        return result.assets.find((item) => item.id === asset.id) ?? null;
+      });
     } catch (loadError) {
       setError(loadError instanceof Error ? loadError.message : i18nService.t('creatorAssetsLoadFailed'));
     } finally {
@@ -71,8 +156,74 @@ export const CreatorAssetGrid: React.FC<CreatorAssetGridProps> = ({ onOpenCowork
   };
 
   useEffect(() => {
-    void loadAssets();
+    void loadWorkspace().catch((loadError) => {
+      setError(loadError instanceof Error ? loadError.message : i18nService.t('creatorWorkspaceLoadFailed'));
+    });
   }, []);
+
+  useEffect(() => {
+    void loadAssets();
+  }, [adoptionStatus, collectionId, currentProjectId, favoriteOnly, source, tag, templateId, workspace?.currentProjectId]);
+
+  useEffect(() => {
+    if (!selectedAsset) {
+      setTagDraft('');
+      setLicenseNoteDraft('');
+      setUsageNoteDraft('');
+      setCollectionTargetId('');
+      return;
+    }
+    setTagDraft(selectedAsset.tags.join(', '));
+    setLicenseNoteDraft(selectedAsset.licenseNote ?? '');
+    setUsageNoteDraft(selectedAsset.usageNote ?? '');
+    setCollectionTargetId('');
+  }, [selectedAsset]);
+
+  const handleCreateProject = async () => {
+    const name = window.prompt(i18nService.t('creatorProjectNamePrompt'));
+    if (!name?.trim()) return;
+    try {
+      const nextWorkspace = await creatorStudioAssetService.createProject({ name: name.trim() });
+      setWorkspace(nextWorkspace);
+      setCurrentProjectId(nextWorkspace.currentProjectId);
+      setCollectionId('');
+    } catch (createError) {
+      dispatchToast(createError instanceof Error ? createError.message : i18nService.t('creatorProjectCreateFailed'));
+    }
+  };
+
+  const handleSwitchProject = async (projectId: string) => {
+    try {
+      const nextWorkspace = await creatorStudioAssetService.setCurrentProject(projectId);
+      setWorkspace(nextWorkspace);
+      setCurrentProjectId(nextWorkspace.currentProjectId);
+      setCollectionId('');
+      setSelectedAsset(null);
+    } catch (switchError) {
+      dispatchToast(switchError instanceof Error ? switchError.message : i18nService.t('creatorProjectSwitchFailed'));
+    }
+  };
+
+  const handleCreateCollection = async () => {
+    if (!currentProjectId) return;
+    const name = window.prompt(i18nService.t('creatorCollectionNamePrompt'));
+    if (!name?.trim()) return;
+    try {
+      const nextWorkspace = await creatorStudioAssetService.createCollection({
+        projectId: currentProjectId,
+        name: name.trim(),
+      });
+      setWorkspace(nextWorkspace);
+    } catch (createError) {
+      dispatchToast(createError instanceof Error ? createError.message : i18nService.t('creatorCollectionCreateFailed'));
+    }
+  };
+
+  const updateAssetInList = (updated: CreatorProductionAssetRecord | null) => {
+    if (!updated) return;
+    setAssets((items) => items.map((item) => item.id === updated.id ? updated : item));
+    setSelectedAsset((asset) => asset?.id === updated.id ? updated : asset);
+  };
 
   const handleCopyPrompt = async (asset: CreatorProductionAssetRecord) => {
     const prompt = asset.promptText.trim()
@@ -98,13 +249,13 @@ export const CreatorAssetGrid: React.FC<CreatorAssetGridProps> = ({ onOpenCowork
       return;
     }
     try {
-      const source = await creatorStudioAssetService.getAssetSource(asset.id);
-      if (!source?.session) {
+      const sourceLookup = await creatorStudioAssetService.getAssetSource(asset.id);
+      if (!sourceLookup?.session) {
         dispatchToast(i18nService.t('creatorAssetSourceUnavailable'));
         await loadAssets();
         return;
       }
-      const opened = await onOpenCoworkSession(source.session.id);
+      const opened = await onOpenCoworkSession(sourceLookup.session.id);
       if (!opened) {
         dispatchToast(i18nService.t('creatorAssetSourceUnavailable'));
         await loadAssets();
@@ -116,135 +267,428 @@ export const CreatorAssetGrid: React.FC<CreatorAssetGridProps> = ({ onOpenCowork
 
   const handleToggleFavorite = async (asset: CreatorProductionAssetRecord) => {
     try {
-      const updated = await creatorStudioAssetService.setFavorite(asset.id, !asset.favorite);
-      if (!updated) return;
-      setAssets((items) => items.map((item) => item.id === updated.id ? updated : item));
+      updateAssetInList(await creatorStudioAssetService.setFavorite(asset.id, !asset.favorite));
     } catch {
       dispatchToast(i18nService.t('creatorAssetFavoriteFailed'));
     }
   };
 
+  const handleChangeAdoptionStatus = async (
+    asset: CreatorProductionAssetRecord,
+    nextStatus: CreatorAssetAdoptionStatusType
+  ) => {
+    try {
+      updateAssetInList(await creatorStudioAssetService.updateAsset({
+        assetId: asset.id,
+        adoptionStatus: nextStatus,
+        favorite: nextStatus === CreatorAssetAdoptionStatus.Favorite ? true : asset.favorite,
+      }));
+    } catch {
+      dispatchToast(i18nService.t('creatorAssetUpdateFailed'));
+    }
+  };
+
+  const handleSaveProvenance = async () => {
+    if (!selectedAsset) return;
+    try {
+      const tags = tagDraft.split(',').map((item) => item.trim()).filter(Boolean);
+      updateAssetInList(await creatorStudioAssetService.updateAsset({
+        assetId: selectedAsset.id,
+        tags,
+        licenseNote: licenseNoteDraft,
+        usageNote: usageNoteDraft,
+      }));
+      dispatchToast(i18nService.t('creatorAssetSaved'));
+    } catch {
+      dispatchToast(i18nService.t('creatorAssetUpdateFailed'));
+    }
+  };
+
+  const handleAddToCollection = async () => {
+    if (!selectedAsset || !collectionTargetId) return;
+    try {
+      updateAssetInList(await creatorStudioAssetService.addAssetToCollection({
+        assetId: selectedAsset.id,
+        collectionId: collectionTargetId,
+      }));
+      await loadWorkspace();
+      await loadAssets();
+      dispatchToast(i18nService.t('creatorAssetAddedToCollection'));
+    } catch {
+      dispatchToast(i18nService.t('creatorAssetUpdateFailed'));
+    }
+  };
+
+  const handleClearFilters = () => {
+    setCollectionId('');
+    setTemplateId('');
+    setTag('');
+    setAdoptionStatus('');
+    setSource('');
+    setFavoriteOnly(false);
+  };
+
   return (
-    <section className="space-y-4 p-4">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h2 className="text-sm font-semibold">{i18nService.t('creatorAssetsTitle')}</h2>
-          <p className="mt-1 text-xs text-muted">
-            {i18nService.t('creatorAssetsCount').replace('{count}', String(total))}
-          </p>
+    <section className="grid min-h-full gap-4 p-4 xl:grid-cols-[minmax(0,1fr)_360px]">
+      <div className="min-w-0 space-y-4">
+        <div className="rounded-lg border border-border bg-surface p-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h2 className="text-sm font-semibold">{i18nService.t('creatorWorkspaceTitle')}</h2>
+              <p className="mt-1 text-xs text-muted">
+                {i18nService.t('creatorAssetsCount').replace('{count}', String(total))}
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() => void handleCreateProject()}
+                className="inline-flex items-center gap-2 rounded-lg border border-border px-3 py-2 text-sm font-medium text-secondary transition-colors hover:bg-surface-raised hover:text-foreground"
+              >
+                <PlusIcon className="h-4 w-4" />
+                {i18nService.t('creatorProjectCreate')}
+              </button>
+              <button
+                type="button"
+                onClick={() => void handleCreateCollection()}
+                className="inline-flex items-center gap-2 rounded-lg border border-border px-3 py-2 text-sm font-medium text-secondary transition-colors hover:bg-surface-raised hover:text-foreground"
+              >
+                <PlusIcon className="h-4 w-4" />
+                {i18nService.t('creatorCollectionCreate')}
+              </button>
+              <button
+                type="button"
+                onClick={() => void loadAssets()}
+                className="rounded-lg border border-border px-3 py-2 text-sm font-medium text-secondary transition-colors hover:bg-surface-raised hover:text-foreground"
+              >
+                {isLoading ? i18nService.t('loading') : i18nService.t('creatorAssetsRefresh')}
+              </button>
+            </div>
+          </div>
+
+          <div className="mt-4 grid gap-2 lg:grid-cols-[180px_170px_160px_1fr_1fr_150px_auto]">
+            <select
+              value={currentProjectId}
+              onChange={(event) => void handleSwitchProject(event.target.value)}
+              className="h-10 rounded-lg border border-border bg-background px-3 text-sm outline-none focus:border-primary"
+              aria-label={i18nService.t('creatorProjectSelect')}
+            >
+              {workspace?.projects.map((project) => (
+                <option key={project.id} value={project.id}>{getProjectLabel(project.id, project.name)}</option>
+              ))}
+            </select>
+            <select
+              value={collectionId}
+              onChange={(event) => setCollectionId(event.target.value)}
+              className="h-10 rounded-lg border border-border bg-background px-3 text-sm outline-none focus:border-primary"
+              aria-label={i18nService.t('creatorCollectionFilter')}
+            >
+              <option value="">{i18nService.t('creatorCollectionAll')}</option>
+              {currentCollections.map((collection) => (
+                <option key={collection.id} value={collection.id}>
+                  {collection.name} ({collection.assetCount})
+                </option>
+              ))}
+            </select>
+            <select
+              value={adoptionStatus}
+              onChange={(event) => setAdoptionStatus(event.target.value)}
+              className="h-10 rounded-lg border border-border bg-background px-3 text-sm outline-none focus:border-primary"
+              aria-label={i18nService.t('creatorAssetStatusFilter')}
+            >
+              <option value="">{i18nService.t('creatorAssetStatusAll')}</option>
+              {adoptionStatusOptions.map((status) => (
+                <option key={status} value={status}>{getAdoptionStatusLabel(status)}</option>
+              ))}
+            </select>
+            <input
+              value={templateId}
+              onChange={(event) => setTemplateId(event.target.value)}
+              placeholder={i18nService.t('creatorTemplateFilterPlaceholder')}
+              className="h-10 rounded-lg border border-border bg-background px-3 text-sm outline-none focus:border-primary"
+            />
+            <input
+              value={tag}
+              onChange={(event) => setTag(event.target.value)}
+              placeholder={i18nService.t('creatorTagFilterPlaceholder')}
+              className="h-10 rounded-lg border border-border bg-background px-3 text-sm outline-none focus:border-primary"
+            />
+            <select
+              value={source}
+              onChange={(event) => setSource(event.target.value)}
+              className="h-10 rounded-lg border border-border bg-background px-3 text-sm outline-none focus:border-primary"
+              aria-label={i18nService.t('creatorAssetSourceFilter')}
+            >
+              <option value="">{i18nService.t('creatorAssetSourceAll')}</option>
+              <option value={CreatorProductionAssetSource.CoworkGeneratedImage}>
+                {i18nService.t('creatorAssetSourceCowork')}
+              </option>
+            </select>
+            <button
+              type="button"
+              onClick={handleClearFilters}
+              className="h-10 rounded-lg border border-border px-3 text-sm font-medium text-secondary transition-colors hover:bg-surface-raised hover:text-foreground"
+            >
+              {i18nService.t('creatorClearFilters')}
+            </button>
+          </div>
+
+          <label className="mt-3 inline-flex items-center gap-2 text-xs text-secondary">
+            <input
+              type="checkbox"
+              checked={favoriteOnly}
+              onChange={(event) => setFavoriteOnly(event.target.checked)}
+              className="h-4 w-4 rounded border-border"
+            />
+            {i18nService.t('creatorFavoriteOnly')}
+          </label>
         </div>
-        <button
-          type="button"
-          onClick={() => void loadAssets()}
-          className="rounded-lg border border-border px-3 py-2 text-sm font-medium text-secondary transition-colors hover:bg-surface-raised hover:text-foreground"
-        >
-          {isLoading ? i18nService.t('loading') : i18nService.t('creatorAssetsRefresh')}
-        </button>
+
+        {error && (
+          <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-600 dark:text-red-300">
+            {error}
+          </div>
+        )}
+
+        {!isLoading && assets.length === 0 ? (
+          <div className="flex min-h-[260px] flex-col items-center justify-center rounded-lg border border-dashed border-border bg-surface text-center">
+            <PhotoIcon className="h-10 w-10 text-muted" />
+            <div className="mt-3 text-sm font-medium">{i18nService.t('creatorAssetsEmptyTitle')}</div>
+            <div className="mt-1 max-w-md text-xs leading-5 text-muted">{i18nService.t('creatorAssetsEmptyHint')}</div>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 2xl:grid-cols-3">
+            {assets.map((asset) => (
+              <article key={asset.id} className="overflow-hidden rounded-lg border border-border bg-surface">
+                <div className="relative aspect-[4/3] bg-surface-raised">
+                  {asset.status === CreatorProductionAssetStatus.Ready ? (
+                    <img
+                      src={encodeLocalFileSrc(asset.filePath)}
+                      alt={asset.fileName}
+                      loading="lazy"
+                      className="h-full w-full object-contain"
+                    />
+                  ) : (
+                    <PlaceholderImage className="h-full w-full" />
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => void handleToggleFavorite(asset)}
+                    className={`absolute right-2 top-2 inline-flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-background/90 transition-colors hover:bg-surface ${
+                      asset.favorite ? 'text-amber-500' : 'text-muted'
+                    }`}
+                    aria-label={i18nService.t('creatorAssetFavorite')}
+                  >
+                    <StarIcon className="h-4 w-4" />
+                  </button>
+                </div>
+                <div className="space-y-2 p-3">
+                  <h3 className="truncate text-sm font-semibold">{asset.fileName}</h3>
+                  <div className="flex flex-wrap gap-1.5">
+                    <span className="rounded-md bg-surface-raised px-2 py-0.5 text-[11px] text-secondary">
+                      {getAdoptionStatusLabel(asset.adoptionStatus)}
+                    </span>
+                    {asset.templateId && (
+                      <span className="rounded-md bg-surface-raised px-2 py-0.5 text-[11px] text-secondary">
+                        {asset.templateId}
+                      </span>
+                    )}
+                    {asset.tags.slice(0, 3).map((assetTag) => (
+                      <span key={assetTag} className="inline-flex items-center gap-1 rounded-md bg-surface-raised px-2 py-0.5 text-[11px] text-secondary">
+                        <TagIcon className="h-3 w-3" />
+                        {assetTag}
+                      </span>
+                    ))}
+                  </div>
+                  <select
+                    value={asset.adoptionStatus}
+                    onChange={(event) => void handleChangeAdoptionStatus(asset, event.target.value as CreatorAssetAdoptionStatusType)}
+                    className="h-8 w-full rounded-lg border border-border bg-background px-2 text-xs outline-none focus:border-primary"
+                    aria-label={i18nService.t('creatorAssetStatus')}
+                  >
+                    {adoptionStatusOptions.map((status) => (
+                      <option key={status} value={status}>{getAdoptionStatusLabel(status)}</option>
+                    ))}
+                  </select>
+                  <div className="text-xs text-muted">{new Date(asset.createdAt).toLocaleString()}</div>
+                  {!asset.sourceSessionAvailable && (
+                    <div className="text-xs text-muted">{i18nService.t('creatorAssetSourceMissing')}</div>
+                  )}
+                </div>
+                <div className="grid grid-cols-5 gap-1 border-t border-border p-2">
+                  <IconAction label={i18nService.t('creatorAssetUseAsReference')} onClick={() => onUseAssetAsReference(asset)}>
+                    <SparklesIcon className="h-4 w-4" />
+                  </IconAction>
+                  <IconAction label={i18nService.t('creatorAssetSendToCowork')} onClick={() => onSendAssetToCowork(asset)}>
+                    <PaperAirplaneIcon className="h-4 w-4" />
+                  </IconAction>
+                  <IconAction label={i18nService.t('copy')} onClick={() => void handleCopyPrompt(asset)}>
+                    <ClipboardDocumentIcon className="h-4 w-4" />
+                  </IconAction>
+                  <IconAction label={i18nService.t('creatorAssetSource')} onClick={() => void handleOpenSource(asset)} disabled={!asset.sourceSessionAvailable}>
+                    <ArrowTopRightOnSquareIcon className="h-4 w-4" />
+                  </IconAction>
+                  <IconAction label={i18nService.t('creatorAssetDetails')} onClick={() => setSelectedAsset(asset)}>
+                    <InformationCircleIcon className="h-4 w-4" />
+                  </IconAction>
+                </div>
+              </article>
+            ))}
+          </div>
+        )}
       </div>
 
-      {error && (
-        <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-600 dark:text-red-300">
-          {error}
-        </div>
-      )}
+      <aside className="min-h-0 rounded-lg border border-border bg-surface">
+        {selectedAsset ? (
+          <div className="flex h-full min-h-0 flex-col">
+            <div className="flex items-center justify-between border-b border-border px-4 py-3">
+              <h2 className="text-sm font-semibold">{i18nService.t('creatorAssetProvenance')}</h2>
+              <button
+                type="button"
+                onClick={() => setSelectedAsset(null)}
+                className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-muted transition-colors hover:bg-surface-raised hover:text-foreground"
+                aria-label={i18nService.t('close')}
+              >
+                <XMarkIcon className="h-4 w-4" />
+              </button>
+            </div>
+            <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-4">
+              {selectedAsset.status === CreatorProductionAssetStatus.Ready ? (
+                <img
+                  src={encodeLocalFileSrc(selectedAsset.filePath)}
+                  alt={selectedAsset.fileName}
+                  className="aspect-[4/3] w-full rounded-lg bg-surface-raised object-contain"
+                />
+              ) : (
+                <PlaceholderImage className="aspect-[4/3] w-full rounded-lg" />
+              )}
+              <ProvenanceRow label={i18nService.t('creatorAssetFileName')} value={selectedAsset.fileName} />
+              <ProvenanceRow label={i18nService.t('creatorAssetLocalPath')} value={selectedAsset.filePath} />
+              <ProvenanceRow label={i18nService.t('creatorAssetSource')} value={selectedAsset.source} />
+              <ProvenanceRow label="templateId" value={selectedAsset.templateId || 'none'} />
+              <ProvenanceRow label="caseIds" value={selectedAsset.caseIds.length > 0 ? selectedAsset.caseIds.join(', ') : 'none'} />
+              <ProvenanceRow label="sessionId" value={selectedAsset.sessionId || 'none'} />
+              <ProvenanceRow label="messageId" value={selectedAsset.messageId || 'none'} />
+              <ProvenanceRow label="variantOfAssetId" value={selectedAsset.variantOfAssetId || 'none'} />
 
-      {!isLoading && assets.length === 0 ? (
-        <div className="flex min-h-[260px] flex-col items-center justify-center rounded-lg border border-dashed border-border bg-surface text-center">
-          <PhotoIcon className="h-10 w-10 text-muted" />
-          <div className="mt-3 text-sm font-medium">{i18nService.t('creatorAssetsEmptyTitle')}</div>
-          <div className="mt-1 max-w-md text-xs leading-5 text-muted">{i18nService.t('creatorAssetsEmptyHint')}</div>
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
-          {assets.map((asset) => (
-            <article key={asset.id} className="overflow-hidden rounded-lg border border-border bg-surface">
-              <div className="relative aspect-[4/3] bg-surface-raised">
-                {asset.status === CreatorProductionAssetStatus.Ready ? (
-                  <img
-                    src={encodeLocalFileSrc(asset.filePath)}
-                    alt={asset.fileName}
-                    loading="lazy"
-                    className="h-full w-full object-contain"
-                  />
-                ) : (
-                  <PlaceholderImage alt={asset.fileName} className="h-full w-full" />
-                )}
-                <button
-                  type="button"
-                  onClick={() => void handleToggleFavorite(asset)}
-                  className={`absolute right-2 top-2 inline-flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-background/90 transition-colors hover:bg-surface ${
-                    asset.favorite ? 'text-amber-500' : 'text-muted'
-                  }`}
-                  aria-label={i18nService.t('creatorAssetFavorite')}
-                >
-                  <StarIcon className="h-4 w-4" />
-                </button>
-              </div>
-              <div className="space-y-2 p-3">
-                <h3 className="truncate text-sm font-semibold">{asset.fileName}</h3>
-                <div className="flex flex-wrap gap-1.5">
-                  {asset.templateId && (
-                    <span className="rounded-md bg-surface-raised px-2 py-0.5 text-[11px] text-secondary">
-                      {asset.templateId}
-                    </span>
-                  )}
-                  {asset.caseIds.slice(0, 2).map((caseId) => (
-                    <span key={caseId} className="rounded-md bg-surface-raised px-2 py-0.5 text-[11px] text-secondary">
-                      {caseId}
-                    </span>
-                  ))}
-                  {asset.messageId && (
-                    <span className="rounded-md bg-surface-raised px-2 py-0.5 text-[11px] text-muted">
-                      {i18nService.t('creatorAssetMessageTag')}
-                    </span>
-                  )}
+              <label className="block">
+                <span className="text-xs font-medium text-secondary">{i18nService.t('creatorAssetTags')}</span>
+                <input
+                  value={tagDraft}
+                  onChange={(event) => setTagDraft(event.target.value)}
+                  className="mt-1 h-10 w-full rounded-lg border border-border bg-background px-3 text-sm outline-none focus:border-primary"
+                />
+              </label>
+              <label className="block">
+                <span className="text-xs font-medium text-secondary">{i18nService.t('creatorAssetLicenseNote')}</span>
+                <textarea
+                  value={licenseNoteDraft}
+                  onChange={(event) => setLicenseNoteDraft(event.target.value)}
+                  rows={3}
+                  className="mt-1 w-full resize-none rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none focus:border-primary"
+                />
+              </label>
+              <label className="block">
+                <span className="text-xs font-medium text-secondary">{i18nService.t('creatorAssetUsageNote')}</span>
+                <textarea
+                  value={usageNoteDraft}
+                  onChange={(event) => setUsageNoteDraft(event.target.value)}
+                  rows={3}
+                  className="mt-1 w-full resize-none rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none focus:border-primary"
+                />
+              </label>
+              <button
+                type="button"
+                onClick={() => void handleSaveProvenance()}
+                className="w-full rounded-lg bg-primary px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-primary-hover"
+              >
+                {i18nService.t('creatorAssetSaveMetadata')}
+              </button>
+
+              <div className="rounded-lg border border-border p-3">
+                <div className="text-xs font-medium text-secondary">{i18nService.t('creatorCollectionAddAsset')}</div>
+                <div className="mt-2 flex gap-2">
+                  <select
+                    value={collectionTargetId}
+                    onChange={(event) => setCollectionTargetId(event.target.value)}
+                    className="h-9 min-w-0 flex-1 rounded-lg border border-border bg-background px-2 text-xs outline-none focus:border-primary"
+                  >
+                    <option value="">{i18nService.t('creatorCollectionSelect')}</option>
+                    {currentCollections.map((collection) => (
+                      <option key={collection.id} value={collection.id}>{collection.name}</option>
+                    ))}
+                  </select>
+                  <button
+                    type="button"
+                    disabled={!collectionTargetId}
+                    onClick={() => void handleAddToCollection()}
+                    className="rounded-lg border border-border px-3 text-xs font-medium text-secondary transition-colors hover:bg-surface-raised hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    {i18nService.t('add')}
+                  </button>
                 </div>
-                <div className="text-xs text-muted">
-                  {new Date(asset.createdAt).toLocaleString()}
-                </div>
-                {!asset.sourceSessionAvailable && (
-                  <div className="text-xs text-muted">{i18nService.t('creatorAssetSourceMissing')}</div>
-                )}
               </div>
-              <div className="grid grid-cols-4 gap-1 border-t border-border p-2">
-                <button
-                  type="button"
-                  onClick={() => onUseAssetAsReference(asset)}
-                  className="inline-flex items-center justify-center gap-1 rounded-lg px-2 py-2 text-xs font-medium text-secondary transition-colors hover:bg-surface-raised hover:text-foreground"
-                >
-                  <SparklesIcon className="h-4 w-4" />
+
+              <div className="grid grid-cols-2 gap-2">
+                <button type="button" onClick={() => onUseAssetAsReference(selectedAsset)} className="rounded-lg border border-border px-3 py-2 text-sm font-medium text-secondary transition-colors hover:bg-surface-raised hover:text-foreground">
                   {i18nService.t('creatorAssetUseAsReference')}
                 </button>
-                <button
-                  type="button"
-                  onClick={() => void handleCopyPrompt(asset)}
-                  className="inline-flex items-center justify-center gap-1 rounded-lg px-2 py-2 text-xs font-medium text-secondary transition-colors hover:bg-surface-raised hover:text-foreground"
-                >
-                  <ClipboardDocumentIcon className="h-4 w-4" />
-                  {i18nService.t('copy')}
+                <button type="button" onClick={() => onSendAssetToCowork(selectedAsset)} className="rounded-lg border border-border px-3 py-2 text-sm font-medium text-secondary transition-colors hover:bg-surface-raised hover:text-foreground">
+                  {i18nService.t('creatorAssetSendToCowork')}
                 </button>
-                <button
-                  type="button"
-                  onClick={() => void handleOpenSource(asset)}
-                  disabled={!asset.sourceSessionAvailable}
-                  className="inline-flex items-center justify-center gap-1 rounded-lg px-2 py-2 text-xs font-medium text-secondary transition-colors hover:bg-surface-raised hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  <ArrowTopRightOnSquareIcon className="h-4 w-4" />
+                <button type="button" onClick={() => void handleOpenSource(selectedAsset)} disabled={!selectedAsset.sourceSessionAvailable} className="rounded-lg border border-border px-3 py-2 text-sm font-medium text-secondary transition-colors hover:bg-surface-raised hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50">
                   {i18nService.t('creatorAssetSource')}
                 </button>
-                <button
-                  type="button"
-                  onClick={() => void handleRevealAsset(asset)}
-                  className="inline-flex items-center justify-center gap-1 rounded-lg px-2 py-2 text-xs font-medium text-secondary transition-colors hover:bg-surface-raised hover:text-foreground"
-                >
+                <button type="button" onClick={() => void handleRevealAsset(selectedAsset)} className="inline-flex items-center justify-center gap-2 rounded-lg border border-border px-3 py-2 text-sm font-medium text-secondary transition-colors hover:bg-surface-raised hover:text-foreground">
                   <FolderOpenIcon className="h-4 w-4" />
                   {i18nService.t('creatorAssetReveal')}
                 </button>
               </div>
-            </article>
-          ))}
-        </div>
-      )}
+
+              <section>
+                <h3 className="text-xs font-medium text-secondary">{i18nService.t('creatorPromptPreview')}</h3>
+                <pre className="mt-2 max-h-52 overflow-auto whitespace-pre-wrap rounded-lg bg-surface-raised p-3 text-xs leading-5 text-secondary">
+                  {selectedAsset.promptText || JSON.stringify(selectedAsset.promptSpec, null, 2)}
+                </pre>
+              </section>
+            </div>
+          </div>
+        ) : (
+          <div className="flex min-h-[360px] flex-col items-center justify-center p-6 text-center">
+            <InformationCircleIcon className="h-10 w-10 text-muted" />
+            <div className="mt-3 text-sm font-medium">{i18nService.t('creatorAssetProvenanceEmptyTitle')}</div>
+            <div className="mt-1 text-xs leading-5 text-muted">{i18nService.t('creatorAssetProvenanceEmptyHint')}</div>
+          </div>
+        )}
+      </aside>
     </section>
   );
 };
+
+const IconAction: React.FC<{
+  label: string;
+  disabled?: boolean;
+  onClick: () => void;
+  children: React.ReactNode;
+}> = ({ label, disabled = false, onClick, children }) => (
+  <button
+    type="button"
+    disabled={disabled}
+    onClick={onClick}
+    title={label}
+    className="inline-flex items-center justify-center rounded-lg px-2 py-2 text-xs font-medium text-secondary transition-colors hover:bg-surface-raised hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
+  >
+    {children}
+    <span className="sr-only">{label}</span>
+  </button>
+);
+
+const ProvenanceRow: React.FC<{
+  label: string;
+  value: string;
+}> = ({ label, value }) => (
+  <div>
+    <div className="text-[11px] font-medium uppercase text-muted">{label}</div>
+    <div className="mt-1 break-words rounded-lg bg-surface-raised p-2 text-xs leading-5 text-secondary">{value}</div>
+  </div>
+);

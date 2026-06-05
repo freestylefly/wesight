@@ -4,25 +4,35 @@ import path from 'path';
 import { v4 as uuidv4 } from 'uuid';
 
 import {
+  CreatorAssetAdoptionStatus,
+  CreatorAssetSelectionStatus,
   CreatorProductionAssetKind,
   CreatorProductionAssetSource,
   CreatorProductionAssetStatus,
   CreatorProductionRunSource,
   CreatorProductionRunStatus,
+  CreatorStudioDefaultProjectId,
 } from '../shared/creatorStudio/constants';
 import type {
+  CreatorAssetCollectionAddInput,
+  CreatorAssetCollectionCreateInput,
+  CreatorAssetCollectionRecord,
+  CreatorAssetUpdateInput,
   CreatorProductionAssetListInput,
   CreatorProductionAssetListResult,
   CreatorProductionAssetRecord,
   CreatorProductionAssetSourceLookup,
   CreatorProductionRunRecord,
+  CreatorProjectCreateInput,
   CreatorPromptSpecSnapshot,
   CreatorStudioSourceContext,
+  CreatorWorkspaceSnapshot,
 } from '../shared/creatorStudio/types';
 import type { CoworkMessage, CoworkMessageMetadata } from './coworkStore';
 
 interface ProductionAssetRow {
   id: string;
+  project_id: string | null;
   kind: string;
   title: string | null;
   status: string;
@@ -44,9 +54,15 @@ interface ProductionAssetRow {
   file_name: string;
   mime_type: string | null;
   favorite: number;
+  adoption_status: string | null;
+  tags_json: string | null;
+  license_note: string | null;
+  usage_note: string | null;
   created_at: number;
   updated_at: number;
   source_session_available?: number | null;
+  collection_ids_json?: string | null;
+  selected_status?: string | null;
 }
 
 interface ProductionRunRow {
@@ -71,7 +87,28 @@ type GeneratedImageInput = {
   source?: string;
 };
 
+interface ProjectRow {
+  id: string;
+  name: string;
+  description: string | null;
+  created_at: number;
+  updated_at: number;
+}
+
+interface CollectionRow {
+  id: string;
+  project_id: string;
+  name: string;
+  description: string | null;
+  created_at: number;
+  updated_at: number;
+  asset_count: number;
+}
+
 const CREATOR_STUDIO_MARKER = '[Creator Studio]';
+const CreatorWorkspaceStateKey = {
+  CurrentProjectId: 'current_project_id',
+} as const;
 
 const parseJsonArray = (value: string | null | undefined): string[] => {
   if (!value) return [];
@@ -84,6 +121,27 @@ const parseJsonArray = (value: string | null | undefined): string[] => {
     return [];
   }
 };
+
+const normalizeTags = (values: unknown): string[] => {
+  if (!Array.isArray(values)) return [];
+  const unique = new Set<string>();
+  for (const value of values) {
+    if (typeof value !== 'string') continue;
+    const tag = value.trim();
+    if (!tag) continue;
+    unique.add(tag.slice(0, 48));
+  }
+  return [...unique].slice(0, 24);
+};
+
+const normalizeOptionalText = (value: unknown): string | null => (
+  typeof value === 'string' && value.trim() ? value.trim().slice(0, 1000) : null
+);
+
+const isAdoptionStatus = (value: unknown): value is CreatorAssetAdoptionStatus => (
+  typeof value === 'string'
+  && Object.values(CreatorAssetAdoptionStatus).includes(value as CreatorAssetAdoptionStatus)
+);
 
 const parsePromptSpec = (value: string | null | undefined): CreatorPromptSpecSnapshot | null => {
   if (!value) return null;
@@ -180,19 +238,133 @@ export class CreatorAssetStore {
     return this.createRun(sessionId, context, createdAt);
   }
 
+  getWorkspace(): CreatorWorkspaceSnapshot {
+    this.ensureDefaultProject();
+    const currentProjectId = this.getCurrentProjectId();
+    return {
+      currentProjectId,
+      projects: this.listProjects(),
+      collections: this.listCollections(currentProjectId),
+    };
+  }
+
+  createProject(input: CreatorProjectCreateInput): CreatorWorkspaceSnapshot {
+    const name = input.name.trim().slice(0, 80);
+    if (!name) {
+      throw new Error('Project name is required');
+    }
+    const now = Date.now();
+    const id = uuidv4();
+    this.db.prepare(`
+      INSERT INTO creator_projects (id, name, description, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?)
+    `).run(id, name, normalizeOptionalText(input.description), now, now);
+    this.setCurrentProject(id);
+    return this.getWorkspace();
+  }
+
+  setCurrentProject(projectId: string): CreatorWorkspaceSnapshot {
+    const project = this.db.prepare('SELECT id FROM creator_projects WHERE id = ?').get(projectId) as { id: string } | undefined;
+    if (!project) {
+      throw new Error('Project not found');
+    }
+    this.db.prepare(`
+      INSERT INTO creator_workspace_state (key, value, updated_at)
+      VALUES (?, ?, ?)
+      ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at
+    `).run(CreatorWorkspaceStateKey.CurrentProjectId, projectId, Date.now());
+    return this.getWorkspace();
+  }
+
+  createCollection(input: CreatorAssetCollectionCreateInput): CreatorWorkspaceSnapshot {
+    const projectId = input.projectId.trim();
+    const name = input.name.trim().slice(0, 80);
+    if (!projectId || !name) {
+      throw new Error('projectId and collection name are required');
+    }
+    const project = this.db.prepare('SELECT id FROM creator_projects WHERE id = ?').get(projectId);
+    if (!project) {
+      throw new Error('Project not found');
+    }
+    const now = Date.now();
+    this.db.prepare(`
+      INSERT INTO creator_asset_collections (id, project_id, name, description, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?)
+    `).run(uuidv4(), projectId, name, normalizeOptionalText(input.description), now, now);
+    return this.getWorkspace();
+  }
+
+  addAssetToCollection(input: CreatorAssetCollectionAddInput): CreatorProductionAssetRecord | null {
+    const asset = this.getAsset(input.assetId);
+    const collection = this.db.prepare(`
+      SELECT id, project_id
+      FROM creator_asset_collections
+      WHERE id = ?
+    `).get(input.collectionId) as { id: string; project_id: string } | undefined;
+    if (!asset || !collection) {
+      return null;
+    }
+    if (asset.projectId !== collection.project_id) {
+      this.db.prepare('UPDATE production_assets SET project_id = ?, updated_at = ? WHERE id = ?')
+        .run(collection.project_id, Date.now(), asset.id);
+    }
+    this.db.prepare(`
+      INSERT OR IGNORE INTO creator_asset_collection_items (collection_id, asset_id, added_at)
+      VALUES (?, ?, ?)
+    `).run(collection.id, asset.id, Date.now());
+    return this.getAsset(asset.id);
+  }
+
   listAssets(input: CreatorProductionAssetListInput = {}): CreatorProductionAssetListResult {
     const limit = Math.max(1, Math.min(Math.floor(input.limit ?? 60), 200));
     const offset = Math.max(0, Math.floor(input.offset ?? 0));
+    const projectId = input.projectId?.trim() || this.getCurrentProjectId();
+    const clauses = ['COALESCE(a.project_id, ?) = ?'];
+    const params: unknown[] = [CreatorStudioDefaultProjectId, projectId];
+    if (input.collectionId?.trim()) {
+      clauses.push(`EXISTS (
+        SELECT 1
+        FROM creator_asset_collection_items ci
+        WHERE ci.asset_id = a.id AND ci.collection_id = ?
+      )`);
+      params.push(input.collectionId.trim());
+    }
+    if (input.source?.trim()) {
+      clauses.push('a.source = ?');
+      params.push(input.source.trim());
+    }
+    if (input.templateId?.trim()) {
+      clauses.push('a.template_id = ?');
+      params.push(input.templateId.trim());
+    }
+    if (input.tag?.trim()) {
+      clauses.push('a.tags_json LIKE ?');
+      params.push(`%"${input.tag.trim().replace(/"/g, '\\"')}"%`);
+    }
+    if (input.adoptionStatus?.trim()) {
+      clauses.push('a.adoption_status = ?');
+      params.push(input.adoptionStatus.trim());
+    }
+    if (typeof input.favorite === 'boolean') {
+      clauses.push('a.favorite = ?');
+      params.push(input.favorite ? 1 : 0);
+    }
+    const whereSql = `WHERE ${clauses.join(' AND ')}`;
     const rows = this.db.prepare(`
       SELECT
         a.*,
         CASE WHEN s.id IS NULL THEN 0 ELSE 1 END AS source_session_available
       FROM production_assets a
       LEFT JOIN cowork_sessions s ON s.id = COALESCE(a.source_session_id, a.session_id)
+      ${whereSql}
       ORDER BY a.created_at DESC
       LIMIT ? OFFSET ?
-    `).all(limit, offset) as ProductionAssetRow[];
-    const totalRow = this.db.prepare('SELECT COUNT(*) AS count FROM production_assets').get() as { count: number };
+    `).all(...params, limit, offset) as ProductionAssetRow[];
+    const totalRow = this.db.prepare(`
+      SELECT COUNT(*) AS count
+      FROM production_assets a
+      ${whereSql}
+    `).get(...params) as { count: number };
     return {
       assets: rows.map((row) => this.mapAssetRow(row)),
       total: totalRow.count,
@@ -242,9 +414,76 @@ export class CreatorAssetStore {
   }
 
   setFavorite(id: string, favorite: boolean): CreatorProductionAssetRecord | null {
-    this.db.prepare('UPDATE production_assets SET favorite = ?, updated_at = ? WHERE id = ?')
-      .run(favorite ? 1 : 0, Date.now(), id);
+    this.db.prepare(`
+      UPDATE production_assets
+      SET favorite = ?,
+        adoption_status = CASE
+          WHEN ? = 1 THEN ?
+          WHEN adoption_status = ? THEN ?
+          ELSE adoption_status
+        END,
+        updated_at = ?
+      WHERE id = ?
+    `).run(
+      favorite ? 1 : 0,
+      favorite ? 1 : 0,
+      CreatorAssetAdoptionStatus.Favorite,
+      CreatorAssetAdoptionStatus.Favorite,
+      CreatorAssetAdoptionStatus.Unset,
+      Date.now(),
+      id
+    );
     return this.getAsset(id);
+  }
+
+  updateAsset(input: CreatorAssetUpdateInput): CreatorProductionAssetRecord | null {
+    const asset = this.getAsset(input.assetId);
+    if (!asset) return null;
+    const favorite = typeof input.favorite === 'boolean' ? input.favorite : asset.favorite;
+    const adoptionStatus = isAdoptionStatus(input.adoptionStatus)
+      ? input.adoptionStatus
+      : favorite && asset.adoptionStatus === CreatorAssetAdoptionStatus.Unset
+        ? CreatorAssetAdoptionStatus.Favorite
+        : asset.adoptionStatus;
+    const projectId = input.projectId?.trim() || asset.projectId;
+    const tags = Array.isArray(input.tags) ? normalizeTags(input.tags) : asset.tags;
+    const now = Date.now();
+    this.db.prepare(`
+      UPDATE production_assets
+      SET project_id = ?,
+        favorite = ?,
+        adoption_status = ?,
+        tags_json = ?,
+        license_note = ?,
+        usage_note = ?,
+        updated_at = ?
+      WHERE id = ?
+    `).run(
+      projectId,
+      favorite ? 1 : 0,
+      adoptionStatus,
+      JSON.stringify(tags),
+      input.licenseNote === undefined ? asset.licenseNote : normalizeOptionalText(input.licenseNote),
+      input.usageNote === undefined ? asset.usageNote : normalizeOptionalText(input.usageNote),
+      now,
+      asset.id
+    );
+    if (typeof input.selected === 'boolean') {
+      if (input.selected) {
+        this.db.prepare(`
+          INSERT INTO creator_asset_selections (project_id, asset_id, status, created_at, updated_at)
+          VALUES (?, ?, ?, ?, ?)
+          ON CONFLICT(project_id, asset_id) DO UPDATE SET status = excluded.status, updated_at = excluded.updated_at
+        `).run(projectId, asset.id, CreatorAssetSelectionStatus.Selected, now, now);
+      } else {
+        this.db.prepare(`
+          INSERT INTO creator_asset_selections (project_id, asset_id, status, created_at, updated_at)
+          VALUES (?, ?, ?, ?, ?)
+          ON CONFLICT(project_id, asset_id) DO UPDATE SET status = excluded.status, updated_at = excluded.updated_at
+        `).run(projectId, asset.id, CreatorAssetSelectionStatus.Unselected, now, now);
+      }
+    }
+    return this.getAsset(asset.id);
   }
 
   private ingestGeneratedImages(sessionId: string, message: CoworkMessage): void {
@@ -269,12 +508,12 @@ export class CreatorAssetStore {
     const now = message.timestamp || Date.now();
     const insertAsset = this.db.prepare(`
       INSERT INTO production_assets (
-        id, kind, title, status, source, run_id, source_run_id, variant_of_asset_id, session_id,
+        id, project_id, kind, title, status, source, run_id, source_run_id, variant_of_asset_id, session_id,
         source_session_id, message_id, source_message_id, template_id,
         case_ids, case_ids_json, prompt_spec, prompt_spec_json, prompt_text, file_path, file_name, mime_type,
-        favorite, metadata, created_at, updated_at
+        favorite, adoption_status, tags_json, license_note, usage_note, metadata, created_at, updated_at
       )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       ON CONFLICT(session_id, message_id, file_path) DO UPDATE SET
         status = excluded.status,
         run_id = COALESCE(production_assets.run_id, excluded.run_id),
@@ -309,6 +548,7 @@ export class CreatorAssetStore {
         const promptSpecJson = context.promptSpec ? JSON.stringify(context.promptSpec) : null;
         insertAsset.run(
           uuidv4(),
+          this.getCurrentProjectId(),
           CreatorProductionAssetKind.Image,
           getImageName(image),
           fs.existsSync(filePath) ? CreatorProductionAssetStatus.Ready : CreatorProductionAssetStatus.Missing,
@@ -330,6 +570,10 @@ export class CreatorAssetStore {
           getImageName(image),
           image.mimeType || null,
           0,
+          CreatorAssetAdoptionStatus.Unset,
+          '[]',
+          null,
+          null,
           JSON.stringify({ generatedImageSource: image.source || null }),
           now,
           now,
@@ -427,6 +671,91 @@ export class CreatorAssetStore {
     return row ? this.mapRunRow(row) : null;
   }
 
+  private ensureDefaultProject(): void {
+    const now = Date.now();
+    this.db.prepare(`
+      INSERT OR IGNORE INTO creator_projects (id, name, description, created_at, updated_at)
+      VALUES (?, ?, NULL, ?, ?)
+    `).run(CreatorStudioDefaultProjectId, 'Default Project', now, now);
+    this.db.prepare(`
+      INSERT OR IGNORE INTO creator_workspace_state (key, value, updated_at)
+      VALUES (?, ?, ?)
+    `).run(CreatorWorkspaceStateKey.CurrentProjectId, CreatorStudioDefaultProjectId, now);
+  }
+
+  private getCurrentProjectId(): string {
+    this.ensureDefaultProject();
+    const row = this.db.prepare(`
+      SELECT value
+      FROM creator_workspace_state
+      WHERE key = ?
+    `).get(CreatorWorkspaceStateKey.CurrentProjectId) as { value: string } | undefined;
+    const projectId = row?.value || CreatorStudioDefaultProjectId;
+    const project = this.db.prepare('SELECT id FROM creator_projects WHERE id = ?').get(projectId);
+    return project ? projectId : CreatorStudioDefaultProjectId;
+  }
+
+  private listProjects(): CreatorWorkspaceSnapshot['projects'] {
+    const rows = this.db.prepare(`
+      SELECT id, name, description, created_at, updated_at
+      FROM creator_projects
+      ORDER BY updated_at DESC, created_at DESC
+    `).all() as ProjectRow[];
+    return rows.map((row) => ({
+      id: row.id,
+      name: row.name,
+      description: row.description,
+      createdAt: row.created_at,
+      updatedAt: row.updated_at,
+    }));
+  }
+
+  private listCollections(projectId: string): CreatorAssetCollectionRecord[] {
+    const rows = this.db.prepare(`
+      SELECT
+        c.id,
+        c.project_id,
+        c.name,
+        c.description,
+        c.created_at,
+        c.updated_at,
+        COUNT(ci.asset_id) AS asset_count
+      FROM creator_asset_collections c
+      LEFT JOIN creator_asset_collection_items ci ON ci.collection_id = c.id
+      WHERE c.project_id = ?
+      GROUP BY c.id
+      ORDER BY c.updated_at DESC, c.created_at DESC
+    `).all(projectId) as CollectionRow[];
+    return rows.map((row) => ({
+      id: row.id,
+      projectId: row.project_id,
+      name: row.name,
+      description: row.description,
+      createdAt: row.created_at,
+      updatedAt: row.updated_at,
+      assetCount: row.asset_count,
+    }));
+  }
+
+  private getAssetCollectionIds(assetId: string): string[] {
+    const rows = this.db.prepare(`
+      SELECT collection_id
+      FROM creator_asset_collection_items
+      WHERE asset_id = ?
+      ORDER BY added_at DESC
+    `).all(assetId) as Array<{ collection_id: string }>;
+    return rows.map((row) => row.collection_id);
+  }
+
+  private isAssetSelected(projectId: string, assetId: string): boolean {
+    const row = this.db.prepare(`
+      SELECT status
+      FROM creator_asset_selections
+      WHERE project_id = ? AND asset_id = ?
+    `).get(projectId, assetId) as { status: string } | undefined;
+    return row?.status === CreatorAssetSelectionStatus.Selected;
+  }
+
   private mapRunRow(row: ProductionRunRow): CreatorProductionRunRecord {
     return {
       id: row.id,
@@ -446,8 +775,13 @@ export class CreatorAssetStore {
 
   private mapAssetRow(row: ProductionAssetRow): CreatorProductionAssetRecord {
     const exists = fs.existsSync(row.file_path);
+    const projectId = row.project_id || CreatorStudioDefaultProjectId;
+    const adoptionStatus = isAdoptionStatus(row.adoption_status)
+      ? row.adoption_status
+      : CreatorAssetAdoptionStatus.Unset;
     return {
       id: row.id,
+      projectId,
       kind: row.kind as CreatorProductionAssetKind,
       status: exists
         ? row.status as CreatorProductionAssetStatus
@@ -465,6 +799,12 @@ export class CreatorAssetStore {
       fileName: row.file_name,
       mimeType: row.mime_type,
       favorite: Boolean(row.favorite),
+      adoptionStatus,
+      tags: parseJsonArray(row.tags_json),
+      collectionIds: this.getAssetCollectionIds(row.id),
+      selected: this.isAssetSelected(projectId, row.id),
+      licenseNote: row.license_note,
+      usageNote: row.usage_note,
       createdAt: row.created_at,
       updatedAt: row.updated_at,
       sourceSessionAvailable: Boolean(row.source_session_available),

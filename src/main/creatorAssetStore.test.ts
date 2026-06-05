@@ -1,7 +1,12 @@
 import Database from 'better-sqlite3';
 import { afterEach, beforeEach, describe, expect, test } from 'vitest';
 
-import { CreatorProductionAssetStatus, CreatorProductionRunStatus } from '../shared/creatorStudio/constants';
+import {
+  CreatorAssetAdoptionStatus,
+  CreatorProductionAssetStatus,
+  CreatorProductionRunStatus,
+  CreatorStudioDefaultProjectId,
+} from '../shared/creatorStudio/constants';
 import { CreatorAssetStore, parseCreatorStudioSourceContext } from './creatorAssetStore';
 import { ensureCreatorProductionSchema } from './creatorProductionSchema';
 
@@ -243,5 +248,62 @@ describe('CreatorAssetStore', () => {
 
     expect(asset.sourceSessionAvailable).toBe(false);
     expect(source?.session).toBeNull();
+  });
+
+  test('keeps project asset collections isolated by current project', () => {
+    db.prepare('INSERT INTO cowork_sessions (id, title, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?)')
+      .run('session-1', 'Creative Producer', 'running', 1, 1);
+
+    const workspace = store.createProject({ name: 'Launch Campaign' });
+    const projectId = workspace.currentProjectId;
+    expect(projectId).not.toBe(CreatorStudioDefaultProjectId);
+
+    store.handleCoworkMessageInserted({
+      sessionId: 'session-1',
+      message: {
+        id: 'message-user',
+        type: 'user',
+        content: creatorDraft,
+        timestamp: 10,
+        sequence: 1,
+      },
+    });
+    store.handleCoworkMessageInserted({
+      sessionId: 'session-1',
+      message: {
+        id: 'message-assistant',
+        type: 'assistant',
+        content: 'Generated image',
+        timestamp: 20,
+        sequence: 2,
+        metadata: {
+          generatedImages: [{ path: '/tmp/generated-project.png' }],
+        },
+      },
+    });
+
+    expect(store.listAssets({ projectId }).total).toBe(1);
+    expect(store.listAssets({ projectId: CreatorStudioDefaultProjectId }).total).toBe(0);
+
+    const collectionWorkspace = store.createCollection({ projectId, name: 'Shortlist' });
+    const collection = collectionWorkspace.collections.find((item) => item.name === 'Shortlist')!;
+    const asset = store.listAssets({ projectId }).assets[0];
+    const updated = store.updateAsset({
+      assetId: asset.id,
+      adoptionStatus: CreatorAssetAdoptionStatus.Shortlisted,
+      tags: ['hero', 'launch'],
+      licenseNote: 'Internal generated asset.',
+      selected: true,
+    });
+    expect(updated?.adoptionStatus).toBe(CreatorAssetAdoptionStatus.Shortlisted);
+    expect(updated?.tags).toEqual(['hero', 'launch']);
+    expect(updated?.licenseNote).toBe('Internal generated asset.');
+    expect(updated?.selected).toBe(true);
+
+    const collected = store.addAssetToCollection({ assetId: asset.id, collectionId: collection.id });
+    expect(collected?.collectionIds).toContain(collection.id);
+    expect(store.listAssets({ projectId, collectionId: collection.id }).total).toBe(1);
+    expect(store.listAssets({ projectId, tag: 'hero' }).total).toBe(1);
+    expect(store.listAssets({ projectId, adoptionStatus: CreatorAssetAdoptionStatus.Shortlisted }).total).toBe(1);
   });
 });

@@ -534,14 +534,26 @@ contextBridge.exposeInMainWorld('electron', {
     },
   },
   creatorStudio: {
-    listAssets: (input?: { limit?: number; offset?: number }) =>
+    listAssets: (input?: Record<string, unknown>) =>
       ipcRenderer.invoke(CreatorStudioIpcChannel.AssetList, input),
     getAssetSource: (assetId: string) =>
       ipcRenderer.invoke(CreatorStudioIpcChannel.AssetGetSource, assetId),
     setAssetFavorite: (input: { assetId: string; favorite: boolean }) =>
       ipcRenderer.invoke(CreatorStudioIpcChannel.AssetSetFavorite, input),
+    updateAsset: (input: Record<string, unknown>) =>
+      ipcRenderer.invoke(CreatorStudioIpcChannel.AssetUpdate, input),
     revealAssetInFolder: (assetId: string) =>
       ipcRenderer.invoke(CreatorStudioIpcChannel.AssetRevealInFolder, assetId),
+    getWorkspace: () =>
+      ipcRenderer.invoke(CreatorStudioIpcChannel.WorkspaceGet),
+    createProject: (input: { name: string; description?: string }) =>
+      ipcRenderer.invoke(CreatorStudioIpcChannel.ProjectCreate, input),
+    setCurrentProject: (projectId: string) =>
+      ipcRenderer.invoke(CreatorStudioIpcChannel.ProjectSetCurrent, projectId),
+    createCollection: (input: { projectId: string; name: string; description?: string }) =>
+      ipcRenderer.invoke(CreatorStudioIpcChannel.CollectionCreate, input),
+    addAssetToCollection: (input: { assetId: string; collectionId: string }) =>
+      ipcRenderer.invoke(CreatorStudioIpcChannel.CollectionAddAsset, input),
   },
   dialog: {
     selectDirectory: () => ipcRenderer.invoke('dialog:selectDirectory'),

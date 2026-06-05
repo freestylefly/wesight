@@ -6,6 +6,8 @@ import {
   CreatorStudioAssetListDefaultLimit,
   CreatorStudioAssetListMaxLimit,
   CreatorStudioIpcChannel,
+  isCreatorAssetAdoptionStatus,
+  isCreatorProductionAssetSource,
 } from '../../../shared/creatorStudio/constants';
 import type { CreatorAssetStore } from '../../creatorAssetStore';
 
@@ -18,14 +20,26 @@ const toTrimmedString = (value: unknown): string | null => (
   typeof value === 'string' && value.trim() ? value.trim() : null
 );
 
-const normalizeListInput = (input: unknown): { limit: number; offset: number } => {
+const normalizeListInput = (input: unknown) => {
   const record = input && typeof input === 'object' ? input as Record<string, unknown> : {};
   const rawLimit = typeof record.limit === 'number' ? record.limit : CreatorStudioAssetListDefaultLimit;
   const rawOffset = typeof record.offset === 'number' ? record.offset : 0;
   return {
+    ...(toTrimmedString(record.projectId) ? { projectId: toTrimmedString(record.projectId)! } : {}),
+    ...(toTrimmedString(record.collectionId) ? { collectionId: toTrimmedString(record.collectionId)! } : {}),
+    ...(isCreatorProductionAssetSource(record.source) ? { source: record.source } : {}),
+    ...(toTrimmedString(record.templateId) ? { templateId: toTrimmedString(record.templateId)! } : {}),
+    ...(toTrimmedString(record.tag) ? { tag: toTrimmedString(record.tag)! } : {}),
+    ...(isCreatorAssetAdoptionStatus(record.adoptionStatus) ? { adoptionStatus: record.adoptionStatus } : {}),
+    ...(typeof record.favorite === 'boolean' ? { favorite: record.favorite } : {}),
     limit: Math.max(1, Math.min(Math.floor(rawLimit), CreatorStudioAssetListMaxLimit)),
     offset: Math.max(0, Math.floor(rawOffset)),
   };
+};
+
+const normalizeStringArray = (value: unknown): string[] | undefined => {
+  if (!Array.isArray(value)) return undefined;
+  return value.filter((item): item is string => typeof item === 'string');
 };
 
 export const registerCreatorStudioIpcHandlers = (
@@ -85,6 +99,35 @@ export const registerCreatorStudioIpcHandlers = (
     }
   });
 
+  ipcMain.handle(CreatorStudioIpcChannel.AssetUpdate, async (_event, input: unknown) => {
+    try {
+      const record = input && typeof input === 'object' ? input as Record<string, unknown> : {};
+      const assetId = toTrimmedString(record.assetId);
+      if (!assetId) {
+        return { success: false, error: 'assetId is required' };
+      }
+      const asset = getCreatorAssetStore().updateAsset({
+        assetId,
+        ...(toTrimmedString(record.projectId) ? { projectId: toTrimmedString(record.projectId)! } : {}),
+        ...(typeof record.favorite === 'boolean' ? { favorite: record.favorite } : {}),
+        ...(isCreatorAssetAdoptionStatus(record.adoptionStatus) ? { adoptionStatus: record.adoptionStatus } : {}),
+        ...(normalizeStringArray(record.tags) ? { tags: normalizeStringArray(record.tags)! } : {}),
+        ...(record.licenseNote === null || typeof record.licenseNote === 'string' ? { licenseNote: record.licenseNote } : {}),
+        ...(record.usageNote === null || typeof record.usageNote === 'string' ? { usageNote: record.usageNote } : {}),
+        ...(typeof record.selected === 'boolean' ? { selected: record.selected } : {}),
+      });
+      if (!asset) {
+        return { success: false, error: 'Asset not found' };
+      }
+      return { success: true, asset };
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to update creator asset',
+      };
+    }
+  });
+
   ipcMain.handle(CreatorStudioIpcChannel.AssetRevealInFolder, async (_event, input: unknown) => {
     try {
       const assetId = toTrimmedString(input);
@@ -104,6 +147,99 @@ export const registerCreatorStudioIpcHandlers = (
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Failed to reveal creator asset',
+      };
+    }
+  });
+
+  ipcMain.handle(CreatorStudioIpcChannel.WorkspaceGet, async () => {
+    try {
+      return { success: true, workspace: getCreatorAssetStore().getWorkspace() };
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to load creator workspace',
+      };
+    }
+  });
+
+  ipcMain.handle(CreatorStudioIpcChannel.ProjectCreate, async (_event, input: unknown) => {
+    try {
+      const record = input && typeof input === 'object' ? input as Record<string, unknown> : {};
+      const name = toTrimmedString(record.name);
+      if (!name) {
+        return { success: false, error: 'Project name is required' };
+      }
+      return {
+        success: true,
+        workspace: getCreatorAssetStore().createProject({
+          name,
+          ...(toTrimmedString(record.description) ? { description: toTrimmedString(record.description)! } : {}),
+        }),
+      };
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to create creator project',
+      };
+    }
+  });
+
+  ipcMain.handle(CreatorStudioIpcChannel.ProjectSetCurrent, async (_event, input: unknown) => {
+    try {
+      const projectId = toTrimmedString(input);
+      if (!projectId) {
+        return { success: false, error: 'projectId is required' };
+      }
+      return { success: true, workspace: getCreatorAssetStore().setCurrentProject(projectId) };
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to switch creator project',
+      };
+    }
+  });
+
+  ipcMain.handle(CreatorStudioIpcChannel.CollectionCreate, async (_event, input: unknown) => {
+    try {
+      const record = input && typeof input === 'object' ? input as Record<string, unknown> : {};
+      const projectId = toTrimmedString(record.projectId);
+      const name = toTrimmedString(record.name);
+      if (!projectId || !name) {
+        return { success: false, error: 'projectId and collection name are required' };
+      }
+      return {
+        success: true,
+        workspace: getCreatorAssetStore().createCollection({
+          projectId,
+          name,
+          ...(toTrimmedString(record.description) ? { description: toTrimmedString(record.description)! } : {}),
+        }),
+      };
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to create creator collection',
+      };
+    }
+  });
+
+  ipcMain.handle(CreatorStudioIpcChannel.CollectionAddAsset, async (_event, input: unknown) => {
+    try {
+      const record = input && typeof input === 'object' ? input as Record<string, unknown> : {};
+      const assetId = toTrimmedString(record.assetId);
+      const collectionId = toTrimmedString(record.collectionId);
+      if (!assetId || !collectionId) {
+        return { success: false, error: 'assetId and collectionId are required' };
+      }
+      const asset = getCreatorAssetStore().addAssetToCollection({ assetId, collectionId });
+      if (!asset) {
+        return { success: false, error: 'Asset or collection not found' };
+      }
+      return { success: true, asset };
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to add asset to collection',
       };
     }
   });

@@ -334,6 +334,49 @@ const CreatorStudioView: React.FC<CreatorStudioViewProps> = ({
     setActiveTab(CreatorStudioTab.Builder);
   };
 
+  const sendAssetToCowork = async (asset: CreatorProductionAssetRecord) => {
+    setIsSendingToCowork(true);
+    try {
+      dispatch(setActiveSkillIds(installedRecommendedSkillIds));
+      const promptText = asset.promptText || (asset.promptSpec ? JSON.stringify(asset.promptSpec, null, 2) : '');
+      const promptSpec = {
+        ...(asset.promptSpec ?? {}),
+        sourceTitle: asset.promptSpec?.sourceTitle ?? asset.fileName,
+        templateId: asset.templateId ?? asset.promptSpec?.templateId,
+        caseIds: asset.caseIds,
+        variantOfAssetId: asset.id,
+      };
+      await onSendToCowork([
+        '[Creator Studio]',
+        '',
+        i18nService.t('creatorAssetCoworkDraftIntro'),
+        '',
+        `assetId: ${asset.id}`,
+        `templateId: ${asset.templateId || 'none'}`,
+        `caseIds: ${asset.caseIds.length > 0 ? asset.caseIds.join(', ') : 'none'}`,
+        `variantOfAssetId: ${asset.id}`,
+        `localPath: ${asset.filePath}`,
+        '',
+        'PromptSpec:',
+        '```json',
+        JSON.stringify(promptSpec, null, 2),
+        '```',
+        '',
+        'Prompt:',
+        '```text',
+        promptText,
+        '```',
+      ].join('\n'), {
+        activeSkillIds: installedRecommendedSkillIds,
+        preferCreativeProducer: true,
+      });
+    } catch {
+      dispatchToast(i18nService.t('creatorSendToCoworkFailed'));
+    } finally {
+      setIsSendingToCowork(false);
+    }
+  };
+
   const sendToCowork = async (
     promptSpec: CreatorPromptSpec,
     promptText: string,
@@ -456,6 +499,7 @@ const CreatorStudioView: React.FC<CreatorStudioViewProps> = ({
           <CreatorAssetGrid
             onOpenCoworkSession={onOpenCoworkSession}
             onUseAssetAsReference={useAssetAsReference}
+            onSendAssetToCowork={sendAssetToCowork}
           />
         )}
       </main>

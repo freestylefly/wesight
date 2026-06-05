@@ -1,5 +1,11 @@
 import type Database from 'better-sqlite3';
 
+import { CreatorAssetAdoptionStatus, CreatorStudioDefaultProjectId } from '../shared/creatorStudio/constants';
+
+const CreatorWorkspaceStateKey = {
+  CurrentProjectId: 'current_project_id',
+} as const;
+
 const addColumnIfMissing = (
   db: Database.Database,
   tableName: string,
@@ -14,6 +20,67 @@ const addColumnIfMissing = (
 };
 
 export const ensureCreatorProductionSchema = (db: Database.Database): void => {
+  const now = Date.now();
+
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS creator_projects (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      description TEXT,
+      created_at INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL
+    );
+  `);
+
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS creator_workspace_state (
+      key TEXT PRIMARY KEY,
+      value TEXT NOT NULL,
+      updated_at INTEGER NOT NULL
+    );
+  `);
+
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS creator_asset_collections (
+      id TEXT PRIMARY KEY,
+      project_id TEXT NOT NULL,
+      name TEXT NOT NULL,
+      description TEXT,
+      created_at INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL
+    );
+  `);
+
+  db.exec(`
+    CREATE INDEX IF NOT EXISTS idx_creator_asset_collections_project_id
+    ON creator_asset_collections(project_id);
+  `);
+
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS creator_asset_collection_items (
+      collection_id TEXT NOT NULL,
+      asset_id TEXT NOT NULL,
+      added_at INTEGER NOT NULL,
+      PRIMARY KEY(collection_id, asset_id)
+    );
+  `);
+
+  db.exec(`
+    CREATE INDEX IF NOT EXISTS idx_creator_asset_collection_items_asset_id
+    ON creator_asset_collection_items(asset_id);
+  `);
+
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS creator_asset_selections (
+      project_id TEXT NOT NULL,
+      asset_id TEXT NOT NULL,
+      status TEXT NOT NULL,
+      created_at INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL,
+      PRIMARY KEY(project_id, asset_id)
+    );
+  `);
+
   db.exec(`
     CREATE TABLE IF NOT EXISTS production_runs (
       id TEXT PRIMARY KEY,
@@ -53,6 +120,7 @@ export const ensureCreatorProductionSchema = (db: Database.Database): void => {
   db.exec(`
     CREATE TABLE IF NOT EXISTS production_assets (
       id TEXT PRIMARY KEY,
+      project_id TEXT,
       kind TEXT NOT NULL,
       title TEXT,
       status TEXT NOT NULL,
@@ -74,6 +142,10 @@ export const ensureCreatorProductionSchema = (db: Database.Database): void => {
       file_name TEXT NOT NULL,
       mime_type TEXT,
       favorite INTEGER NOT NULL DEFAULT 0,
+      adoption_status TEXT NOT NULL DEFAULT 'unset',
+      tags_json TEXT NOT NULL DEFAULT '[]',
+      license_note TEXT,
+      usage_note TEXT,
       metadata TEXT,
       created_at INTEGER NOT NULL,
       updated_at INTEGER NOT NULL,
@@ -96,11 +168,6 @@ export const ensureCreatorProductionSchema = (db: Database.Database): void => {
     ON production_assets(run_id);
   `);
 
-  db.exec(`
-    CREATE INDEX IF NOT EXISTS idx_production_assets_variant_of_asset_id
-    ON production_assets(variant_of_asset_id);
-  `);
-
   addColumnIfMissing(db, 'production_runs', 'domain', "TEXT NOT NULL DEFAULT 'creator_studio'");
   addColumnIfMissing(db, 'production_runs', 'provider', 'TEXT');
   addColumnIfMissing(db, 'production_runs', 'model', 'TEXT');
@@ -117,10 +184,46 @@ export const ensureCreatorProductionSchema = (db: Database.Database): void => {
   `);
 
   addColumnIfMissing(db, 'production_assets', 'title', 'TEXT');
+  addColumnIfMissing(db, 'production_assets', 'project_id', 'TEXT');
   addColumnIfMissing(db, 'production_assets', 'source_run_id', 'TEXT');
   addColumnIfMissing(db, 'production_assets', 'variant_of_asset_id', 'TEXT');
   addColumnIfMissing(db, 'production_assets', 'source_session_id', 'TEXT');
   addColumnIfMissing(db, 'production_assets', 'source_message_id', 'TEXT');
   addColumnIfMissing(db, 'production_assets', 'case_ids_json', "TEXT NOT NULL DEFAULT '[]'");
   addColumnIfMissing(db, 'production_assets', 'prompt_spec_json', 'TEXT');
+  addColumnIfMissing(db, 'production_assets', 'adoption_status', `TEXT NOT NULL DEFAULT '${CreatorAssetAdoptionStatus.Unset}'`);
+  addColumnIfMissing(db, 'production_assets', 'tags_json', "TEXT NOT NULL DEFAULT '[]'");
+  addColumnIfMissing(db, 'production_assets', 'license_note', 'TEXT');
+  addColumnIfMissing(db, 'production_assets', 'usage_note', 'TEXT');
+
+  db.prepare(`
+    INSERT OR IGNORE INTO creator_projects (id, name, description, created_at, updated_at)
+    VALUES (?, ?, NULL, ?, ?)
+  `).run(CreatorStudioDefaultProjectId, 'Default Project', now, now);
+
+  db.prepare(`
+    INSERT OR IGNORE INTO creator_workspace_state (key, value, updated_at)
+    VALUES (?, ?, ?)
+  `).run(CreatorWorkspaceStateKey.CurrentProjectId, CreatorStudioDefaultProjectId, now);
+
+  db.prepare(`
+    UPDATE production_assets
+    SET project_id = ?
+    WHERE project_id IS NULL OR project_id = ''
+  `).run(CreatorStudioDefaultProjectId);
+
+  db.exec(`
+    CREATE INDEX IF NOT EXISTS idx_production_assets_project_id
+    ON production_assets(project_id);
+  `);
+
+  db.exec(`
+    CREATE INDEX IF NOT EXISTS idx_production_assets_variant_of_asset_id
+    ON production_assets(variant_of_asset_id);
+  `);
+
+  db.exec(`
+    CREATE INDEX IF NOT EXISTS idx_production_assets_adoption_status
+    ON production_assets(adoption_status);
+  `);
 };

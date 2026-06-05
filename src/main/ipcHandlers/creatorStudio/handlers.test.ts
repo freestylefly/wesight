@@ -26,6 +26,12 @@ const createStore = () => ({
   getAsset: vi.fn(),
   getAssetSource: vi.fn(),
   setFavorite: vi.fn(),
+  updateAsset: vi.fn(),
+  getWorkspace: vi.fn(() => ({ currentProjectId: 'project-1', projects: [], collections: [] })),
+  createProject: vi.fn(() => ({ currentProjectId: 'project-2', projects: [], collections: [] })),
+  setCurrentProject: vi.fn(() => ({ currentProjectId: 'project-1', projects: [], collections: [] })),
+  createCollection: vi.fn(() => ({ currentProjectId: 'project-1', projects: [], collections: [] })),
+  addAssetToCollection: vi.fn(),
 }) as unknown as CreatorAssetStore;
 
 beforeEach(() => {
@@ -39,7 +45,13 @@ test('registers creator studio asset IPC handlers with constant channels', () =>
   expect(ipcMain.handle).toHaveBeenCalledWith(CreatorStudioIpcChannel.AssetList, expect.any(Function));
   expect(ipcMain.handle).toHaveBeenCalledWith(CreatorStudioIpcChannel.AssetGetSource, expect.any(Function));
   expect(ipcMain.handle).toHaveBeenCalledWith(CreatorStudioIpcChannel.AssetSetFavorite, expect.any(Function));
+  expect(ipcMain.handle).toHaveBeenCalledWith(CreatorStudioIpcChannel.AssetUpdate, expect.any(Function));
   expect(ipcMain.handle).toHaveBeenCalledWith(CreatorStudioIpcChannel.AssetRevealInFolder, expect.any(Function));
+  expect(ipcMain.handle).toHaveBeenCalledWith(CreatorStudioIpcChannel.WorkspaceGet, expect.any(Function));
+  expect(ipcMain.handle).toHaveBeenCalledWith(CreatorStudioIpcChannel.ProjectCreate, expect.any(Function));
+  expect(ipcMain.handle).toHaveBeenCalledWith(CreatorStudioIpcChannel.ProjectSetCurrent, expect.any(Function));
+  expect(ipcMain.handle).toHaveBeenCalledWith(CreatorStudioIpcChannel.CollectionCreate, expect.any(Function));
+  expect(ipcMain.handle).toHaveBeenCalledWith(CreatorStudioIpcChannel.CollectionAddAsset, expect.any(Function));
 });
 
 test('clamps asset list parameters before reaching the store', async () => {

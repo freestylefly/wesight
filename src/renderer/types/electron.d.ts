@@ -16,9 +16,15 @@ import type {
 import type { CoworkSessionRuntimeSnapshot } from '@shared/cowork/runtimeSnapshot';
 import type { CoworkStudioAssetsResult } from '@shared/cowork/studioAssets';
 import type {
+  CreatorAssetCollectionAddInput,
+  CreatorAssetCollectionCreateInput,
+  CreatorAssetUpdateInput,
+  CreatorProductionAssetListInput,
   CreatorProductionAssetListResult,
   CreatorProductionAssetRecord,
   CreatorProductionAssetSourceLookup,
+  CreatorProjectCreateInput,
+  CreatorWorkspaceSnapshot,
 } from '@shared/creatorStudio/types';
 import type { FeishuEngineKeyType, FeishuManagementModeType, FeishuRuntimeOwnershipType, WeixinOwnershipType } from '@shared/im/constants';
 import type { DesktopPetTaskSnapshot, PetConfig, PetPosition } from '@shared/pet/constants';
@@ -771,7 +777,7 @@ interface IElectronAPI {
     onSessionsChanged: (callback: () => void) => () => void;
   };
   creatorStudio: {
-    listAssets: (input?: { limit?: number; offset?: number }) => Promise<{
+    listAssets: (input?: CreatorProductionAssetListInput) => Promise<{
       success: boolean;
       assets?: CreatorProductionAssetListResult['assets'];
       total?: number;
@@ -787,7 +793,37 @@ interface IElectronAPI {
       asset?: CreatorProductionAssetRecord;
       error?: string;
     }>;
+    updateAsset: (input: CreatorAssetUpdateInput) => Promise<{
+      success: boolean;
+      asset?: CreatorProductionAssetRecord;
+      error?: string;
+    }>;
     revealAssetInFolder: (assetId: string) => Promise<{ success: boolean; error?: string }>;
+    getWorkspace: () => Promise<{
+      success: boolean;
+      workspace?: CreatorWorkspaceSnapshot;
+      error?: string;
+    }>;
+    createProject: (input: CreatorProjectCreateInput) => Promise<{
+      success: boolean;
+      workspace?: CreatorWorkspaceSnapshot;
+      error?: string;
+    }>;
+    setCurrentProject: (projectId: string) => Promise<{
+      success: boolean;
+      workspace?: CreatorWorkspaceSnapshot;
+      error?: string;
+    }>;
+    createCollection: (input: CreatorAssetCollectionCreateInput) => Promise<{
+      success: boolean;
+      workspace?: CreatorWorkspaceSnapshot;
+      error?: string;
+    }>;
+    addAssetToCollection: (input: CreatorAssetCollectionAddInput) => Promise<{
+      success: boolean;
+      asset?: CreatorProductionAssetRecord;
+      error?: string;
+    }>;
   };
   dialog: {
     selectDirectory: () => Promise<{ success: boolean; path: string | null }>;
