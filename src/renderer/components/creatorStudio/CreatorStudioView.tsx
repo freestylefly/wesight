@@ -961,8 +961,6 @@ const Gallery: React.FC<{
   onLoadMore,
 }) => {
   const [thumbnailSize, setThumbnailSize] = useState(GALLERY_THUMBNAIL_SIZE_DEFAULT);
-  const imageFrameHeight = Math.round(thumbnailSize * 0.78);
-
   return (
     <section className="space-y-4 p-4">
       <div className="flex flex-wrap items-center gap-3">
@@ -1024,14 +1022,15 @@ const Gallery: React.FC<{
       ) : (
         <>
           <div
-            className="grid gap-3"
-            style={{ gridTemplateColumns: `repeat(auto-fill, minmax(${thumbnailSize}px, 1fr))` }}
+            style={{
+              columnWidth: `${thumbnailSize}px`,
+              columnGap: '0.75rem',
+            }}
           >
             {filteredCases.map((item) => (
               <CaseCard
                 key={item.id}
                 item={item}
-                imageFrameHeight={imageFrameHeight}
                 onSelect={onSelectCase}
                 onUseCase={onUseCase}
               />
@@ -1074,41 +1073,42 @@ const FilterSelect: React.FC<{
 
 const CaseCard: React.FC<{
   item: CreatorStudioCase;
-  imageFrameHeight: number;
   onSelect: (item: CreatorStudioCase) => void;
   onUseCase: (item: CreatorStudioCase) => void;
-}> = ({ item, imageFrameHeight, onSelect, onUseCase }) => (
-  <article className="overflow-hidden rounded-lg border border-border bg-surface">
+}> = ({ item, onSelect, onUseCase }) => (
+  <article className="mb-3 inline-block w-full break-inside-avoid overflow-hidden rounded-lg border border-border bg-surface align-top">
     <button type="button" className="block w-full text-left" onClick={() => onSelect(item)}>
       <div
-        className="flex items-center justify-center bg-surface-raised p-2"
-        style={{ height: imageFrameHeight }}
+        className="relative flex w-full items-center justify-center overflow-hidden bg-surface-raised"
+        style={{
+          aspectRatio: item.imageOriginal
+            ? `${item.imageOriginal.width} / ${item.imageOriginal.height}`
+            : '4 / 3',
+        }}
       >
         <PlaceholderImage src={item.image} alt={item.imageAlt} fit="contain" className="h-full w-full" />
+        <div className="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/60 via-black/25 to-transparent p-2">
+          <div className="flex flex-wrap gap-1">
+            {[item.category, ...item.styles.slice(0, 2), ...item.scenes.slice(0, 1)].map((tag) => (
+              <span key={tag} className="rounded-md bg-white/90 px-1.5 py-0.5 text-[10px] font-medium text-gray-700 shadow-sm">
+                {tag}
+              </span>
+            ))}
+          </div>
+        </div>
       </div>
-      <div className="space-y-2 p-3">
-        <div className="line-clamp-2 min-h-[40px] text-sm font-semibold">{item.title}</div>
-        <div className="flex flex-wrap gap-1.5">
-          {[item.category, ...item.styles.slice(0, 2), ...item.scenes.slice(0, 1)].map((tag) => (
-            <span key={tag} className="rounded-md bg-surface-raised px-2 py-0.5 text-[11px] text-secondary">
-              {tag}
-            </span>
-          ))}
-        </div>
-        <div className="flex items-center justify-between gap-2 text-xs text-muted">
-          <span className="truncate">{item.sourceLabel || i18nService.t('creatorUnknownSource')}</span>
-          <span className="shrink-0 tabular-nums">{formatImageDimensions(item.imageOriginal)}</span>
-        </div>
+      <div className="px-3 pb-2 pt-2">
+        <div className="line-clamp-2 text-sm font-semibold leading-5">{item.title}</div>
       </div>
     </button>
-    <div className="border-t border-border p-2">
+    <div className="px-3 pb-3">
       <button
         type="button"
         onClick={() => onUseCase(item)}
-        className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-primary px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-primary-hover"
+        className="inline-flex h-8 w-full items-center justify-center gap-1.5 rounded-md bg-primary px-2.5 text-xs font-medium text-white transition-colors hover:bg-primary-hover"
       >
-        <SparklesIcon className="h-4 w-4" />
-        {i18nService.t('creatorUseCase')}
+        <SparklesIcon className="h-3.5 w-3.5" />
+        {i18nService.t('creatorUseCaseShort')}
       </button>
     </div>
   </article>
@@ -1120,45 +1120,50 @@ const TemplateLibrary: React.FC<{
   onSelectTemplate: (template: CreatorStudioTemplate) => void;
   onUseTemplate: (template: CreatorStudioTemplate) => void;
 }> = ({ templates, templateCasesById, onSelectTemplate, onUseTemplate }) => (
-  <section className="grid grid-cols-1 gap-4 p-4 xl:grid-cols-2">
+  <section
+    className="grid gap-3 p-4"
+    style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 400px), 1fr))' }}
+  >
     {templates.map((template) => {
       const exampleCases = template.exampleCases
         .map((sourceCaseId) => templateCasesById.get(sourceCaseId))
         .filter((item): item is CreatorStudioCase => Boolean(item));
       return (
-        <article key={template.id} className="rounded-lg border border-border bg-surface p-5">
-          <div className="flex gap-4">
-            <PlaceholderImage src={template.cover} alt={getText(template.title)} className="h-32 w-32 shrink-0 rounded-lg" />
-            <div className="min-w-0 flex-1">
+        <article key={template.id} className="h-52 max-h-52 overflow-hidden rounded-lg border border-border bg-surface">
+          <div className="grid h-full grid-cols-[42%_1fr]">
+            <PlaceholderImage src={template.cover} alt={getText(template.title)} className="h-full w-full" />
+            <div className="flex min-h-0 min-w-0 flex-col p-3">
               <h2 className="line-clamp-2 text-base font-semibold">{getText(template.title)}</h2>
-              <p className="mt-2 line-clamp-3 text-sm leading-5 text-secondary">{getText(template.description)}</p>
+              <p className="mt-2 line-clamp-2 text-sm leading-5 text-secondary">{getText(template.description)}</p>
               <div className="mt-2 flex flex-wrap gap-1.5">
-                {template.tags.slice(0, 4).map((tag) => (
+                {template.tags.slice(0, 3).map((tag) => (
                   <span key={tag} className="rounded-md bg-surface-raised px-2 py-0.5 text-[11px] text-secondary">
                     {tag}
                   </span>
                 ))}
               </div>
+              <div className="mt-auto pt-3">
+                <div className="text-xs text-muted">
+                  {i18nService.t('creatorExampleCases').replace('{count}', String(exampleCases.length))}
+                </div>
+                <div className="mt-2 flex justify-end gap-2">
+                  <button
+                    type="button"
+                    onClick={() => onSelectTemplate(template)}
+                    className="rounded-lg border border-border px-2.5 py-1.5 text-xs font-medium text-secondary transition-colors hover:bg-surface-raised hover:text-foreground"
+                  >
+                    {i18nService.t('creatorDetails')}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => onUseTemplate(template)}
+                    className="rounded-lg bg-primary px-2.5 py-1.5 text-xs font-medium text-white transition-colors hover:bg-primary-hover"
+                  >
+                    {i18nService.t('creatorUseTemplate')}
+                  </button>
+                </div>
+              </div>
             </div>
-          </div>
-          <div className="mt-3 text-xs text-muted">
-            {i18nService.t('creatorExampleCases').replace('{count}', String(exampleCases.length))}
-          </div>
-          <div className="mt-3 flex justify-end gap-2">
-            <button
-              type="button"
-              onClick={() => onSelectTemplate(template)}
-              className="rounded-lg border border-border px-2.5 py-1.5 text-xs font-medium text-secondary transition-colors hover:bg-surface-raised hover:text-foreground"
-            >
-              {i18nService.t('creatorDetails')}
-            </button>
-            <button
-              type="button"
-              onClick={() => onUseTemplate(template)}
-              className="rounded-lg bg-primary px-2.5 py-1.5 text-xs font-medium text-white transition-colors hover:bg-primary-hover"
-            >
-              {i18nService.t('creatorUseTemplate')}
-            </button>
           </div>
         </article>
       );
