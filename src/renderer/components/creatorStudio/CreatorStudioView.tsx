@@ -5,15 +5,20 @@ import {
   DocumentDuplicateIcon,
   MagnifyingGlassIcon,
   PhotoIcon,
+  RocketLaunchIcon,
   SparklesIcon,
   XMarkIcon,
 } from '@heroicons/react/24/outline';
 import React, { useEffect, useMemo, useState } from 'react';
+import { useDispatch, useSelector } from 'react-redux';
 
 import casesData from '../../data/creatorStudio/cases.json';
 import manifestData from '../../data/creatorStudio/manifest.json';
 import styleLibraryData from '../../data/creatorStudio/style-library.json';
 import { i18nService } from '../../services/i18n';
+import { skillService } from '../../services/skill';
+import { RootState } from '../../store';
+import { setActiveSkillIds,setSkills } from '../../store/slices/skillSlice';
 import type {
   CreatorPromptSpec,
   CreatorStudioCase,
@@ -24,9 +29,13 @@ import type {
 import { CreatorStudioSourceType } from '../../types/creatorStudio';
 import {
   buildPromptSpec,
+  CREATOR_STUDIO_RECOMMENDED_SKILL_IDS,
   type CreatorPromptForm,
   type CreatorPromptSeed,
+  CreatorStudioRecommendedSkillId,
+  hasSeedreamApiConfig,
   normalizePromptLanguage,
+  renderCreatorCoworkDraft,
   renderCreatorPrompt,
 } from '../../utils/creatorStudio';
 
@@ -45,9 +54,23 @@ type CreatorStudioTab = typeof CreatorStudioTab[keyof typeof CreatorStudioTab];
 interface CreatorStudioViewProps {
   isSidebarCollapsed: boolean;
   onToggleSidebar: () => void;
-  onNewChat: () => void;
+  onSendToCowork: (draft: string, options: CreatorCoworkSendOptions) => void | Promise<void>;
   updateBadge?: React.ReactNode;
 }
+
+interface CreatorCoworkSendOptions {
+  activeSkillIds: string[];
+  preferCreativeProducer?: boolean;
+}
+
+const SeedreamStatus = {
+  Missing: 'missing',
+  Checking: 'checking',
+  NeedsConfig: 'needs_config',
+  Configured: 'configured',
+} as const;
+
+type SeedreamStatus = typeof SeedreamStatus[keyof typeof SeedreamStatus];
 
 const CASE_PAGE_SIZE = 80;
 
@@ -100,8 +123,11 @@ const PlaceholderImage: React.FC<{
 const CreatorStudioView: React.FC<CreatorStudioViewProps> = ({
   isSidebarCollapsed,
   onToggleSidebar,
+  onSendToCowork,
   updateBadge,
 }) => {
+  const dispatch = useDispatch();
+  const skills = useSelector((state: RootState) => state.skill.skills);
   const [activeTab, setActiveTab] = useState<CreatorStudioTab>(CreatorStudioTab.Gallery);
   const [query, setQuery] = useState('');
   const [category, setCategory] = useState('');
@@ -112,6 +138,14 @@ const CreatorStudioView: React.FC<CreatorStudioViewProps> = ({
   const [builderSeed, setBuilderSeed] = useState<CreatorPromptSeed | null>(null);
   const [builderForm, setBuilderForm] = useState<CreatorPromptForm>(defaultBuilderForm);
   const [visibleCaseCount, setVisibleCaseCount] = useState(CASE_PAGE_SIZE);
+  const [seedreamStatus, setSeedreamStatus] = useState<SeedreamStatus>(SeedreamStatus.Missing);
+  const [isSendingToCowork, setIsSendingToCowork] = useState(false);
+
+  useEffect(() => {
+    void skillService.loadSkills().then((loadedSkills) => {
+      dispatch(setSkills(loadedSkills));
+    });
+  }, [dispatch]);
 
   const searchableLabels = useMemo(() => {
     const labels = new Map<string, string[]>();
@@ -156,6 +190,40 @@ const CreatorStudioView: React.FC<CreatorStudioViewProps> = ({
 
   const templateCasesById = useMemo(() => new Map(cases.map((item) => [item.sourceCaseId, item])), []);
   const visibleCases = filteredCases.slice(0, visibleCaseCount);
+  const installedRecommendedSkillIds = useMemo(() => {
+    const availableSkillIds = new Set(skills.map((skill) => skill.id));
+    return CREATOR_STUDIO_RECOMMENDED_SKILL_IDS.filter((skillId) => availableSkillIds.has(skillId));
+  }, [skills]);
+  const missingRecommendedSkillIds = useMemo(() => {
+    const installed = new Set(installedRecommendedSkillIds);
+    return CREATOR_STUDIO_RECOMMENDED_SKILL_IDS.filter((skillId) => !installed.has(skillId));
+  }, [installedRecommendedSkillIds]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const seedreamInstalled = skills.some((skill) => skill.id === CreatorStudioRecommendedSkillId.Seedream);
+    if (!seedreamInstalled) {
+      setSeedreamStatus(SeedreamStatus.Missing);
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    setSeedreamStatus(SeedreamStatus.Checking);
+    void skillService.getSkillConfig(CreatorStudioRecommendedSkillId.Seedream)
+      .then((config) => {
+        if (cancelled) return;
+        setSeedreamStatus(hasSeedreamApiConfig(config) ? SeedreamStatus.Configured : SeedreamStatus.NeedsConfig);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setSeedreamStatus(SeedreamStatus.NeedsConfig);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [skills]);
 
   useEffect(() => {
     setVisibleCaseCount(CASE_PAGE_SIZE);
@@ -206,6 +274,31 @@ const CreatorStudioView: React.FC<CreatorStudioViewProps> = ({
     setSelectedTemplate(null);
     setSelectedCase(item);
     setActiveTab(CreatorStudioTab.Gallery);
+  };
+
+  const sendToCowork = async (
+    promptSpec: CreatorPromptSpec,
+    promptText: string,
+    requestImageGeneration = false
+  ) => {
+    setIsSendingToCowork(true);
+    try {
+      dispatch(setActiveSkillIds(installedRecommendedSkillIds));
+      await onSendToCowork(renderCreatorCoworkDraft({
+        promptSpec,
+        promptText,
+        installedSkillIds: installedRecommendedSkillIds,
+        missingSkillIds: missingRecommendedSkillIds,
+        requestImageGeneration,
+      }), {
+        activeSkillIds: installedRecommendedSkillIds,
+        preferCreativeProducer: true,
+      });
+    } catch {
+      dispatchToast(i18nService.t('creatorSendToCoworkFailed'));
+    } finally {
+      setIsSendingToCowork(false);
+    }
   };
 
   return (
@@ -282,6 +375,11 @@ const CreatorStudioView: React.FC<CreatorStudioViewProps> = ({
             seed={builderSeed}
             form={builderForm}
             onFormChange={setBuilderForm}
+            installedSkillIds={installedRecommendedSkillIds}
+            missingSkillIds={missingRecommendedSkillIds}
+            seedreamStatus={seedreamStatus}
+            isSendingToCowork={isSendingToCowork}
+            onSendToCowork={sendToCowork}
           />
         )}
       </main>
@@ -529,10 +627,26 @@ const PromptBuilder: React.FC<{
   seed: CreatorPromptSeed | null;
   form: CreatorPromptForm;
   onFormChange: (form: CreatorPromptForm) => void;
-}> = ({ seed, form, onFormChange }) => {
+  installedSkillIds: readonly string[];
+  missingSkillIds: readonly string[];
+  seedreamStatus: SeedreamStatus;
+  isSendingToCowork: boolean;
+  onSendToCowork: (promptSpec: CreatorPromptSpec, promptText: string, requestImageGeneration?: boolean) => void;
+}> = ({
+  seed,
+  form,
+  onFormChange,
+  installedSkillIds,
+  missingSkillIds,
+  seedreamStatus,
+  isSendingToCowork,
+  onSendToCowork,
+}) => {
   const promptLanguage = normalizePromptLanguage(i18nService.getLanguage(), form);
   const promptSpec: CreatorPromptSpec = buildPromptSpec(seed, form, promptLanguage, i18nService.t('creatorBlankBuilder'));
   const prompt = renderCreatorPrompt(promptSpec);
+  const seedreamReady = seedreamStatus === SeedreamStatus.Configured;
+  const seedreamHint = getSeedreamStatusHint(seedreamStatus);
 
   const updateField = (field: keyof CreatorPromptForm, value: string) => {
     onFormChange({ ...form, [field]: value });
@@ -557,16 +671,59 @@ const PromptBuilder: React.FC<{
         <div className="rounded-lg border border-border bg-surface">
           <div className="flex items-center justify-between border-b border-border px-4 py-3">
             <h2 className="text-sm font-semibold">{i18nService.t('creatorPromptPreview')}</h2>
-            <button
-              type="button"
-              onClick={() => void copyText(prompt)}
-              className="inline-flex items-center gap-2 rounded-lg bg-primary px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-primary-hover"
-            >
-              <ClipboardDocumentIcon className="h-4 w-4" />
-              {i18nService.t('creatorCopyPrompt')}
-            </button>
+            <div className="flex flex-wrap justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => void copyText(prompt)}
+                className="inline-flex items-center gap-2 rounded-lg bg-primary px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-primary-hover"
+              >
+                <ClipboardDocumentIcon className="h-4 w-4" />
+                {i18nService.t('creatorCopyPrompt')}
+              </button>
+              <button
+                type="button"
+                disabled={isSendingToCowork}
+                onClick={() => onSendToCowork(promptSpec, prompt)}
+                className="inline-flex items-center gap-2 rounded-lg border border-primary bg-primary/10 px-3 py-2 text-sm font-medium text-primary transition-colors hover:bg-primary/15 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                <RocketLaunchIcon className="h-4 w-4" />
+                {isSendingToCowork ? i18nService.t('creatorSendingToCowork') : i18nService.t('creatorSendToCowork')}
+              </button>
+              <button
+                type="button"
+                disabled={!seedreamReady || isSendingToCowork}
+                title={seedreamHint}
+                onClick={() => onSendToCowork(promptSpec, prompt, true)}
+                className="inline-flex items-center gap-2 rounded-lg border border-border px-3 py-2 text-sm font-medium text-secondary transition-colors hover:bg-surface-raised hover:text-foreground disabled:cursor-not-allowed disabled:opacity-55"
+              >
+                <SparklesIcon className="h-4 w-4" />
+                {i18nService.t('creatorGenerateWithSeedream')}
+              </button>
+            </div>
           </div>
           <pre className="max-h-[420px] whitespace-pre-wrap overflow-auto p-4 text-sm leading-6 text-foreground">{prompt}</pre>
+        </div>
+        <div className="rounded-lg border border-border bg-surface p-4">
+          <h2 className="text-sm font-semibold">{i18nService.t('creatorRecommendedRuntime')}</h2>
+          <p className="mt-1 text-xs leading-5 text-muted">{i18nService.t('creatorRecommendedRuntimeHint')}</p>
+          <div className="mt-3 flex flex-wrap gap-1.5">
+            {[...installedSkillIds, ...missingSkillIds].map((skillId) => {
+              const isInstalled = installedSkillIds.includes(skillId);
+              return (
+                <span
+                  key={skillId}
+                  className={`rounded-md px-2 py-1 text-[11px] ${
+                    isInstalled
+                      ? 'bg-primary/10 text-primary'
+                      : 'bg-surface-raised text-muted'
+                  }`}
+                >
+                  {skillId}{isInstalled ? '' : ` · ${i18nService.t('creatorSkillMissing')}`}
+                </span>
+              );
+            })}
+          </div>
+          <p className="mt-3 text-xs leading-5 text-muted">{seedreamHint}</p>
         </div>
         <div className="rounded-lg border border-border bg-surface">
           <div className="flex items-center justify-between border-b border-border px-4 py-3">
@@ -585,6 +742,20 @@ const PromptBuilder: React.FC<{
       </div>
     </section>
   );
+};
+
+const getSeedreamStatusHint = (status: SeedreamStatus): string => {
+  switch (status) {
+    case SeedreamStatus.Configured:
+      return i18nService.t('creatorSeedreamConfiguredHint');
+    case SeedreamStatus.Checking:
+      return i18nService.t('creatorSeedreamCheckingHint');
+    case SeedreamStatus.NeedsConfig:
+      return i18nService.t('creatorSeedreamConfigRequired');
+    case SeedreamStatus.Missing:
+    default:
+      return i18nService.t('creatorSeedreamMissingHint');
+  }
 };
 
 const BuilderInput: React.FC<{

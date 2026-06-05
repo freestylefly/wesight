@@ -19,6 +19,7 @@ import AppUpdateModal from './components/update/AppUpdateModal';
 import WindowTitleBar from './components/window/WindowTitleBar';
 import { defaultConfig, getProviderDisplayName } from './config';
 import { MainView } from './constants/app';
+import { agentService } from './services/agent';
 import type { ApiConfig } from './services/api';
 import { apiService } from './services/api';
 import { type AppUpdateDownloadProgress, type AppUpdateInfo, checkForAppUpdate, UPDATE_HEARTBEAT_INTERVAL_MS,UPDATE_POLL_INTERVAL_MS } from './services/appUpdate';
@@ -30,12 +31,20 @@ import { scheduledTaskService } from './services/scheduledTask';
 import { matchesShortcut } from './services/shortcuts';
 import { themeService } from './services/theme';
 import { RootState, store } from './store';
+import { setCurrentAgentId } from './store/slices/agentSlice';
 import { setDraftPrompt } from './store/slices/coworkSlice';
 import { setAvailableModels, setSelectedModel } from './store/slices/modelSlice';
 import { clearSelection } from './store/slices/quickActionSlice';
+import { setActiveSkillIds } from './store/slices/skillSlice';
 import type { CoworkPermissionResult } from './types/cowork';
+import { CreatorStudioAgentId } from './utils/creatorStudio';
 
 const CreatorStudioView = React.lazy(() => import('./components/creatorStudio/CreatorStudioView'));
+
+interface CreatorCoworkSendOptions {
+  activeSkillIds: string[];
+  preferCreativeProducer?: boolean;
+}
 
 const App: React.FC = () => {
   const [showSettings, setShowSettings] = useState(false);
@@ -328,6 +337,49 @@ const App: React.FC = () => {
     dispatch(clearSelection());
     setMainView(MainView.Cowork);
   }, [dispatch]);
+
+  const ensureCreativeProducerAgent = useCallback(async (): Promise<string | null> => {
+    const existingAgent = store.getState().agent.agents.find((agent) => agent.id === CreatorStudioAgentId.CreativeProducer);
+    if (existingAgent) {
+      if (!existingAgent.enabled) {
+        const enabledAgent = await agentService.updateAgent(CreatorStudioAgentId.CreativeProducer, { enabled: true });
+        if (!enabledAgent) {
+          return null;
+        }
+      }
+      return CreatorStudioAgentId.CreativeProducer;
+    }
+
+    const installedAgent = await agentService.addPreset(CreatorStudioAgentId.CreativeProducer);
+    return installedAgent?.id ?? null;
+  }, []);
+
+  const handleSendCreatorDraftToCowork = useCallback(async (
+    draft: string,
+    options: CreatorCoworkSendOptions
+  ) => {
+    coworkService.clearSession();
+    dispatch(clearSelection());
+    if (options.preferCreativeProducer !== false) {
+      const creativeProducerAgentId = await ensureCreativeProducerAgent();
+      if (creativeProducerAgentId) {
+        dispatch(setCurrentAgentId(creativeProducerAgentId));
+        void coworkService.loadSessions(creativeProducerAgentId);
+      } else {
+        window.dispatchEvent(new CustomEvent('app:showToast', {
+          detail: i18nService.t('creatorCreativeProducerInstallFailed'),
+        }));
+      }
+    }
+    dispatch(setActiveSkillIds(options.activeSkillIds));
+    dispatch(setDraftPrompt({ sessionId: '__home__', draft }));
+    setMainView(MainView.Cowork);
+    window.setTimeout(() => {
+      window.dispatchEvent(new CustomEvent('cowork:focus-input', {
+        detail: { clear: false },
+      }));
+    }, 0);
+  }, [dispatch, ensureCreativeProducerAgent]);
 
   const showToast = useCallback((message: string) => {
     setToastMessage(message);
@@ -775,7 +827,7 @@ const App: React.FC = () => {
                 <CreatorStudioView
                   isSidebarCollapsed={isSidebarCollapsed}
                   onToggleSidebar={handleToggleSidebar}
-                  onNewChat={handleNewChat}
+                  onSendToCowork={handleSendCreatorDraftToCowork}
                   updateBadge={isSidebarCollapsed ? updateBadge : null}
                 />
               </React.Suspense>
