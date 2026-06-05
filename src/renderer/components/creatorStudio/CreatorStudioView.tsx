@@ -13,6 +13,7 @@ import {
   XMarkIcon,
 } from '@heroicons/react/24/outline';
 import {
+  CreatorAssetAdoptionStatus,
   CreatorBatchTaskStatus,
   CreatorProductionAssetKind,
   CreatorStudioDefaultProjectId,
@@ -87,6 +88,12 @@ const CreatorStudioTab = {
 } as const;
 
 type CreatorStudioTab = typeof CreatorStudioTab[keyof typeof CreatorStudioTab];
+
+const WINNING_ASSET_ADOPTION_STATUSES = new Set<string>([
+  CreatorAssetAdoptionStatus.Adopted,
+  CreatorAssetAdoptionStatus.Shortlisted,
+  CreatorAssetAdoptionStatus.Favorite,
+]);
 
 interface CreatorStudioViewProps {
   isSidebarCollapsed: boolean;
@@ -222,6 +229,29 @@ const formatImageFileSize = (image: CreatorStudioCase['imageOriginal']): string 
   if (image.byteSize < 1024) return `${image.byteSize} B`;
   if (image.byteSize < 1024 * 1024) return `${(image.byteSize / 1024).toFixed(1)} KB`;
   return `${(image.byteSize / 1024 / 1024).toFixed(1)} MB`;
+};
+
+const getWinningAssetScore = (asset: CreatorProductionAssetRecord): number => {
+  if (asset.adoptionStatus === CreatorAssetAdoptionStatus.Adopted) return 5;
+  if (asset.selected) return 4;
+  if (asset.adoptionStatus === CreatorAssetAdoptionStatus.Shortlisted) return 3;
+  if (asset.favorite || asset.adoptionStatus === CreatorAssetAdoptionStatus.Favorite) return 2;
+  return 0;
+};
+
+const resolveWinningBatchAsset = async (
+  projectId: string,
+  assetIds: string[]
+): Promise<CreatorProductionAssetRecord | null> => {
+  if (assetIds.length === 0) return null;
+  const result = await creatorStudioAssetService.listAssets({ projectId, limit: 200 });
+  const taskAssetIds = new Set(assetIds);
+  const candidates = result.assets
+    .filter((asset) => taskAssetIds.has(asset.id))
+    .map((asset) => ({ asset, score: getWinningAssetScore(asset) }))
+    .filter((item) => item.score > 0 || WINNING_ASSET_ADOPTION_STATUSES.has(item.asset.adoptionStatus))
+    .sort((a, b) => b.score - a.score);
+  return candidates[0]?.asset ?? null;
 };
 
 const CreatorStudioView: React.FC<CreatorStudioViewProps> = ({
@@ -842,13 +872,20 @@ const CreatorStudioView: React.FC<CreatorStudioViewProps> = ({
       return;
     }
     try {
+      const winningAsset = await resolveWinningBatchAsset(projectId, task.assetIds);
       await creatorStudioAssetService.createRecipe({
         projectId,
         title: task.directionTitle || i18nService.t('creatorRecipeDefaultTitle'),
-        description: `${task.modelName} · ${task.templateId} · ${task.size}`,
+        description: [
+          `${task.modelName} · ${task.templateId} · ${task.size}`,
+          winningAsset ? `winningAsset=${winningAsset.fileName}` : '',
+        ].filter(Boolean).join(' · '),
         promptSpec: {
           ...task.promptSpec,
           selectedDirectionId: task.directionId,
+          winningAssetId: winningAsset?.id ?? null,
+          winningAssetFileName: winningAsset?.fileName ?? null,
+          winningAssetAdoptionStatus: winningAsset?.adoptionStatus ?? null,
         },
         defaultRuntime: {
           modelId: task.modelId,
@@ -857,8 +894,15 @@ const CreatorStudioView: React.FC<CreatorStudioViewProps> = ({
         defaultOutput: {
           templateId: task.templateId,
           size: task.size,
+          winningAssetId: winningAsset?.id ?? null,
         },
-        tags: [task.directionId, task.modelId, task.templateId, task.size],
+        tags: [
+          task.directionId,
+          task.modelId,
+          task.templateId,
+          task.size,
+          winningAsset ? 'winning-direction' : 'batch-direction',
+        ],
       });
       await loadRecipes(projectId);
       dispatchToast(i18nService.t('creatorRecipeSaved'));

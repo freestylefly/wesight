@@ -960,7 +960,7 @@ Builder 页面增加：
 | P0+ | 基本完成 | Source Mode、来源条、表单分组、Preview tabs、selected direction 编译、基础 Lint、来源回跳均已落地 | Source Mode 顶部“一键保存为 Recipe”尚未放入来源条，但 Actions 中已有 Save as Recipe | 暂不阻塞，后续 UI polish 时合并 |
 | P1 | 已完成 | PromptSpecV1 snapshot、legacy adapter、compiler、Builder 迁移、Batch task 标准块、Asset schemaVersion、Compiler tests 已落地 | Cowork metadata 双写仍属于后续集成增强，不阻塞 P1 compiler 闭环 | 下一阶段推进 P2 Context Pack role strategy |
 | P2 | 基本完成 | 模板动态字段、案例 prompt 逆向拆解、自然语言填表、模板感知 directions、模板说明展示、Context Pack role strategy 已落地 | 图片语义摘要仍是本地尺寸/色彩级别，尚未接入懒分析或 LLM 摘要 | 后续按需推进素材图片摘要缓存 |
-| P3 | 部分完成 | Recipe、Prompt Version、diff、fork、rollback、资产变体链路已落地 | Batch winning direction 仍未基于采用/收藏结果判定，只能保存“方向”为 Recipe | 后续接入资产 adoption/selected 后再判定 winning |
+| P3 | 基本完成 | Recipe、Prompt Version、diff、fork、rollback、资产变体链路、Batch winning asset provenance 已落地 | 批量结果表现统计仍属于 P4 评估范围 | 后续进入评估和治理阶段 |
 | P4 | 未开始 | 无 | 历史表现、Recipe 自动化、导出生产包、敏感信息和授权检查均未实现 | 等 P1-P3 闭环后启动治理阶段 |
 
 当前没有阻塞 P1 下一步的产品决策。后续进入 P4 前需要补充决策：
