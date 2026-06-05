@@ -32,11 +32,13 @@ import type {
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 
+import { DeliveryMode, PayloadKind, ScheduleKind, SessionTarget, WakeMode } from '../../../scheduledTask/constants';
 import casesData from '../../data/creatorStudio/cases.json';
 import manifestData from '../../data/creatorStudio/manifest.json';
 import styleLibraryData from '../../data/creatorStudio/style-library.json';
 import { creatorStudioAssetService } from '../../services/creatorStudioAssets';
 import { i18nService } from '../../services/i18n';
+import { scheduledTaskService } from '../../services/scheduledTask';
 import { skillService } from '../../services/skill';
 import { RootState } from '../../store';
 import { setActiveSkillIds, setSkills } from '../../store/slices/skillSlice';
@@ -212,6 +214,33 @@ const buildProductionPackageFileName = (projectName: string): string => {
   const safeProjectName = projectName.trim().replace(/[^a-zA-Z0-9._-]+/g, '-').replace(/^-+|-+$/g, '') || 'creator-project';
   return `${safeProjectName}-production-package.json`;
 };
+
+const CreatorRecipeAutomationDefaultCron = '0 9 * * *';
+
+const buildRecipeAutomationPrompt = (recipe: CreatorRecipeRecord): string => (
+  [
+    i18nService.t('creatorRecipeAutomationPromptIntro'),
+    '',
+    `recipeId: ${recipe.id}`,
+    `recipeTitle: ${recipe.title}`,
+    `tags: ${recipe.tags.length > 0 ? recipe.tags.join(', ') : 'none'}`,
+    '',
+    'PromptSpec:',
+    '```json',
+    JSON.stringify(recipe.promptSpec, null, 2),
+    '```',
+    '',
+    'Default runtime:',
+    '```json',
+    JSON.stringify(recipe.defaultRuntime, null, 2),
+    '```',
+    '',
+    'Default output:',
+    '```json',
+    JSON.stringify(recipe.defaultOutput, null, 2),
+    '```',
+  ].join('\n')
+);
 
 const PlaceholderImage: React.FC<{
   src: string | null;
@@ -838,6 +867,41 @@ const CreatorStudioView: React.FC<CreatorStudioViewProps> = ({
     }
   };
 
+  const scheduleRecipeAutomation = async (recipe: CreatorRecipeRecord) => {
+    const cronExpression = window.prompt(
+      i18nService.t('creatorRecipeSchedulePrompt'),
+      CreatorRecipeAutomationDefaultCron
+    )?.trim();
+    if (!cronExpression) return;
+    if (!window.electron?.scheduledTasks) {
+      dispatchToast(i18nService.t('creatorRecipeAutomationFailed'));
+      return;
+    }
+    try {
+      await scheduledTaskService.createTask({
+        name: i18nService.t('creatorRecipeAutomationTaskName').replace('{title}', recipe.title),
+        description: i18nService.t('creatorRecipeAutomationTaskDescription').replace('{id}', recipe.id),
+        enabled: true,
+        schedule: {
+          kind: ScheduleKind.Cron,
+          expr: cronExpression,
+        },
+        sessionTarget: SessionTarget.Isolated,
+        wakeMode: WakeMode.Now,
+        payload: {
+          kind: PayloadKind.AgentTurn,
+          message: buildRecipeAutomationPrompt(recipe),
+        },
+        delivery: {
+          mode: DeliveryMode.None,
+        },
+      });
+      dispatchToast(i18nService.t('creatorRecipeAutomationCreated'));
+    } catch (error) {
+      dispatchToast(error instanceof Error ? error.message : i18nService.t('creatorRecipeAutomationFailed'));
+    }
+  };
+
   const exportProductionPackage = async () => {
     const projectId = currentProjectId || workspace?.currentProjectId;
     if (!projectId) {
@@ -1185,6 +1249,7 @@ const CreatorStudioView: React.FC<CreatorStudioViewProps> = ({
             onUseRecipe={useRecipeInBuilder}
             onSaveRecipe={(promptSpec) => void saveRecipe(promptSpec)}
             onImportRecipe={(recipeJson) => void importRecipe(recipeJson)}
+            onScheduleRecipe={(recipe) => void scheduleRecipeAutomation(recipe)}
             onExportProductionPackage={() => void exportProductionPackage()}
             onClearSource={() => {
               setBuilderSeed(null);
@@ -1630,6 +1695,7 @@ const PromptBuilder: React.FC<{
   onUseRecipe: (recipe: CreatorRecipeRecord) => void;
   onSaveRecipe: (promptSpec: CreatorPromptSpec) => void;
   onImportRecipe: (recipeJson: string) => void;
+  onScheduleRecipe: (recipe: CreatorRecipeRecord) => void;
   onExportProductionPackage: () => void;
   onClearSource: () => void;
   onOpenSourceDetail: () => void;
@@ -1661,6 +1727,7 @@ const PromptBuilder: React.FC<{
   onUseRecipe,
   onSaveRecipe,
   onImportRecipe,
+  onScheduleRecipe,
   onExportProductionPackage,
   onClearSource,
   onOpenSourceDetail,
@@ -1921,6 +1988,13 @@ const PromptBuilder: React.FC<{
                       className="rounded-md border border-border px-2 py-1 text-[11px] font-medium text-secondary transition-colors hover:bg-background hover:text-foreground"
                     >
                       {i18nService.t('creatorRecipeUse')}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => onScheduleRecipe(recipe)}
+                      className="rounded-md border border-border px-2 py-1 text-[11px] font-medium text-secondary transition-colors hover:bg-background hover:text-foreground"
+                    >
+                      {i18nService.t('creatorRecipeSchedule')}
                     </button>
                     <button
                       type="button"

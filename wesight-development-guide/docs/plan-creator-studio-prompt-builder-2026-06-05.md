@@ -961,7 +961,7 @@ Builder 页面增加：
 | P1 | 已完成 | PromptSpecV1 snapshot、legacy adapter、compiler、Builder 迁移、Batch task 标准块、Asset schemaVersion、Compiler tests 已落地 | Cowork metadata 双写仍属于后续集成增强，不阻塞 P1 compiler 闭环 | 下一阶段推进 P2 Context Pack role strategy |
 | P2 | 基本完成 | 模板动态字段、案例 prompt 逆向拆解、自然语言填表、模板感知 directions、模板说明展示、Context Pack role strategy 已落地 | 图片语义摘要仍是本地尺寸/色彩级别，尚未接入懒分析或 LLM 摘要 | 后续按需推进素材图片摘要缓存 |
 | P3 | 基本完成 | Recipe、Prompt Version、diff、fork、rollback、资产变体链路、Batch winning asset provenance 已落地 | 批量结果表现统计仍属于 P4 评估范围 | 后续进入评估和治理阶段 |
-| P4 | 基本完成 | Builder 已展示本地 adoption/favorite/selected、Batch completion/failed 统计；模板/模型/方向聚合表现已落地；生产包单 JSON manifest 导出已落地；导出前敏感信息、本地路径、授权、用途、来源会话、未评审资产检查已落地 | Recipe scheduled creative workflow 尚未实现 | 下一阶段推进 Recipe 自动化，复用 Scheduled Tasks 任务模型 |
+| P4 | 已完成 | Builder 已展示本地 adoption/favorite/selected、Batch completion/failed 统计；模板/模型/方向聚合表现已落地；Recipe 可创建 Scheduled Tasks cron 自动化任务；生产包单 JSON manifest 导出已落地；导出前敏感信息、本地路径、授权、用途、来源会话、未评审资产检查已落地 | Recipe 自动化当前为 cron 表达式入口，尚未提供完整可视化排期表单 | 后续进入 P5 或 UI polish 时把 Recipe 自动化接入完整 Scheduled Tasks 表单 |
 
 当前 P4 已采用前序确认的推荐决策：
 
