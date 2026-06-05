@@ -1,6 +1,7 @@
 import {
   ArrowPathIcon,
   ClipboardDocumentIcon,
+  DocumentDuplicateIcon,
   PlayIcon,
   RocketLaunchIcon,
   XMarkIcon,
@@ -80,6 +81,7 @@ export const CreatorBatchPanel: React.FC<{
   onFailTask: (taskId: string) => void;
   onSendTaskToCowork: (task: CreatorBatchTaskRecord) => void;
   onSendBatchToCowork: (batchRun: CreatorBatchRunRecord) => void;
+  onSaveTaskAsRecipe: (task: CreatorBatchTaskRecord) => void;
 }> = ({
   projectId,
   promptSpec,
@@ -97,6 +99,7 @@ export const CreatorBatchPanel: React.FC<{
   onFailTask,
   onSendTaskToCowork,
   onSendBatchToCowork,
+  onSaveTaskAsRecipe,
 }) => {
   const directions = useMemo(() => (promptSpec.creativeDirections ?? []).slice(0, 6), [promptSpec]);
   const defaultTemplateId = promptSpec.templateId || templates[0]?.id || 'default-template';
@@ -376,6 +379,9 @@ export const CreatorBatchPanel: React.FC<{
                           </IconButton>
                           <IconButton title={i18nService.t('creatorBatchSendTask')} onClick={() => onSendTaskToCowork(task)}>
                             <PlayIcon className="h-4 w-4" />
+                          </IconButton>
+                          <IconButton title={i18nService.t('creatorBatchSaveAsRecipe')} onClick={() => onSaveTaskAsRecipe(task)}>
+                            <DocumentDuplicateIcon className="h-4 w-4" />
                           </IconButton>
                           {(task.status === CreatorBatchTaskStatus.Failed || task.status === CreatorBatchTaskStatus.Skipped) && (
                             <IconButton title={i18nService.t('creatorBatchRetry')} onClick={() => onRetryTask(task.id)}>

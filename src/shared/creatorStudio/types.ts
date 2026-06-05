@@ -170,6 +170,9 @@ export interface CreatorStudioSourceContext {
   variantOfAssetId: string | null;
   batchRunId: string | null;
   batchTaskId: string | null;
+  promptVersionId: string | null;
+  recipeId: string | null;
+  selectedDirectionId: string | null;
 }
 
 export interface CreatorProductionRunRecord {
@@ -182,6 +185,9 @@ export interface CreatorProductionRunRecord {
   promptSpec: CreatorPromptSpecSnapshot | null;
   promptText: string;
   variantOfAssetId: string | null;
+  promptVersionId: string | null;
+  recipeId: string | null;
+  selectedDirectionId: string | null;
   createdAt: number;
   updatedAt: number;
   completedAt: number | null;
@@ -201,6 +207,10 @@ export interface CreatorProductionAssetRecord {
   caseIds: string[];
   promptSpec: CreatorPromptSpecSnapshot | null;
   promptText: string;
+  parentPromptAssetId: string | null;
+  promptVersionId: string | null;
+  recipeId: string | null;
+  selectedDirectionId: string | null;
   filePath: string;
   fileName: string;
   mimeType: string | null;
@@ -303,6 +313,105 @@ export interface CreatorPromptAssetCreateInput {
   templateId?: string | null;
   caseIds?: string[];
   tags?: string[];
+  parentPromptAssetId?: string | null;
+  recipeId?: string | null;
+  selectedDirectionId?: string | null;
+  changeNote?: string | null;
+}
+
+export interface CreatorRecipeRecord {
+  id: string;
+  projectId: string;
+  title: string;
+  description: string | null;
+  sourcePromptAssetId: string | null;
+  promptSpec: CreatorPromptSpecSnapshot;
+  defaultRuntime: Record<string, unknown>;
+  defaultOutput: Record<string, unknown>;
+  tags: string[];
+  createdAt: number;
+  updatedAt: number;
+}
+
+export interface CreatorRecipeCreateInput {
+  projectId: string;
+  title: string;
+  description?: string | null;
+  sourcePromptAssetId?: string | null;
+  promptSpec: CreatorPromptSpecSnapshot;
+  defaultRuntime?: Record<string, unknown>;
+  defaultOutput?: Record<string, unknown>;
+  tags?: string[];
+}
+
+export interface CreatorRecipeListInput {
+  projectId?: string;
+  tag?: string;
+  limit?: number;
+  offset?: number;
+}
+
+export interface CreatorRecipeListResult {
+  recipes: CreatorRecipeRecord[];
+  total: number;
+}
+
+export interface CreatorRecipeImportInput {
+  projectId: string;
+  recipe: Omit<CreatorRecipeCreateInput, 'projectId'> & {
+    projectId?: string;
+  };
+}
+
+export interface CreatorPromptVersionRecord {
+  id: string;
+  promptAssetId: string;
+  version: number;
+  promptText: string;
+  promptSpec: CreatorPromptSpecSnapshot;
+  changeNote: string | null;
+  createdAt: number;
+}
+
+export interface CreatorPromptVersionCreateInput {
+  promptAssetId: string;
+  promptText: string;
+  promptSpec: CreatorPromptSpecSnapshot;
+  changeNote?: string | null;
+}
+
+export interface CreatorPromptVersionListInput {
+  promptAssetId: string;
+  limit?: number;
+  offset?: number;
+}
+
+export interface CreatorPromptVersionListResult {
+  versions: CreatorPromptVersionRecord[];
+  total: number;
+}
+
+export interface CreatorPromptVersionForkInput {
+  promptVersionId: string;
+  projectId?: string;
+  title?: string;
+  changeNote?: string | null;
+}
+
+export interface CreatorPromptVersionDiffInput {
+  fromVersionId: string;
+  toVersionId: string;
+}
+
+export interface CreatorPromptVersionDiffResult {
+  fromVersion: CreatorPromptVersionRecord;
+  toVersion: CreatorPromptVersionRecord;
+  promptTextChanged: boolean;
+  promptSpecChanged: boolean;
+  promptTextBefore: string;
+  promptTextAfter: string;
+  promptSpecBefore: CreatorPromptSpecSnapshot;
+  promptSpecAfter: CreatorPromptSpecSnapshot;
 }
 
 export interface CreatorCaseAssetCreateInput {

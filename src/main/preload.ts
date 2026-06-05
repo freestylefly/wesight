@@ -548,6 +548,20 @@ contextBridge.exposeInMainWorld('electron', {
       ipcRenderer.invoke(CreatorStudioIpcChannel.AssetCreateCase, input),
     revealAssetInFolder: (assetId: string) =>
       ipcRenderer.invoke(CreatorStudioIpcChannel.AssetRevealInFolder, assetId),
+    createRecipe: (input: Record<string, unknown>) =>
+      ipcRenderer.invoke(CreatorStudioIpcChannel.RecipeCreate, input),
+    importRecipe: (input: Record<string, unknown>) =>
+      ipcRenderer.invoke(CreatorStudioIpcChannel.RecipeImport, input),
+    listRecipes: (input?: Record<string, unknown>) =>
+      ipcRenderer.invoke(CreatorStudioIpcChannel.RecipeList, input),
+    createPromptVersion: (input: Record<string, unknown>) =>
+      ipcRenderer.invoke(CreatorStudioIpcChannel.PromptVersionCreate, input),
+    listPromptVersions: (input: Record<string, unknown>) =>
+      ipcRenderer.invoke(CreatorStudioIpcChannel.PromptVersionList, input),
+    forkPromptVersion: (input: Record<string, unknown>) =>
+      ipcRenderer.invoke(CreatorStudioIpcChannel.PromptVersionFork, input),
+    diffPromptVersions: (input: Record<string, unknown>) =>
+      ipcRenderer.invoke(CreatorStudioIpcChannel.PromptVersionDiff, input),
     getWorkspace: () =>
       ipcRenderer.invoke(CreatorStudioIpcChannel.WorkspaceGet),
     createProject: (input: { name: string; description?: string }) =>

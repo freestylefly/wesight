@@ -25,6 +25,7 @@ import type {
   CreatorBrandKitRecord,
   CreatorCreativeModelCapability,
   CreatorProductionAssetRecord,
+  CreatorRecipeRecord,
   CreatorWorkspaceSnapshot,
 } from '@shared/creatorStudio/types';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
@@ -145,6 +146,28 @@ const defaultBuilderForm: CreatorPromptForm = {
   templateFieldValues: {},
 };
 
+const buildFormFromPromptSpec = (promptSpec: Partial<CreatorPromptSpec>): CreatorPromptForm => ({
+  taskType: typeof promptSpec.taskType === 'string' ? promptSpec.taskType : '',
+  subject: typeof promptSpec.subject === 'string' ? promptSpec.subject : '',
+  platform: typeof promptSpec.platform === 'string' ? promptSpec.platform : '',
+  audience: typeof promptSpec.audience === 'string' ? promptSpec.audience : '',
+  mainObject: typeof promptSpec.mainObject === 'string' ? promptSpec.mainObject : '',
+  requiredText: typeof promptSpec.constraints?.requiredText === 'string' ? promptSpec.constraints.requiredText : '',
+  visualStyle: typeof promptSpec.visualStyle === 'string' ? promptSpec.visualStyle : '',
+  colorPreference: typeof promptSpec.colorPreference === 'string' ? promptSpec.colorPreference : '',
+  aspectRatio: typeof promptSpec.constraints?.aspectRatio === 'string' ? promptSpec.constraints.aspectRatio : '1:1',
+  outputCount: typeof promptSpec.outputCount === 'string' ? promptSpec.outputCount : '1',
+  negativeRequirements: typeof promptSpec.constraints?.negativeRequirements === 'string'
+    ? promptSpec.constraints.negativeRequirements
+    : '',
+  templateFieldValues: promptSpec.templateFieldValues && typeof promptSpec.templateFieldValues === 'object'
+    ? Object.fromEntries(
+      Object.entries(promptSpec.templateFieldValues)
+        .filter(([, value]) => typeof value === 'string')
+    ) as Record<string, string>
+    : {},
+});
+
 const dispatchToast = (message: string) => {
   window.dispatchEvent(new CustomEvent('app:showToast', { detail: message }));
 };
@@ -231,6 +254,7 @@ const CreatorStudioView: React.FC<CreatorStudioViewProps> = ({
   const [batchRuns, setBatchRuns] = useState<CreatorBatchRunRecord[]>([]);
   const [activeBatchRun, setActiveBatchRun] = useState<CreatorBatchRunRecord | null>(null);
   const [isCreatingBatchRun, setIsCreatingBatchRun] = useState(false);
+  const [recipes, setRecipes] = useState<CreatorRecipeRecord[]>([]);
 
   useEffect(() => {
     void skillService.loadSkills().then((loadedSkills) => {
@@ -257,6 +281,11 @@ const CreatorStudioView: React.FC<CreatorStudioViewProps> = ({
       if (!current) return result.runs[0] ?? null;
       return result.runs.find((run) => run.id === current.id) ?? result.runs[0] ?? null;
     });
+  }, []);
+
+  const loadRecipes = useCallback(async (projectId: string) => {
+    const result = await creatorStudioAssetService.listRecipes({ projectId, limit: 50 });
+    setRecipes(result.recipes);
   }, []);
 
   useEffect(() => {
@@ -286,6 +315,13 @@ const CreatorStudioView: React.FC<CreatorStudioViewProps> = ({
       dispatchToast(i18nService.t('creatorBatchLoadFailed'));
     });
   }, [currentProjectId, loadBatchRuns]);
+
+  useEffect(() => {
+    if (!currentProjectId) return;
+    void loadRecipes(currentProjectId).catch(() => {
+      dispatchToast(i18nService.t('creatorRecipeLoadFailed'));
+    });
+  }, [currentProjectId, loadRecipes]);
 
   const searchableLabels = useMemo(() => {
     const labels = new Map<string, string[]>();
@@ -490,6 +526,25 @@ const CreatorStudioView: React.FC<CreatorStudioViewProps> = ({
     setActiveTab(CreatorStudioTab.Builder);
   };
 
+  const useRecipeInBuilder = (recipe: CreatorRecipeRecord) => {
+    const promptSpec = recipe.promptSpec as Partial<CreatorPromptSpec>;
+    setBuilderSeed({
+      sourceType: CreatorStudioSourceType.Template,
+      sourceMode: CreatorPromptSourceMode.TemplateDraft,
+      sourceId: recipe.id,
+      sourceTitle: recipe.title,
+      templateId: typeof promptSpec.templateId === 'string' ? promptSpec.templateId : undefined,
+      caseIds: Array.isArray(promptSpec.caseIds) ? promptSpec.caseIds : [],
+      category: typeof promptSpec.category === 'string' ? promptSpec.category : undefined,
+      styles: Array.isArray(promptSpec.styles) ? promptSpec.styles : [],
+      scenes: Array.isArray(promptSpec.scenes) ? promptSpec.scenes : [],
+      templateGuidance: Array.isArray(promptSpec.templateGuidance) ? promptSpec.templateGuidance : [],
+      templatePitfalls: Array.isArray(promptSpec.templatePitfalls) ? promptSpec.templatePitfalls : [],
+    });
+    setBuilderForm(buildFormFromPromptSpec(promptSpec));
+    setActiveTab(CreatorStudioTab.Builder);
+  };
+
   const sendAssetToCowork = async (asset: CreatorProductionAssetRecord) => {
     setIsSendingToCowork(true);
     try {
@@ -613,6 +668,71 @@ const CreatorStudioView: React.FC<CreatorStudioViewProps> = ({
     }
   };
 
+  const saveRecipe = async (promptSpec: CreatorPromptSpec) => {
+    const projectId = currentProjectId || workspace?.currentProjectId;
+    if (!projectId) {
+      dispatchToast(i18nService.t('creatorWorkspaceLoadFailed'));
+      return;
+    }
+    try {
+      await creatorStudioAssetService.createRecipe({
+        projectId,
+        title: (promptSpec.subject || promptSpec.sourceTitle || i18nService.t('creatorRecipeDefaultTitle')).trim(),
+        description: promptSpec.selectedCreativeDirection?.reason ?? null,
+        promptSpec: toCreatorPromptSpecSnapshot(promptSpec),
+        defaultRuntime: {
+          activeSkillIds: installedRecommendedSkillIds,
+          requestImageGeneration: false,
+        },
+        defaultOutput: {
+          aspectRatio: promptSpec.constraints.aspectRatio ?? '',
+          outputCount: promptSpec.outputCount,
+        },
+        tags: [
+          promptSpec.category,
+          promptSpec.templateId,
+          promptSpec.selectedCreativeDirectionId,
+          ...(promptSpec.styles ?? []),
+          ...(promptSpec.scenes ?? []),
+        ].filter((item): item is string => Boolean(item?.trim())),
+      });
+      await loadRecipes(projectId);
+      dispatchToast(i18nService.t('creatorRecipeSaved'));
+    } catch (error) {
+      dispatchToast(error instanceof Error ? error.message : i18nService.t('creatorRecipeSaveFailed'));
+    }
+  };
+
+  const importRecipe = async (recipeJson: string) => {
+    const projectId = currentProjectId || workspace?.currentProjectId;
+    if (!projectId) {
+      dispatchToast(i18nService.t('creatorWorkspaceLoadFailed'));
+      return;
+    }
+    try {
+      const parsed = JSON.parse(recipeJson) as Partial<CreatorRecipeRecord>;
+      if (!parsed.title || !parsed.promptSpec) {
+        throw new Error(i18nService.t('creatorRecipeImportInvalid'));
+      }
+      await creatorStudioAssetService.importRecipe({
+        projectId,
+        recipe: {
+          title: parsed.title,
+          description: parsed.description ?? null,
+          sourcePromptAssetId: parsed.sourcePromptAssetId ?? null,
+          promptSpec: parsed.promptSpec,
+          defaultRuntime: parsed.defaultRuntime ?? {},
+          defaultOutput: parsed.defaultOutput ?? {},
+          tags: parsed.tags ?? [],
+        },
+      });
+      await loadRecipes(projectId);
+      dispatchToast(i18nService.t('creatorRecipeImported'));
+    } catch (error) {
+      dispatchToast(error instanceof Error ? error.message : i18nService.t('creatorRecipeImportFailed'));
+    }
+  };
+
   const saveCaseAsset = async (item: CreatorStudioCase) => {
     const projectId = currentProjectId || workspace?.currentProjectId;
     if (!projectId) {
@@ -688,6 +808,38 @@ const CreatorStudioView: React.FC<CreatorStudioViewProps> = ({
       }
     } catch (error) {
       dispatchToast(error instanceof Error ? error.message : i18nService.t('creatorBatchFailFailed'));
+    }
+  };
+
+  const saveBatchTaskAsRecipe = async (task: CreatorBatchTaskRecord) => {
+    const projectId = currentProjectId || workspace?.currentProjectId;
+    if (!projectId) {
+      dispatchToast(i18nService.t('creatorWorkspaceLoadFailed'));
+      return;
+    }
+    try {
+      await creatorStudioAssetService.createRecipe({
+        projectId,
+        title: task.directionTitle || i18nService.t('creatorRecipeDefaultTitle'),
+        description: `${task.modelName} · ${task.templateId} · ${task.size}`,
+        promptSpec: {
+          ...task.promptSpec,
+          selectedDirectionId: task.directionId,
+        },
+        defaultRuntime: {
+          modelId: task.modelId,
+          modelName: task.modelName,
+        },
+        defaultOutput: {
+          templateId: task.templateId,
+          size: task.size,
+        },
+        tags: [task.directionId, task.modelId, task.templateId, task.size],
+      });
+      await loadRecipes(projectId);
+      dispatchToast(i18nService.t('creatorRecipeSaved'));
+    } catch (error) {
+      dispatchToast(error instanceof Error ? error.message : i18nService.t('creatorRecipeSaveFailed'));
     }
   };
 
@@ -865,8 +1017,12 @@ const CreatorStudioView: React.FC<CreatorStudioViewProps> = ({
             isSendingToCowork={isSendingToCowork}
             workspace={workspace}
             currentProjectId={currentProjectId}
+            recipes={recipes}
             onProjectChange={(projectId) => void switchProject(projectId)}
             onCreateProject={createProject}
+            onUseRecipe={useRecipeInBuilder}
+            onSaveRecipe={(promptSpec) => void saveRecipe(promptSpec)}
+            onImportRecipe={(recipeJson) => void importRecipe(recipeJson)}
             onClearSource={() => {
               setBuilderSeed(null);
               setBuilderForm(defaultBuilderForm);
@@ -929,6 +1085,7 @@ const CreatorStudioView: React.FC<CreatorStudioViewProps> = ({
             onFailTask={(taskId) => void failBatchTask(taskId)}
             onSendTaskToCowork={(task) => void sendBatchTaskToCowork(task)}
             onSendBatchToCowork={(batchRun) => void sendBatchRunToCowork(batchRun)}
+            onSaveTaskAsRecipe={(task) => void saveBatchTaskAsRecipe(task)}
           />
         )}
       </main>
@@ -1274,8 +1431,12 @@ const PromptBuilder: React.FC<{
   isSendingToCowork: boolean;
   workspace: CreatorWorkspaceSnapshot | null;
   currentProjectId: string;
+  recipes: CreatorRecipeRecord[];
   onProjectChange: (projectId: string) => void;
   onCreateProject: (name: string) => Promise<void> | void;
+  onUseRecipe: (recipe: CreatorRecipeRecord) => void;
+  onSaveRecipe: (promptSpec: CreatorPromptSpec) => void;
+  onImportRecipe: (recipeJson: string) => void;
   onClearSource: () => void;
   brandKit: CreatorBrandKitRecord | null;
   boardContextPack: string;
@@ -1298,8 +1459,12 @@ const PromptBuilder: React.FC<{
   isSendingToCowork,
   workspace,
   currentProjectId,
+  recipes,
   onProjectChange,
   onCreateProject,
+  onUseRecipe,
+  onSaveRecipe,
+  onImportRecipe,
   onClearSource,
   brandKit,
   boardContextPack,
@@ -1313,6 +1478,8 @@ const PromptBuilder: React.FC<{
   const [isCreatingProject, setIsCreatingProject] = useState(false);
   const [briefAutofillText, setBriefAutofillText] = useState('');
   const [briefAutofillMessage, setBriefAutofillMessage] = useState('');
+  const [recipeImportText, setRecipeImportText] = useState('');
+  const [isRecipeImportOpen, setIsRecipeImportOpen] = useState(false);
   const promptLanguage = normalizePromptLanguage(i18nService.getLanguage(), form);
   const rawPromptSpec: CreatorPromptSpec = buildPromptSpec(seed, form, promptLanguage, i18nService.t('creatorBlankBuilder'), materials);
   const basePromptSpec = applyBoardAndBrandKit(rawPromptSpec, brandKit, boardContextPack);
@@ -1469,6 +1636,87 @@ const PromptBuilder: React.FC<{
             </div>
           )}
         </div>
+        <div className="rounded-lg border border-border bg-background p-3">
+          <div className="flex items-center justify-between gap-2">
+            <div className="text-xs font-medium text-secondary">{i18nService.t('creatorRecipeLibrary')}</div>
+            <button
+              type="button"
+              onClick={() => setIsRecipeImportOpen((open) => !open)}
+              className="rounded-md border border-border px-2 py-1 text-[11px] font-medium text-secondary transition-colors hover:bg-surface-raised hover:text-foreground"
+            >
+              {i18nService.t('creatorRecipeImport')}
+            </button>
+          </div>
+          {isRecipeImportOpen && (
+            <div className="mt-2 space-y-2">
+              <textarea
+                value={recipeImportText}
+                onChange={(event) => setRecipeImportText(event.target.value)}
+                rows={4}
+                placeholder={i18nService.t('creatorRecipeImportPlaceholder')}
+                className="w-full resize-none rounded-lg border border-border bg-surface px-3 py-2 text-xs outline-none focus:border-primary"
+              />
+              <div className="flex justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setRecipeImportText('');
+                    setIsRecipeImportOpen(false);
+                  }}
+                  className="rounded-lg border border-border px-3 py-1.5 text-xs font-medium text-secondary transition-colors hover:bg-surface-raised hover:text-foreground"
+                >
+                  {i18nService.t('cancel')}
+                </button>
+                <button
+                  type="button"
+                  disabled={!recipeImportText.trim()}
+                  onClick={() => {
+                    onImportRecipe(recipeImportText);
+                    setRecipeImportText('');
+                    setIsRecipeImportOpen(false);
+                  }}
+                  className="rounded-lg bg-primary px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-primary-hover disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {i18nService.t('creatorRecipeImport')}
+                </button>
+              </div>
+            </div>
+          )}
+          <div className="mt-3 space-y-2">
+            {recipes.length === 0 ? (
+              <div className="rounded-lg border border-dashed border-border bg-surface p-3 text-xs text-muted">
+                {i18nService.t('creatorRecipeEmpty')}
+              </div>
+            ) : recipes.slice(0, 6).map((recipe) => (
+              <div key={recipe.id} className="rounded-lg border border-border bg-surface p-3">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <div className="truncate text-xs font-semibold">{recipe.title}</div>
+                    <div className="mt-1 truncate text-[11px] text-muted">
+                      {recipe.tags.slice(0, 4).join(', ') || i18nService.t('creatorRecipeNoTags')}
+                    </div>
+                  </div>
+                  <div className="flex shrink-0 gap-1">
+                    <button
+                      type="button"
+                      onClick={() => onUseRecipe(recipe)}
+                      className="rounded-md border border-border px-2 py-1 text-[11px] font-medium text-secondary transition-colors hover:bg-background hover:text-foreground"
+                    >
+                      {i18nService.t('creatorRecipeUse')}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => void copyText(JSON.stringify(recipe, null, 2))}
+                      className="rounded-md border border-border px-2 py-1 text-[11px] font-medium text-secondary transition-colors hover:bg-background hover:text-foreground"
+                    >
+                      {i18nService.t('creatorRecipeExport')}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
         <BuilderSection title={i18nService.t('creatorBuilderSectionBrief')}>
           <label className="block">
             <span className="text-xs font-medium text-secondary">{i18nService.t('creatorBriefAutofill')}</span>
@@ -1601,6 +1849,15 @@ const PromptBuilder: React.FC<{
               >
                 <DocumentDuplicateIcon className="h-4 w-4" />
                 {i18nService.t('creatorSavePromptAsset')}
+              </button>
+              <button
+                type="button"
+                disabled={!currentProjectId}
+                onClick={() => onSaveRecipe(promptSpec)}
+                className="inline-flex items-center gap-2 rounded-lg border border-border px-3 py-2 text-sm font-medium text-secondary transition-colors hover:bg-surface-raised hover:text-foreground disabled:cursor-not-allowed disabled:opacity-55"
+              >
+                <DocumentDuplicateIcon className="h-4 w-4" />
+                {i18nService.t('creatorSaveAsRecipe')}
               </button>
               <button
                 type="button"

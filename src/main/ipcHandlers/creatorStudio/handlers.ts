@@ -16,6 +16,8 @@ import type {
   CreatorBoardCardCreateInput,
   CreatorBoardCardUpdateInput,
   CreatorBrandKitUpdateInput,
+  CreatorPromptAssetCreateInput,
+  CreatorRecipeCreateInput,
 } from '../../../shared/creatorStudio/types';
 import type { CreatorAssetStore } from '../../creatorAssetStore';
 
@@ -93,6 +95,10 @@ const normalizeBatchDirections = (value: unknown) => (
   Array.isArray(value)
     ? value.map(normalizeBatchDirection).filter((item): item is NonNullable<ReturnType<typeof normalizeBatchDirection>> => Boolean(item))
     : []
+);
+
+const normalizeRecord = (value: unknown): Record<string, unknown> => (
+  normalizeObject(value) ?? {}
 );
 
 export const registerCreatorStudioIpcHandlers = (
@@ -212,7 +218,11 @@ export const registerCreatorStudioIpcHandlers = (
         ...(toTrimmedString(record.templateId) ? { templateId: toTrimmedString(record.templateId)! } : {}),
         ...(normalizeStringArray(record.caseIds) ? { caseIds: normalizeStringArray(record.caseIds)! } : {}),
         ...(normalizeStringArray(record.tags) ? { tags: normalizeStringArray(record.tags)! } : {}),
-      });
+        ...(record.parentPromptAssetId === null ? { parentPromptAssetId: null } : toTrimmedString(record.parentPromptAssetId) ? { parentPromptAssetId: toTrimmedString(record.parentPromptAssetId)! } : {}),
+        ...(record.recipeId === null ? { recipeId: null } : toTrimmedString(record.recipeId) ? { recipeId: toTrimmedString(record.recipeId)! } : {}),
+        ...(toTrimmedString(record.selectedDirectionId) ? { selectedDirectionId: toTrimmedString(record.selectedDirectionId)! } : {}),
+        ...(record.changeNote === null ? { changeNote: null } : toTrimmedString(record.changeNote) ? { changeNote: toTrimmedString(record.changeNote)! } : {}),
+      } satisfies CreatorPromptAssetCreateInput);
       return { success: true, asset };
     } catch (error) {
       return {
@@ -273,6 +283,180 @@ export const registerCreatorStudioIpcHandlers = (
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Failed to reveal creator asset',
+      };
+    }
+  });
+
+  ipcMain.handle(CreatorStudioIpcChannel.RecipeCreate, async (_event, input: unknown) => {
+    try {
+      const record = normalizeRecord(input);
+      const projectId = toTrimmedString(record.projectId);
+      const title = toTrimmedString(record.title);
+      const promptSpec = normalizeObject(record.promptSpec);
+      if (!projectId || !title || !promptSpec) {
+        return { success: false, error: 'projectId, title, and promptSpec are required' };
+      }
+      const recipeInput: CreatorRecipeCreateInput = {
+        projectId,
+        title,
+        ...(record.description === null ? { description: null } : toTrimmedString(record.description) ? { description: toTrimmedString(record.description)! } : {}),
+        ...(record.sourcePromptAssetId === null ? { sourcePromptAssetId: null } : toTrimmedString(record.sourcePromptAssetId) ? { sourcePromptAssetId: toTrimmedString(record.sourcePromptAssetId)! } : {}),
+        promptSpec,
+        ...(normalizeObject(record.defaultRuntime) ? { defaultRuntime: normalizeObject(record.defaultRuntime)! } : {}),
+        ...(normalizeObject(record.defaultOutput) ? { defaultOutput: normalizeObject(record.defaultOutput)! } : {}),
+        ...(normalizeStringArray(record.tags) ? { tags: normalizeStringArray(record.tags)! } : {}),
+      };
+      return { success: true, recipe: getCreatorAssetStore().createRecipe(recipeInput) };
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to create creator recipe',
+      };
+    }
+  });
+
+  ipcMain.handle(CreatorStudioIpcChannel.RecipeImport, async (_event, input: unknown) => {
+    try {
+      const record = normalizeRecord(input);
+      const projectId = toTrimmedString(record.projectId);
+      const recipe = normalizeObject(record.recipe);
+      const title = toTrimmedString(recipe?.title);
+      const promptSpec = normalizeObject(recipe?.promptSpec);
+      if (!projectId || !recipe || !title || !promptSpec) {
+        return { success: false, error: 'projectId and recipe are required' };
+      }
+      return {
+        success: true,
+        recipe: getCreatorAssetStore().importRecipe({
+          projectId,
+          recipe: {
+            title,
+            ...(recipe.description === null ? { description: null } : toTrimmedString(recipe.description) ? { description: toTrimmedString(recipe.description)! } : {}),
+            ...(recipe.sourcePromptAssetId === null ? { sourcePromptAssetId: null } : toTrimmedString(recipe.sourcePromptAssetId) ? { sourcePromptAssetId: toTrimmedString(recipe.sourcePromptAssetId)! } : {}),
+            promptSpec,
+            ...(normalizeObject(recipe.defaultRuntime) ? { defaultRuntime: normalizeObject(recipe.defaultRuntime)! } : {}),
+            ...(normalizeObject(recipe.defaultOutput) ? { defaultOutput: normalizeObject(recipe.defaultOutput)! } : {}),
+            ...(normalizeStringArray(recipe.tags) ? { tags: normalizeStringArray(recipe.tags)! } : {}),
+          },
+        }),
+      };
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to import creator recipe',
+      };
+    }
+  });
+
+  ipcMain.handle(CreatorStudioIpcChannel.RecipeList, async (_event, input: unknown) => {
+    try {
+      const record = normalizeRecord(input);
+      return {
+        success: true,
+        ...getCreatorAssetStore().listRecipes({
+          ...(toTrimmedString(record.projectId) ? { projectId: toTrimmedString(record.projectId)! } : {}),
+          ...(toTrimmedString(record.tag) ? { tag: toTrimmedString(record.tag)! } : {}),
+          ...(typeof record.limit === 'number' ? { limit: record.limit } : {}),
+          ...(typeof record.offset === 'number' ? { offset: record.offset } : {}),
+        }),
+      };
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to list creator recipes',
+      };
+    }
+  });
+
+  ipcMain.handle(CreatorStudioIpcChannel.PromptVersionCreate, async (_event, input: unknown) => {
+    try {
+      const record = normalizeRecord(input);
+      const promptAssetId = toTrimmedString(record.promptAssetId);
+      const promptText = toTrimmedString(record.promptText);
+      const promptSpec = normalizeObject(record.promptSpec);
+      if (!promptAssetId || !promptText || !promptSpec) {
+        return { success: false, error: 'promptAssetId, promptText, and promptSpec are required' };
+      }
+      return {
+        success: true,
+        version: getCreatorAssetStore().createPromptVersion({
+          promptAssetId,
+          promptText,
+          promptSpec,
+          ...(record.changeNote === null ? { changeNote: null } : toTrimmedString(record.changeNote) ? { changeNote: toTrimmedString(record.changeNote)! } : {}),
+        }),
+      };
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to create creator prompt version',
+      };
+    }
+  });
+
+  ipcMain.handle(CreatorStudioIpcChannel.PromptVersionList, async (_event, input: unknown) => {
+    try {
+      const record = normalizeRecord(input);
+      const promptAssetId = toTrimmedString(record.promptAssetId);
+      if (!promptAssetId) {
+        return { success: false, error: 'promptAssetId is required' };
+      }
+      return {
+        success: true,
+        ...getCreatorAssetStore().listPromptVersions({
+          promptAssetId,
+          ...(typeof record.limit === 'number' ? { limit: record.limit } : {}),
+          ...(typeof record.offset === 'number' ? { offset: record.offset } : {}),
+        }),
+      };
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to list creator prompt versions',
+      };
+    }
+  });
+
+  ipcMain.handle(CreatorStudioIpcChannel.PromptVersionFork, async (_event, input: unknown) => {
+    try {
+      const record = normalizeRecord(input);
+      const promptVersionId = toTrimmedString(record.promptVersionId);
+      if (!promptVersionId) {
+        return { success: false, error: 'promptVersionId is required' };
+      }
+      return {
+        success: true,
+        asset: getCreatorAssetStore().forkPromptVersion({
+          promptVersionId,
+          ...(toTrimmedString(record.projectId) ? { projectId: toTrimmedString(record.projectId)! } : {}),
+          ...(toTrimmedString(record.title) ? { title: toTrimmedString(record.title)! } : {}),
+          ...(record.changeNote === null ? { changeNote: null } : toTrimmedString(record.changeNote) ? { changeNote: toTrimmedString(record.changeNote)! } : {}),
+        }),
+      };
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to fork creator prompt version',
+      };
+    }
+  });
+
+  ipcMain.handle(CreatorStudioIpcChannel.PromptVersionDiff, async (_event, input: unknown) => {
+    try {
+      const record = normalizeRecord(input);
+      const fromVersionId = toTrimmedString(record.fromVersionId);
+      const toVersionId = toTrimmedString(record.toVersionId);
+      if (!fromVersionId || !toVersionId) {
+        return { success: false, error: 'fromVersionId and toVersionId are required' };
+      }
+      return {
+        success: true,
+        diff: getCreatorAssetStore().diffPromptVersions({ fromVersionId, toVersionId }),
+      };
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to diff creator prompt versions',
       };
     }
   });

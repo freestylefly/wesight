@@ -202,6 +202,45 @@ export const ensureCreatorProductionSchema = (db: Database.Database): void => {
   `);
 
   db.exec(`
+    CREATE TABLE IF NOT EXISTS creator_recipes (
+      id TEXT PRIMARY KEY,
+      project_id TEXT NOT NULL,
+      title TEXT NOT NULL,
+      description TEXT,
+      source_prompt_asset_id TEXT,
+      prompt_spec_json TEXT NOT NULL,
+      default_runtime_json TEXT NOT NULL DEFAULT '{}',
+      default_output_json TEXT NOT NULL DEFAULT '{}',
+      tags_json TEXT NOT NULL DEFAULT '[]',
+      created_at INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL
+    );
+  `);
+
+  db.exec(`
+    CREATE INDEX IF NOT EXISTS idx_creator_recipes_project_updated
+    ON creator_recipes(project_id, updated_at DESC);
+  `);
+
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS creator_prompt_versions (
+      id TEXT PRIMARY KEY,
+      prompt_asset_id TEXT NOT NULL,
+      version INTEGER NOT NULL,
+      prompt_text TEXT NOT NULL,
+      prompt_spec_json TEXT NOT NULL,
+      change_note TEXT,
+      created_at INTEGER NOT NULL,
+      UNIQUE(prompt_asset_id, version)
+    );
+  `);
+
+  db.exec(`
+    CREATE INDEX IF NOT EXISTS idx_creator_prompt_versions_asset_version
+    ON creator_prompt_versions(prompt_asset_id, version DESC);
+  `);
+
+  db.exec(`
     CREATE TABLE IF NOT EXISTS production_runs (
       id TEXT PRIMARY KEY,
       source TEXT NOT NULL,
@@ -217,6 +256,9 @@ export const ensureCreatorProductionSchema = (db: Database.Database): void => {
       output_asset_ids_json TEXT NOT NULL DEFAULT '[]',
       template_id TEXT,
       variant_of_asset_id TEXT,
+      prompt_version_id TEXT,
+      recipe_id TEXT,
+      selected_direction_id TEXT,
       case_ids TEXT NOT NULL DEFAULT '[]',
       prompt_spec TEXT,
       prompt_text TEXT NOT NULL DEFAULT '',
@@ -258,6 +300,10 @@ export const ensureCreatorProductionSchema = (db: Database.Database): void => {
       prompt_spec TEXT,
       prompt_spec_json TEXT,
       prompt_text TEXT NOT NULL DEFAULT '',
+      parent_prompt_asset_id TEXT,
+      prompt_version_id TEXT,
+      recipe_id TEXT,
+      selected_direction_id TEXT,
       file_path TEXT NOT NULL,
       file_name TEXT NOT NULL,
       mime_type TEXT,
@@ -297,6 +343,9 @@ export const ensureCreatorProductionSchema = (db: Database.Database): void => {
   addColumnIfMissing(db, 'production_runs', 'input_asset_ids_json', "TEXT NOT NULL DEFAULT '[]'");
   addColumnIfMissing(db, 'production_runs', 'output_asset_ids_json', "TEXT NOT NULL DEFAULT '[]'");
   addColumnIfMissing(db, 'production_runs', 'variant_of_asset_id', 'TEXT');
+  addColumnIfMissing(db, 'production_runs', 'prompt_version_id', 'TEXT');
+  addColumnIfMissing(db, 'production_runs', 'recipe_id', 'TEXT');
+  addColumnIfMissing(db, 'production_runs', 'selected_direction_id', 'TEXT');
 
   db.exec(`
     CREATE INDEX IF NOT EXISTS idx_production_runs_variant_of_asset_id
@@ -311,6 +360,10 @@ export const ensureCreatorProductionSchema = (db: Database.Database): void => {
   addColumnIfMissing(db, 'production_assets', 'source_message_id', 'TEXT');
   addColumnIfMissing(db, 'production_assets', 'case_ids_json', "TEXT NOT NULL DEFAULT '[]'");
   addColumnIfMissing(db, 'production_assets', 'prompt_spec_json', 'TEXT');
+  addColumnIfMissing(db, 'production_assets', 'parent_prompt_asset_id', 'TEXT');
+  addColumnIfMissing(db, 'production_assets', 'prompt_version_id', 'TEXT');
+  addColumnIfMissing(db, 'production_assets', 'recipe_id', 'TEXT');
+  addColumnIfMissing(db, 'production_assets', 'selected_direction_id', 'TEXT');
   addColumnIfMissing(db, 'production_assets', 'adoption_status', `TEXT NOT NULL DEFAULT '${CreatorAssetAdoptionStatus.Unset}'`);
   addColumnIfMissing(db, 'production_assets', 'tags_json', "TEXT NOT NULL DEFAULT '[]'");
   addColumnIfMissing(db, 'production_assets', 'license_note', 'TEXT');
@@ -340,6 +393,16 @@ export const ensureCreatorProductionSchema = (db: Database.Database): void => {
   db.exec(`
     CREATE INDEX IF NOT EXISTS idx_production_assets_variant_of_asset_id
     ON production_assets(variant_of_asset_id);
+  `);
+
+  db.exec(`
+    CREATE INDEX IF NOT EXISTS idx_production_assets_prompt_version_id
+    ON production_assets(prompt_version_id);
+  `);
+
+  db.exec(`
+    CREATE INDEX IF NOT EXISTS idx_production_assets_recipe_id
+    ON production_assets(recipe_id);
   `);
 
   db.exec(`

@@ -25,6 +25,18 @@ import type {
   CreatorProductionAssetSourceLookup,
   CreatorProjectCreateInput,
   CreatorPromptAssetCreateInput,
+  CreatorPromptVersionCreateInput,
+  CreatorPromptVersionDiffInput,
+  CreatorPromptVersionDiffResult,
+  CreatorPromptVersionForkInput,
+  CreatorPromptVersionListInput,
+  CreatorPromptVersionListResult,
+  CreatorPromptVersionRecord,
+  CreatorRecipeCreateInput,
+  CreatorRecipeImportInput,
+  CreatorRecipeListInput,
+  CreatorRecipeListResult,
+  CreatorRecipeRecord,
   CreatorWorkspaceSnapshot,
 } from '@shared/creatorStudio/types';
 
@@ -85,6 +97,68 @@ class CreatorStudioAssetService {
     if (!result.success) {
       throw new Error(result.error || 'Failed to reveal creator asset');
     }
+  }
+
+  async createRecipe(input: CreatorRecipeCreateInput): Promise<CreatorRecipeRecord> {
+    const result = await window.electron.creatorStudio.createRecipe(input);
+    if (!result.success || !result.recipe) {
+      throw new Error(result.error || 'Failed to create creator recipe');
+    }
+    return result.recipe;
+  }
+
+  async importRecipe(input: CreatorRecipeImportInput): Promise<CreatorRecipeRecord> {
+    const result = await window.electron.creatorStudio.importRecipe(input);
+    if (!result.success || !result.recipe) {
+      throw new Error(result.error || 'Failed to import creator recipe');
+    }
+    return result.recipe;
+  }
+
+  async listRecipes(input: CreatorRecipeListInput = {}): Promise<CreatorRecipeListResult> {
+    const result = await window.electron.creatorStudio.listRecipes(input);
+    if (!result.success) {
+      throw new Error(result.error || 'Failed to list creator recipes');
+    }
+    return {
+      recipes: result.recipes ?? [],
+      total: result.total ?? 0,
+    };
+  }
+
+  async createPromptVersion(input: CreatorPromptVersionCreateInput): Promise<CreatorPromptVersionRecord> {
+    const result = await window.electron.creatorStudio.createPromptVersion(input);
+    if (!result.success || !result.version) {
+      throw new Error(result.error || 'Failed to create creator prompt version');
+    }
+    return result.version;
+  }
+
+  async listPromptVersions(input: CreatorPromptVersionListInput): Promise<CreatorPromptVersionListResult> {
+    const result = await window.electron.creatorStudio.listPromptVersions(input);
+    if (!result.success) {
+      throw new Error(result.error || 'Failed to list creator prompt versions');
+    }
+    return {
+      versions: result.versions ?? [],
+      total: result.total ?? 0,
+    };
+  }
+
+  async forkPromptVersion(input: CreatorPromptVersionForkInput): Promise<CreatorProductionAssetRecord> {
+    const result = await window.electron.creatorStudio.forkPromptVersion(input);
+    if (!result.success || !result.asset) {
+      throw new Error(result.error || 'Failed to fork creator prompt version');
+    }
+    return result.asset;
+  }
+
+  async diffPromptVersions(input: CreatorPromptVersionDiffInput): Promise<CreatorPromptVersionDiffResult> {
+    const result = await window.electron.creatorStudio.diffPromptVersions(input);
+    if (!result.success || !result.diff) {
+      throw new Error(result.error || 'Failed to diff creator prompt versions');
+    }
+    return result.diff;
   }
 
   async getWorkspace(): Promise<CreatorWorkspaceSnapshot> {

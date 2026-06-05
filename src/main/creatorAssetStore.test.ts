@@ -396,6 +396,159 @@ describe('CreatorAssetStore', () => {
     expect(store.listAssets({ projectId, tag: 'typography' }).total).toBe(1);
   });
 
+  test('tracks prompt versions, recipes, diffs, and forks', () => {
+    const workspace = store.createProject({ name: 'Recipe Project' });
+    const projectId = workspace.currentProjectId;
+    const promptAsset = store.createPromptAsset({
+      projectId,
+      title: 'Reusable Poster Prompt',
+      promptText: 'Generate a launch poster.',
+      promptSpec: {
+        sourceTitle: 'Reusable Poster Prompt',
+        templateId: 'poster-system',
+        caseIds: ['case-1'],
+        subject: 'Launch poster',
+      },
+      templateId: 'poster-system',
+      caseIds: ['case-1'],
+      selectedDirectionId: 'bold',
+      tags: ['poster', 'launch'],
+    });
+
+    expect(promptAsset.promptVersionId).toBeTruthy();
+    expect(promptAsset.selectedDirectionId).toBe('bold');
+
+    const firstVersions = store.listPromptVersions({ promptAssetId: promptAsset.id });
+    expect(firstVersions.total).toBe(1);
+    expect(firstVersions.versions[0].version).toBe(1);
+
+    const secondVersion = store.createPromptVersion({
+      promptAssetId: promptAsset.id,
+      promptText: 'Generate a refined launch poster.',
+      promptSpec: {
+        ...promptAsset.promptSpec!,
+        subject: 'Refined launch poster',
+      },
+      changeNote: 'Refine subject',
+    });
+    expect(secondVersion.version).toBe(2);
+
+    const diff = store.diffPromptVersions({
+      fromVersionId: firstVersions.versions[0].id,
+      toVersionId: secondVersion.id,
+    });
+    expect(diff.promptTextChanged).toBe(true);
+    expect(diff.promptSpecChanged).toBe(true);
+
+    const recipe = store.createRecipe({
+      projectId,
+      title: 'Weekly launch poster',
+      sourcePromptAssetId: promptAsset.id,
+      promptSpec: secondVersion.promptSpec,
+      defaultRuntime: { modelId: 'seedream-image' },
+      defaultOutput: { aspectRatio: '1:1' },
+      tags: ['poster', 'weekly'],
+    });
+    expect(recipe.sourcePromptAssetId).toBe(promptAsset.id);
+    expect(store.listRecipes({ projectId, tag: 'weekly' }).total).toBe(1);
+
+    const imported = store.importRecipe({
+      projectId,
+      recipe: {
+        title: 'Imported poster recipe',
+        promptSpec: recipe.promptSpec,
+        tags: ['imported'],
+      },
+    });
+    expect(imported.title).toBe('Imported poster recipe');
+
+    const forked = store.forkPromptVersion({
+      promptVersionId: firstVersions.versions[0].id,
+      projectId,
+      title: 'Rollback fork',
+    });
+    expect(forked.parentPromptAssetId).toBe(promptAsset.id);
+    expect(forked.promptText).toBe('Generate a launch poster.');
+    expect(store.listPromptVersions({ promptAssetId: forked.id }).total).toBe(1);
+  });
+
+  test('carries prompt version and recipe lineage from cowork draft to generated assets', () => {
+    db.prepare('INSERT INTO cowork_sessions (id, title, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?)')
+      .run('session-1', 'Creative Producer', 'running', 1, 1);
+    const workspace = store.createProject({ name: 'Lineage Project' });
+    const projectId = workspace.currentProjectId;
+    const promptAsset = store.createPromptAsset({
+      projectId,
+      title: 'Lineage Prompt',
+      promptText: 'Generate a lineage visual.',
+      promptSpec: {
+        sourceTitle: 'Lineage Prompt',
+        templateId: 'poster-system',
+        caseIds: ['case-1'],
+      },
+      templateId: 'poster-system',
+      caseIds: ['case-1'],
+      selectedDirectionId: 'route-a',
+    });
+    const recipe = store.createRecipe({
+      projectId,
+      title: 'Lineage recipe',
+      sourcePromptAssetId: promptAsset.id,
+      promptSpec: promptAsset.promptSpec!,
+    });
+
+    store.handleCoworkMessageInserted({
+      sessionId: 'session-1',
+      message: {
+        id: 'message-user',
+        type: 'user',
+        content: [
+          '[Creator Studio]',
+          '',
+          `promptVersionId: ${promptAsset.promptVersionId}`,
+          `recipeId: ${recipe.id}`,
+          'selectedDirectionId: route-a',
+          'templateId: poster-system',
+          '',
+          'PromptSpec:',
+          '```json',
+          JSON.stringify({
+            ...promptAsset.promptSpec,
+            promptVersionId: promptAsset.promptVersionId,
+            recipeId: recipe.id,
+            selectedDirectionId: 'route-a',
+          }, null, 2),
+          '```',
+          '',
+          'Prompt:',
+          '```text',
+          promptAsset.promptText,
+          '```',
+        ].join('\n'),
+        timestamp: 10,
+        sequence: 1,
+      },
+    });
+    store.handleCoworkMessageInserted({
+      sessionId: 'session-1',
+      message: {
+        id: 'message-assistant',
+        type: 'assistant',
+        content: 'Generated image',
+        timestamp: 20,
+        sequence: 2,
+        metadata: {
+          generatedImages: [{ path: '/tmp/generated-lineage.png' }],
+        },
+      },
+    });
+
+    const asset = store.listAssets({ projectId }).assets.find((item) => item.kind === CreatorProductionAssetKind.Image);
+    expect(asset?.promptVersionId).toBe(promptAsset.promptVersionId);
+    expect(asset?.recipeId).toBe(recipe.id);
+    expect(asset?.selectedDirectionId).toBe('route-a');
+  });
+
   test('persists project boards, card selection, context packs, and brand kit', () => {
     const workspace = store.createProject({ name: 'Board Project' });
     const projectId = workspace.currentProjectId;

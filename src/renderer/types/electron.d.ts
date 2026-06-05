@@ -42,6 +42,18 @@ import type {
   CreatorProductionAssetSourceLookup,
   CreatorProjectCreateInput,
   CreatorPromptAssetCreateInput,
+  CreatorPromptVersionCreateInput,
+  CreatorPromptVersionDiffInput,
+  CreatorPromptVersionDiffResult,
+  CreatorPromptVersionForkInput,
+  CreatorPromptVersionListInput,
+  CreatorPromptVersionListResult,
+  CreatorPromptVersionRecord,
+  CreatorRecipeCreateInput,
+  CreatorRecipeImportInput,
+  CreatorRecipeListInput,
+  CreatorRecipeListResult,
+  CreatorRecipeRecord,
   CreatorWorkspaceSnapshot,
 } from '@shared/creatorStudio/types';
 import type { FeishuEngineKeyType, FeishuManagementModeType, FeishuRuntimeOwnershipType, WeixinOwnershipType } from '@shared/im/constants';
@@ -827,6 +839,43 @@ interface IElectronAPI {
       error?: string;
     }>;
     revealAssetInFolder: (assetId: string) => Promise<{ success: boolean; error?: string }>;
+    createRecipe: (input: CreatorRecipeCreateInput) => Promise<{
+      success: boolean;
+      recipe?: CreatorRecipeRecord;
+      error?: string;
+    }>;
+    importRecipe: (input: CreatorRecipeImportInput) => Promise<{
+      success: boolean;
+      recipe?: CreatorRecipeRecord;
+      error?: string;
+    }>;
+    listRecipes: (input?: CreatorRecipeListInput) => Promise<{
+      success: boolean;
+      recipes?: CreatorRecipeListResult['recipes'];
+      total?: number;
+      error?: string;
+    }>;
+    createPromptVersion: (input: CreatorPromptVersionCreateInput) => Promise<{
+      success: boolean;
+      version?: CreatorPromptVersionRecord;
+      error?: string;
+    }>;
+    listPromptVersions: (input: CreatorPromptVersionListInput) => Promise<{
+      success: boolean;
+      versions?: CreatorPromptVersionListResult['versions'];
+      total?: number;
+      error?: string;
+    }>;
+    forkPromptVersion: (input: CreatorPromptVersionForkInput) => Promise<{
+      success: boolean;
+      asset?: CreatorProductionAssetRecord;
+      error?: string;
+    }>;
+    diffPromptVersions: (input: CreatorPromptVersionDiffInput) => Promise<{
+      success: boolean;
+      diff?: CreatorPromptVersionDiffResult;
+      error?: string;
+    }>;
     getWorkspace: () => Promise<{
       success: boolean;
       workspace?: CreatorWorkspaceSnapshot;
