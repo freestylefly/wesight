@@ -1073,25 +1073,19 @@ Builder 页面增加：
 6. 强绑定单一图片模型。
 7. 用 UI 硬编码第三方 provider 特殊逻辑。
 
-## 23. 推荐下一步
+## 23. 当前完成结论和后续方向
 
-建议按下面顺序推进：
+截至 2026-06-05，Prompt Builder P0+ 到 P4 的当前规划队列已经完成：
 
-1. 先做 P0+，把 Builder 模式、表单分组、Lint 和方向选择语义修正好。
-2. 再做 P1，把 PromptSpecV1 和 Prompt Compiler 建起来。
-3. 然后做 P2 的模板动态字段和案例 prompt 拆解。
-4. 最后做 Recipe、Version、评估指标和自动化。
+1. P0+ 已完成 Builder 模式、表单分组、Preview tabs、Lint、方向选择编译和来源回跳。
+2. P1 已完成 PromptSpecV1、legacy adapter、Prompt Compiler、Batch compiler、Asset schemaVersion 和 Cowork message metadata 双写。
+3. P2 已完成模板动态字段、案例 prompt 逆向拆解、自然语言填表、模板感知 directions、Context Pack role strategy 和图片摘要。
+4. P3 已完成 Recipe、Prompt Version、diff、fork、rollback、资产变体链路和 Batch winning asset provenance。
+5. P4 已完成生产指标聚合、Recipe 自动化表单、生产包 manifest 导出和治理检查。
 
-最优先的第一个 PR：
+后续 P5 可从以下方向继续拆分独立分支：
 
-```text
-fix/feat(creator): clarify prompt builder modes and add prompt quality checks
-```
-
-建议包含：
-
-- Source Mode 状态条。
-- 表单分组。
-- 基础 Lint。
-- selected direction prompt 编译修正。
-- 对应单元测试。
+- LLM 视觉摘要缓存：把当前本地图片摘要升级为可选 LLM/vision 懒分析，并保留本地 fallback。
+- 自动化模板增强：为 Recipe 自动化提供常用频率、交付目标和运行历史回看。
+- 结果归因闭环：把 Cowork generatedImages、batchTask、production asset 和 recipe provenance 自动串联。
+- Provider 扩展：在 compiler target 层接入更多图像、视频或工作流 provider。
