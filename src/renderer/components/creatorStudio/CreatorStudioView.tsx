@@ -1837,30 +1837,42 @@ const PromptBuilder: React.FC<{
                 </div>
               )}
             </div>
-            {sourceMode !== CreatorPromptSourceMode.Blank && (
-              <div className="flex shrink-0 gap-1">
-                {sourceCanOpen && (
+            <div className="flex shrink-0 gap-1">
+              <button
+                type="button"
+                disabled={!currentProjectId}
+                onClick={() => onSaveRecipe(promptSpec)}
+                className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-border text-muted transition-colors hover:bg-surface-raised hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
+                aria-label={i18nService.t('creatorSaveAsRecipe')}
+                title={i18nService.t('creatorSaveAsRecipe')}
+              >
+                <DocumentDuplicateIcon className="h-4 w-4" />
+              </button>
+              {sourceMode !== CreatorPromptSourceMode.Blank && (
+                <>
+                  {sourceCanOpen && (
+                    <button
+                      type="button"
+                      onClick={onOpenSourceDetail}
+                      className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-border text-muted transition-colors hover:bg-surface-raised hover:text-foreground"
+                      aria-label={i18nService.t('creatorBuilderOpenSource')}
+                      title={i18nService.t('creatorBuilderOpenSource')}
+                    >
+                      <ArrowTopRightOnSquareIcon className="h-4 w-4" />
+                    </button>
+                  )}
                   <button
                     type="button"
-                    onClick={onOpenSourceDetail}
+                    onClick={onClearSource}
                     className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-border text-muted transition-colors hover:bg-surface-raised hover:text-foreground"
-                    aria-label={i18nService.t('creatorBuilderOpenSource')}
-                    title={i18nService.t('creatorBuilderOpenSource')}
+                    aria-label={i18nService.t('creatorBuilderClearSource')}
+                    title={i18nService.t('creatorBuilderClearSource')}
                   >
-                    <ArrowTopRightOnSquareIcon className="h-4 w-4" />
+                    <XMarkIcon className="h-4 w-4" />
                   </button>
-                )}
-                <button
-                  type="button"
-                  onClick={onClearSource}
-                  className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-border text-muted transition-colors hover:bg-surface-raised hover:text-foreground"
-                  aria-label={i18nService.t('creatorBuilderClearSource')}
-                  title={i18nService.t('creatorBuilderClearSource')}
-                >
-                  <XMarkIcon className="h-4 w-4" />
-                </button>
-              </div>
-            )}
+                </>
+              )}
+            </div>
           </div>
         </div>
         <div className="rounded-lg border border-border bg-background p-3">
