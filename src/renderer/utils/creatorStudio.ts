@@ -1,5 +1,6 @@
 import type { CreatorBuilderMaterial, CreatorCreativeDirection, CreatorPromptMaterial, CreatorPromptSpec } from '../types/creatorStudio';
 import { CreatorMaterialRole } from '../types/creatorStudio';
+import { CreatorPromptSourceMode } from '../types/creatorStudio';
 import { CreatorStudioSourceType } from '../types/creatorStudio';
 
 export const CreatorStudioAgentId = {
@@ -29,6 +30,7 @@ export const CREATOR_STUDIO_RECOMMENDED_SKILL_IDS = [
 
 export interface CreatorPromptSeed {
   sourceType: CreatorPromptSpec['sourceType'];
+  sourceMode?: CreatorPromptSpec['sourceMode'];
   sourceId: string;
   sourceTitle: string;
   referencePrompt?: string;
@@ -51,12 +53,16 @@ export interface CreatorCoworkDraftInput {
 }
 
 export interface CreatorPromptForm {
+  taskType: string;
   subject: string;
   platform: string;
+  audience: string;
   mainObject: string;
   requiredText: string;
   visualStyle: string;
+  colorPreference: string;
   aspectRatio: string;
+  outputCount: string;
   negativeRequirements: string;
 }
 
@@ -88,6 +94,7 @@ export const buildPromptSpec = (
   const promptMaterials = materials.map(toPromptMaterial);
   const baseSpec: CreatorPromptSpec = {
     sourceType: seed?.sourceType ?? CreatorStudioSourceType.Template,
+    sourceMode: seed?.sourceMode ?? CreatorPromptSourceMode.Blank,
     sourceId: seed?.sourceId ?? 'blank',
     sourceTitle: seed?.sourceTitle ?? blankSourceTitle,
     language,
@@ -95,10 +102,14 @@ export const buildPromptSpec = (
     caseIds: seed?.caseIds ?? [],
     styles: seed?.styles ?? [],
     scenes: seed?.scenes ?? [],
+    taskType: form.taskType.trim(),
     subject: form.subject.trim(),
     platform: form.platform.trim(),
+    audience: form.audience.trim(),
     mainObject: form.mainObject.trim(),
     visualStyle: form.visualStyle.trim(),
+    colorPreference: form.colorPreference.trim(),
+    outputCount: form.outputCount.trim(),
     constraints: {
       ...(form.aspectRatio.trim() ? { aspectRatio: form.aspectRatio.trim() } : {}),
       ...(form.requiredText.trim() ? { requiredText: form.requiredText.trim() } : {}),
@@ -147,20 +158,24 @@ export const renderCreatorPrompt = (spec: CreatorPromptSpec): string => {
 
 const renderChinesePrompt = (spec: CreatorPromptSpec): string[] => [
   '请生成一张专业视觉图像。',
+  spec.taskType ? `任务类型：${spec.taskType}` : '',
   spec.subject ? `主题：${spec.subject}` : '',
   spec.platform ? `使用场景 / 平台：${spec.platform}` : '',
+  spec.audience ? `目标受众：${spec.audience}` : '',
   spec.mainObject ? `主体：${spec.mainObject}` : '',
   spec.constraints.requiredText ? `必须出现的文字：${spec.constraints.requiredText}` : '',
   spec.visualStyle ? `视觉风格：${spec.visualStyle}` : '',
+  spec.colorPreference ? `色彩偏好：${spec.colorPreference}` : '',
   spec.styles.length > 0 ? `继承风格标签：${spec.styles.join('、')}` : '',
   spec.scenes.length > 0 ? `适用场景标签：${spec.scenes.join('、')}` : '',
   spec.constraints.aspectRatio ? `画面比例：${spec.constraints.aspectRatio}` : '',
+  spec.outputCount ? `输出数量：${spec.outputCount}` : '',
   spec.templateGuidance.length > 0 ? `模板建议：\n${spec.templateGuidance.map((item) => `- ${item}`).join('\n')}` : '',
   spec.templatePitfalls.length > 0 ? `避免问题：\n${spec.templatePitfalls.map((item) => `- ${item}`).join('\n')}` : '',
   spec.constraints.negativeRequirements ? `负向要求：${spec.constraints.negativeRequirements}` : '',
   spec.contextPack ? `Context Pack：\n${spec.contextPack}` : '',
   spec.selectedCreativeDirection ? `已选择创意方向：\n${renderSelectedDirection(spec.selectedCreativeDirection, spec.language)}` : '',
-  spec.creativeDirections && spec.creativeDirections.length > 0
+  !spec.selectedCreativeDirection && spec.creativeDirections && spec.creativeDirections.length > 0
     ? `四个差异化创意方向：\n${renderDirectionLines(spec.creativeDirections)}`
     : '',
   `来源：${spec.sourceTitle}`,
@@ -212,7 +227,7 @@ export const renderCreatorCoworkDraft = ({
           '```',
         ].join('\n')
         : '',
-      promptSpec.creativeDirections && promptSpec.creativeDirections.length > 0
+      !promptSpec.selectedCreativeDirection && promptSpec.creativeDirections && promptSpec.creativeDirections.length > 0
         ? [
           '',
           'Creative Directions:',
@@ -271,7 +286,7 @@ export const renderCreatorCoworkDraft = ({
         '```',
       ].join('\n')
       : '',
-    promptSpec.creativeDirections && promptSpec.creativeDirections.length > 0
+    !promptSpec.selectedCreativeDirection && promptSpec.creativeDirections && promptSpec.creativeDirections.length > 0
       ? [
         '',
         'Creative Directions:',
@@ -308,20 +323,24 @@ export const hasSeedreamApiConfig = (config: Record<string, string>): boolean =>
 
 const renderEnglishPrompt = (spec: CreatorPromptSpec): string[] => [
   'Generate a professional visual image.',
+  spec.taskType ? `Task type: ${spec.taskType}` : '',
   spec.subject ? `Topic: ${spec.subject}` : '',
   spec.platform ? `Platform or usage context: ${spec.platform}` : '',
+  spec.audience ? `Audience: ${spec.audience}` : '',
   spec.mainObject ? `Main subject: ${spec.mainObject}` : '',
   spec.constraints.requiredText ? `Required visible text: ${spec.constraints.requiredText}` : '',
   spec.visualStyle ? `Visual style: ${spec.visualStyle}` : '',
+  spec.colorPreference ? `Color preference: ${spec.colorPreference}` : '',
   spec.styles.length > 0 ? `Inherited style tags: ${spec.styles.join(', ')}` : '',
   spec.scenes.length > 0 ? `Usage scene tags: ${spec.scenes.join(', ')}` : '',
   spec.constraints.aspectRatio ? `Aspect ratio: ${spec.constraints.aspectRatio}` : '',
+  spec.outputCount ? `Output count: ${spec.outputCount}` : '',
   spec.templateGuidance.length > 0 ? `Template guidance:\n${spec.templateGuidance.map((item) => `- ${item}`).join('\n')}` : '',
   spec.templatePitfalls.length > 0 ? `Avoid:\n${spec.templatePitfalls.map((item) => `- ${item}`).join('\n')}` : '',
   spec.constraints.negativeRequirements ? `Negative requirements: ${spec.constraints.negativeRequirements}` : '',
   spec.contextPack ? `Context Pack:\n${spec.contextPack}` : '',
   spec.selectedCreativeDirection ? `Selected creative direction:\n${renderSelectedDirection(spec.selectedCreativeDirection, spec.language)}` : '',
-  spec.creativeDirections && spec.creativeDirections.length > 0
+  !spec.selectedCreativeDirection && spec.creativeDirections && spec.creativeDirections.length > 0
     ? `Four differentiated creative directions:\n${renderDirectionLines(spec.creativeDirections)}`
     : '',
   `Source: ${spec.sourceTitle}`,

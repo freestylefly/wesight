@@ -124,6 +124,15 @@ export const CreatorStudioSourceType = {
 
 export type CreatorStudioSourceType = typeof CreatorStudioSourceType[keyof typeof CreatorStudioSourceType];
 
+export const CreatorPromptSourceMode = {
+  Blank: 'blank',
+  CaseRemix: 'case-remix',
+  TemplateDraft: 'template-draft',
+  AssetVariant: 'asset-variant',
+} as const;
+
+export type CreatorPromptSourceMode = typeof CreatorPromptSourceMode[keyof typeof CreatorPromptSourceMode];
+
 export const CreatorMaterialRole = {
   Reference: 'reference',
   Style: 'style',
@@ -176,6 +185,7 @@ export interface CreatorCreativeDirection {
 
 export interface CreatorPromptSpec {
   sourceType: CreatorStudioSourceType;
+  sourceMode?: CreatorPromptSourceMode;
   sourceId: string;
   sourceTitle: string;
   language: 'zh' | 'en';
@@ -183,10 +193,14 @@ export interface CreatorPromptSpec {
   caseIds: string[];
   styles: string[];
   scenes: string[];
+  taskType: string;
   subject: string;
   platform: string;
+  audience: string;
   mainObject: string;
   visualStyle: string;
+  colorPreference: string;
+  outputCount: string;
   constraints: {
     aspectRatio?: string;
     requiredText?: string;

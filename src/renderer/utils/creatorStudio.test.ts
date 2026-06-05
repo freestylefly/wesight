@@ -3,23 +3,34 @@ import { describe, expect, test } from 'vitest';
 import { type CreatorBuilderMaterial, CreatorMaterialRole, CreatorMaterialSource, CreatorStudioSourceType } from '../types/creatorStudio';
 import {
   buildPromptSpec,
+  type CreatorPromptForm,
   hasSeedreamApiConfig,
   renderCreatorCoworkDraft,
   renderCreatorPrompt,
   selectCreatorCreativeDirection,
 } from './creatorStudio';
 
+const createPromptForm = (overrides: Partial<CreatorPromptForm> = {}): CreatorPromptForm => ({
+  taskType: '',
+  subject: '',
+  platform: '',
+  audience: '',
+  mainObject: '',
+  requiredText: '',
+  visualStyle: '',
+  colorPreference: '',
+  aspectRatio: '',
+  outputCount: '1',
+  negativeRequirements: '',
+  ...overrides,
+});
+
 describe('creator studio prompt utilities', () => {
   test('omits empty form fields from rendered prompts', () => {
-    const spec = buildPromptSpec(null, {
-      subject: '',
-      platform: '',
+    const spec = buildPromptSpec(null, createPromptForm({
       mainObject: 'A compact camera',
-      requiredText: '',
-      visualStyle: '',
-      aspectRatio: '',
-      negativeRequirements: '',
-    }, 'en', 'Blank builder');
+      outputCount: '',
+    }), 'en', 'Blank builder');
 
     const prompt = renderCreatorPrompt(spec);
 
@@ -40,15 +51,14 @@ describe('creator studio prompt utilities', () => {
       scenes: ['Campaign'],
       templateGuidance: ['Lock hierarchy and readable text.'],
       templatePitfalls: ['Avoid generic layouts.'],
-    }, {
+    }, createPromptForm({
       subject: 'Spring launch',
       platform: 'Xiaohongshu cover',
-      mainObject: '',
       requiredText: 'NEW DROP',
       visualStyle: 'Bold editorial poster',
       aspectRatio: '3:4',
       negativeRequirements: 'No unreadable text',
-    }, 'en', 'Blank builder');
+    }), 'en', 'Blank builder');
 
     expect(spec.templateId).toBe('poster-system');
     expect(spec.caseIds).toEqual(['case-1', 'case-2']);
@@ -74,15 +84,10 @@ describe('creator studio prompt utilities', () => {
       caseIds: ['case-1'],
       styles: ['Poster'],
       scenes: ['Campaign'],
-    }, {
+    }, createPromptForm({
       subject: 'Spring launch',
-      platform: '',
-      mainObject: '',
-      requiredText: '',
-      visualStyle: '',
       aspectRatio: '1:1',
-      negativeRequirements: '',
-    }, 'en', 'Blank builder');
+    }), 'en', 'Blank builder');
     const promptText = renderCreatorPrompt(spec);
 
     const draft = renderCreatorCoworkDraft({
@@ -124,15 +129,13 @@ describe('creator studio prompt utilities', () => {
       dataUrl: 'data:image/jpeg;base64,BBBB',
       addedAt: 2,
     }];
-    const spec = buildPromptSpec(null, {
+    const spec = buildPromptSpec(null, createPromptForm({
       subject: 'Launch poster',
       platform: 'Instagram',
       mainObject: 'Camera',
-      requiredText: '',
       visualStyle: 'Premium editorial',
       aspectRatio: '4:5',
-      negativeRequirements: '',
-    }, 'en', 'Blank builder', materials);
+    }), 'en', 'Blank builder', materials);
 
     expect(spec.materials).toHaveLength(2);
     expect(spec.contextPack).toContain('role=brand');
@@ -162,15 +165,10 @@ describe('creator studio prompt utilities', () => {
       templateId: 'poster-system',
       caseIds: ['case-1'],
       variantOfAssetId: 'asset-parent',
-    }, {
+    }, createPromptForm({
       subject: 'Spring launch',
-      platform: '',
-      mainObject: '',
-      requiredText: '',
-      visualStyle: '',
       aspectRatio: '1:1',
-      negativeRequirements: '',
-    }, 'en', 'Blank builder');
+    }), 'en', 'Blank builder');
     const selectedSpec = selectCreatorCreativeDirection(spec, 'bold-campaign');
     const prompt = renderCreatorPrompt(selectedSpec);
     const draft = renderCreatorCoworkDraft({
@@ -183,7 +181,9 @@ describe('creator studio prompt utilities', () => {
     expect(selectedSpec.selectedCreativeDirectionId).toBe('bold-campaign');
     expect(prompt).toContain('Selected creative direction');
     expect(prompt).toContain('Bold campaign');
+    expect(prompt).not.toContain('Four differentiated creative directions');
     expect(draft).toContain('Selected Creative Direction:');
+    expect(draft).not.toContain('Creative Directions:');
     expect(draft).toContain('variantOfAssetId: asset-parent');
   });
 
@@ -194,15 +194,10 @@ describe('creator studio prompt utilities', () => {
       sourceTitle: 'Poster System',
       templateId: 'poster-system',
       caseIds: ['case-1'],
-    }, {
+    }, createPromptForm({
       subject: 'Spring launch',
-      platform: '',
-      mainObject: '',
-      requiredText: '',
-      visualStyle: '',
       aspectRatio: '1:1',
-      negativeRequirements: '',
-    }, 'en', 'Blank builder');
+    }), 'en', 'Blank builder');
 
     const draft = renderCreatorCoworkDraft({
       promptSpec: spec,

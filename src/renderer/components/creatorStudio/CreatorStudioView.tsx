@@ -46,7 +46,8 @@ import type {
   CreatorStudioStyleLibrary,
   CreatorStudioTemplate,
 } from '../../types/creatorStudio';
-import { CreatorMaterialRole, CreatorMaterialSource, CreatorStudioSourceType } from '../../types/creatorStudio';
+import { CreatorMaterialRole, CreatorMaterialSource, CreatorPromptSourceMode, CreatorStudioSourceType } from '../../types/creatorStudio';
+import { CreatorPromptLintSeverity, lintCreatorPromptSpec } from '../../utils/creatorPromptLint';
 import {
   buildPromptSpec,
   CREATOR_MATERIAL_ROLE_LABELS,
@@ -109,6 +110,13 @@ const SeedreamStatus = {
 
 type SeedreamStatus = typeof SeedreamStatus[keyof typeof SeedreamStatus];
 
+const PromptBuilderPreviewTab = {
+  Prompt: 'prompt',
+  Spec: 'spec',
+} as const;
+
+type PromptBuilderPreviewTab = typeof PromptBuilderPreviewTab[keyof typeof PromptBuilderPreviewTab];
+
 const CASE_PAGE_SIZE = 80;
 const GALLERY_THUMBNAIL_SIZE_MIN = 180;
 const GALLERY_THUMBNAIL_SIZE_MAX = 360;
@@ -116,12 +124,16 @@ const GALLERY_THUMBNAIL_SIZE_STEP = 20;
 const GALLERY_THUMBNAIL_SIZE_DEFAULT = 260;
 
 const defaultBuilderForm: CreatorPromptForm = {
+  taskType: '',
   subject: '',
   platform: '',
+  audience: '',
   mainObject: '',
   requiredText: '',
   visualStyle: '',
+  colorPreference: '',
   aspectRatio: '1:1',
+  outputCount: '1',
   negativeRequirements: '',
 };
 
@@ -366,6 +378,7 @@ const CreatorStudioView: React.FC<CreatorStudioViewProps> = ({
   const startFromCase = (item: CreatorStudioCase) => {
     setBuilderSeed({
       sourceType: CreatorStudioSourceType.Case,
+      sourceMode: CreatorPromptSourceMode.CaseRemix,
       sourceId: item.id,
       sourceTitle: item.title,
       referencePrompt: item.prompt,
@@ -385,6 +398,7 @@ const CreatorStudioView: React.FC<CreatorStudioViewProps> = ({
   const startFromTemplate = (template: CreatorStudioTemplate) => {
     setBuilderSeed({
       sourceType: CreatorStudioSourceType.Template,
+      sourceMode: CreatorPromptSourceMode.TemplateDraft,
       sourceId: template.id,
       sourceTitle: getText(template.title),
       templateId: template.id,
@@ -413,6 +427,7 @@ const CreatorStudioView: React.FC<CreatorStudioViewProps> = ({
   const useAssetAsReference = (asset: CreatorProductionAssetRecord) => {
     setBuilderSeed({
       sourceType: CreatorStudioSourceType.Template,
+      sourceMode: CreatorPromptSourceMode.AssetVariant,
       sourceId: asset.id,
       sourceTitle: asset.fileName,
       referencePrompt: asset.promptText || (asset.promptSpec ? JSON.stringify(asset.promptSpec, null, 2) : undefined),
@@ -426,12 +441,16 @@ const CreatorStudioView: React.FC<CreatorStudioViewProps> = ({
       variantOfAssetId: asset.id,
     });
     setBuilderForm({
+      taskType: typeof asset.promptSpec?.taskType === 'string' ? asset.promptSpec.taskType : '',
       subject: asset.promptSpec?.subject ?? asset.fileName,
       platform: asset.promptSpec?.platform ?? '',
+      audience: typeof asset.promptSpec?.audience === 'string' ? asset.promptSpec.audience : '',
       mainObject: asset.promptSpec?.mainObject ?? '',
       requiredText: asset.promptSpec?.constraints?.requiredText ?? '',
       visualStyle: asset.promptSpec?.visualStyle ?? '',
+      colorPreference: typeof asset.promptSpec?.colorPreference === 'string' ? asset.promptSpec.colorPreference : '',
       aspectRatio: asset.promptSpec?.constraints?.aspectRatio ?? '1:1',
+      outputCount: typeof asset.promptSpec?.outputCount === 'string' ? asset.promptSpec.outputCount : '1',
       negativeRequirements: asset.promptSpec?.constraints?.negativeRequirements ?? '',
     });
     if (asset.kind === CreatorProductionAssetKind.Image) {
@@ -828,6 +847,12 @@ const CreatorStudioView: React.FC<CreatorStudioViewProps> = ({
             currentProjectId={currentProjectId}
             onProjectChange={(projectId) => void switchProject(projectId)}
             onCreateProject={createProject}
+            onClearSource={() => {
+              setBuilderSeed(null);
+              setBuilderForm(defaultBuilderForm);
+              setBuilderMaterials([]);
+              setBoardContextPack('');
+            }}
             onSendToCowork={sendToCowork}
             onSavePromptAsset={(promptSpec, promptText) => void savePromptAsset(promptSpec, promptText)}
             brandKit={boardWorkspace?.brandKit ?? null}
@@ -1173,6 +1198,50 @@ const TemplateLibrary: React.FC<{
   </section>
 );
 
+const getSourceModeLabel = (mode: CreatorPromptSourceMode): string => {
+  switch (mode) {
+    case CreatorPromptSourceMode.CaseRemix:
+      return i18nService.t('creatorSourceModeCaseRemix');
+    case CreatorPromptSourceMode.TemplateDraft:
+      return i18nService.t('creatorSourceModeTemplateDraft');
+    case CreatorPromptSourceMode.AssetVariant:
+      return i18nService.t('creatorSourceModeAssetVariant');
+    case CreatorPromptSourceMode.Blank:
+    default:
+      return i18nService.t('creatorSourceModeBlank');
+  }
+};
+
+const getSourceModeHint = (mode: CreatorPromptSourceMode): string => {
+  switch (mode) {
+    case CreatorPromptSourceMode.CaseRemix:
+      return i18nService.t('creatorSourceModeCaseRemixHint');
+    case CreatorPromptSourceMode.TemplateDraft:
+      return i18nService.t('creatorSourceModeTemplateDraftHint');
+    case CreatorPromptSourceMode.AssetVariant:
+      return i18nService.t('creatorSourceModeAssetVariantHint');
+    case CreatorPromptSourceMode.Blank:
+    default:
+      return i18nService.t('creatorSourceModeBlankHint');
+  }
+};
+
+const getLintSeverityClass = (severity: CreatorPromptLintSeverity): string => {
+  switch (severity) {
+    case CreatorPromptLintSeverity.Error:
+      return 'bg-red-500/10 text-red-600';
+    case CreatorPromptLintSeverity.Warning:
+      return 'bg-amber-500/10 text-amber-700 dark:text-amber-400';
+    case CreatorPromptLintSeverity.Info:
+    default:
+      return 'bg-surface-raised text-muted';
+  }
+};
+
+const capitalizeLintSeverity = (severity: CreatorPromptLintSeverity): string => (
+  severity.charAt(0).toUpperCase() + severity.slice(1)
+);
+
 const PromptBuilder: React.FC<{
   seed: CreatorPromptSeed | null;
   form: CreatorPromptForm;
@@ -1187,6 +1256,7 @@ const PromptBuilder: React.FC<{
   currentProjectId: string;
   onProjectChange: (projectId: string) => void;
   onCreateProject: (name: string) => Promise<void> | void;
+  onClearSource: () => void;
   brandKit: CreatorBrandKitRecord | null;
   boardContextPack: string;
   onSendToCowork: (
@@ -1210,12 +1280,14 @@ const PromptBuilder: React.FC<{
   currentProjectId,
   onProjectChange,
   onCreateProject,
+  onClearSource,
   brandKit,
   boardContextPack,
   onSendToCowork,
   onSavePromptAsset,
 }) => {
   const [selectedDirectionId, setSelectedDirectionId] = useState<string | null>(null);
+  const [previewTab, setPreviewTab] = useState<PromptBuilderPreviewTab>(PromptBuilderPreviewTab.Prompt);
   const [projectNameDraft, setProjectNameDraft] = useState('');
   const [isProjectFormOpen, setIsProjectFormOpen] = useState(false);
   const [isCreatingProject, setIsCreatingProject] = useState(false);
@@ -1224,8 +1296,15 @@ const PromptBuilder: React.FC<{
   const basePromptSpec = applyBoardAndBrandKit(rawPromptSpec, brandKit, boardContextPack);
   const promptSpec = selectCreatorCreativeDirection(basePromptSpec, selectedDirectionId);
   const prompt = renderCreatorPrompt(promptSpec);
+  const promptSpecJson = JSON.stringify(promptSpec, null, 2);
+  const lintResult = lintCreatorPromptSpec(promptSpec);
+  const lintErrorCount = lintResult.issues.filter((issue) => issue.severity === CreatorPromptLintSeverity.Error).length;
+  const lintWarningCount = lintResult.issues.filter((issue) => issue.severity === CreatorPromptLintSeverity.Warning).length;
+  const lintInfoCount = lintResult.issues.filter((issue) => issue.severity === CreatorPromptLintSeverity.Info).length;
+  const hasLintErrors = lintErrorCount > 0;
   const seedreamReady = seedreamStatus === SeedreamStatus.Configured;
   const seedreamHint = getSeedreamStatusHint(seedreamStatus);
+  const sourceMode = promptSpec.sourceMode ?? CreatorPromptSourceMode.Blank;
 
   useEffect(() => {
     setSelectedDirectionId(null);
@@ -1250,9 +1329,32 @@ const PromptBuilder: React.FC<{
   return (
     <section className="grid min-w-0 gap-4 p-4 xl:grid-cols-[minmax(320px,420px)_minmax(0,1fr)]">
       <div className="min-w-0 space-y-3 rounded-lg border border-border bg-surface p-4">
-        <div>
-          <div className="text-xs font-medium uppercase text-muted">{i18nService.t('creatorBuilderSource')}</div>
-          <div className="mt-1 break-words text-sm font-semibold">{promptSpec.sourceTitle}</div>
+        <div className="rounded-lg border border-border bg-background p-3">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <div className="text-xs font-medium uppercase text-muted">{i18nService.t('creatorBuilderSource')}</div>
+              <div className="mt-1 flex flex-wrap items-center gap-2">
+                <span className="rounded-md bg-primary/10 px-2 py-1 text-[11px] font-medium text-primary">
+                  {getSourceModeLabel(sourceMode)}
+                </span>
+                {promptSpec.templateId && <span className="rounded-md bg-surface-raised px-2 py-1 text-[11px] text-muted">template: {promptSpec.templateId}</span>}
+                {promptSpec.caseIds.length > 0 && <span className="rounded-md bg-surface-raised px-2 py-1 text-[11px] text-muted">cases: {promptSpec.caseIds.length}</span>}
+              </div>
+              <div className="mt-2 break-words text-sm font-semibold">{promptSpec.sourceTitle}</div>
+              <p className="mt-1 text-xs leading-5 text-muted">{getSourceModeHint(sourceMode)}</p>
+            </div>
+            {sourceMode !== CreatorPromptSourceMode.Blank && (
+              <button
+                type="button"
+                onClick={onClearSource}
+                className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-border text-muted transition-colors hover:bg-surface-raised hover:text-foreground"
+                aria-label={i18nService.t('creatorBuilderClearSource')}
+                title={i18nService.t('creatorBuilderClearSource')}
+              >
+                <XMarkIcon className="h-4 w-4" />
+              </button>
+            )}
+          </div>
         </div>
         <div className="rounded-lg border border-border bg-background p-3">
           <div className="text-xs font-medium text-secondary">{i18nService.t('creatorBuilderProject')}</div>
@@ -1312,27 +1414,92 @@ const PromptBuilder: React.FC<{
             </div>
           )}
         </div>
-        <BuilderInput label={i18nService.t('creatorFieldSubject')} value={form.subject} onChange={(value) => updateField('subject', value)} />
-        <BuilderInput label={i18nService.t('creatorFieldPlatform')} value={form.platform} onChange={(value) => updateField('platform', value)} />
-        <BuilderInput label={i18nService.t('creatorFieldMainObject')} value={form.mainObject} onChange={(value) => updateField('mainObject', value)} />
-        <BuilderInput label={i18nService.t('creatorFieldRequiredText')} value={form.requiredText} onChange={(value) => updateField('requiredText', value)} />
-        <BuilderInput label={i18nService.t('creatorFieldVisualStyle')} value={form.visualStyle} onChange={(value) => updateField('visualStyle', value)} />
-        <BuilderInput label={i18nService.t('creatorFieldAspectRatio')} value={form.aspectRatio} onChange={(value) => updateField('aspectRatio', value)} />
-        <BuilderTextarea label={i18nService.t('creatorFieldNegative')} value={form.negativeRequirements} onChange={(value) => updateField('negativeRequirements', value)} />
-        <MaterialTray materials={materials} onMaterialsChange={onMaterialsChange} />
+        <BuilderSection title={i18nService.t('creatorBuilderSectionBrief')}>
+          <BuilderInput label={i18nService.t('creatorFieldTaskType')} value={form.taskType} onChange={(value) => updateField('taskType', value)} />
+          <BuilderInput label={i18nService.t('creatorFieldSubject')} value={form.subject} onChange={(value) => updateField('subject', value)} />
+          <BuilderInput label={i18nService.t('creatorFieldPlatform')} value={form.platform} onChange={(value) => updateField('platform', value)} />
+          <BuilderInput label={i18nService.t('creatorFieldAudience')} value={form.audience} onChange={(value) => updateField('audience', value)} />
+        </BuilderSection>
+        <BuilderSection title={i18nService.t('creatorBuilderSectionComposition')}>
+          <BuilderInput label={i18nService.t('creatorFieldMainObject')} value={form.mainObject} onChange={(value) => updateField('mainObject', value)} />
+          <BuilderInput label={i18nService.t('creatorFieldAspectRatio')} value={form.aspectRatio} onChange={(value) => updateField('aspectRatio', value)} />
+          <BuilderInput label={i18nService.t('creatorFieldOutputCount')} value={form.outputCount} onChange={(value) => updateField('outputCount', value)} />
+        </BuilderSection>
+        <BuilderSection title={i18nService.t('creatorBuilderSectionStyle')}>
+          <BuilderInput label={i18nService.t('creatorFieldVisualStyle')} value={form.visualStyle} onChange={(value) => updateField('visualStyle', value)} />
+          <BuilderInput label={i18nService.t('creatorFieldColorPreference')} value={form.colorPreference} onChange={(value) => updateField('colorPreference', value)} />
+          <BuilderInput label={i18nService.t('creatorFieldRequiredText')} value={form.requiredText} onChange={(value) => updateField('requiredText', value)} />
+          <BuilderTextarea label={i18nService.t('creatorFieldNegative')} value={form.negativeRequirements} onChange={(value) => updateField('negativeRequirements', value)} />
+        </BuilderSection>
+        <BuilderSection title={i18nService.t('creatorBuilderSectionMaterials')}>
+          <MaterialTray materials={materials} onMaterialsChange={onMaterialsChange} />
+        </BuilderSection>
       </div>
       <div className="min-w-0 space-y-4">
+        <div className="min-w-0 rounded-lg border border-border bg-surface p-4">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <h2 className="text-sm font-semibold">{i18nService.t('creatorPromptQuality')}</h2>
+              <p className="mt-1 text-xs leading-5 text-muted">
+                {i18nService.t('creatorPromptQualitySummary')
+                  .replace('{score}', String(lintResult.score))
+                  .replace('{errors}', String(lintErrorCount))
+                  .replace('{warnings}', String(lintWarningCount))
+                  .replace('{info}', String(lintInfoCount))}
+              </p>
+            </div>
+            <span className={`rounded-md px-2 py-1 text-xs font-medium ${hasLintErrors ? 'bg-red-500/10 text-red-600' : 'bg-primary/10 text-primary'}`}>
+              {lintResult.score}/100
+            </span>
+          </div>
+          {lintResult.issues.length > 0 ? (
+            <div className="mt-3 space-y-2">
+              {lintResult.issues.map((issue) => (
+                <div key={`${issue.code}-${issue.fieldPath}`} className="rounded-lg border border-border bg-background p-3">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className={`rounded-md px-2 py-0.5 text-[11px] font-medium ${getLintSeverityClass(issue.severity)}`}>
+                      {i18nService.t(`creatorPromptLintSeverity${capitalizeLintSeverity(issue.severity)}`)}
+                    </span>
+                    <span className="text-xs font-medium text-secondary">{issue.fieldPath}</span>
+                  </div>
+                  <p className="mt-2 text-xs leading-5 text-secondary">{i18nService.t(issue.messageKey)}</p>
+                  {issue.suggestionKey && <p className="mt-1 text-xs leading-5 text-muted">{i18nService.t(issue.suggestionKey)}</p>}
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="mt-3 text-xs leading-5 text-muted">{i18nService.t('creatorPromptQualityClean')}</p>
+          )}
+        </div>
         <div className="min-w-0 rounded-lg border border-border bg-surface">
           <div className="flex items-center justify-between border-b border-border px-4 py-3">
-            <h2 className="text-sm font-semibold">{i18nService.t('creatorPromptPreview')}</h2>
+            <div className="flex flex-wrap items-center gap-2">
+              <h2 className="text-sm font-semibold">{i18nService.t('creatorPromptPreview')}</h2>
+              <div className="inline-flex rounded-lg border border-border bg-background p-1">
+                <button
+                  type="button"
+                  onClick={() => setPreviewTab(PromptBuilderPreviewTab.Prompt)}
+                  className={`rounded-md px-2 py-1 text-xs font-medium ${previewTab === PromptBuilderPreviewTab.Prompt ? 'bg-primary text-white' : 'text-secondary hover:bg-surface-raised hover:text-foreground'}`}
+                >
+                  {i18nService.t('creatorPromptPreviewFinal')}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPreviewTab(PromptBuilderPreviewTab.Spec)}
+                  className={`rounded-md px-2 py-1 text-xs font-medium ${previewTab === PromptBuilderPreviewTab.Spec ? 'bg-primary text-white' : 'text-secondary hover:bg-surface-raised hover:text-foreground'}`}
+                >
+                  {i18nService.t('creatorPromptPreviewSpec')}
+                </button>
+              </div>
+            </div>
             <div className="flex flex-wrap justify-end gap-2">
               <button
                 type="button"
-                onClick={() => void copyText(prompt)}
+                onClick={() => void copyText(previewTab === PromptBuilderPreviewTab.Prompt ? prompt : promptSpecJson)}
                 className="inline-flex items-center gap-2 rounded-lg bg-primary px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-primary-hover"
               >
                 <ClipboardDocumentIcon className="h-4 w-4" />
-                {i18nService.t('creatorCopyPrompt')}
+                {previewTab === PromptBuilderPreviewTab.Prompt ? i18nService.t('creatorCopyPrompt') : i18nService.t('copy')}
               </button>
               <button
                 type="button"
@@ -1345,7 +1512,8 @@ const PromptBuilder: React.FC<{
               </button>
               <button
                 type="button"
-                disabled={isSendingToCowork}
+                disabled={isSendingToCowork || hasLintErrors}
+                title={hasLintErrors ? i18nService.t('creatorPromptLintBlocksExecution') : undefined}
                 onClick={() => onSendToCowork(promptSpec, prompt, materials)}
                 className="inline-flex items-center gap-2 rounded-lg border border-primary bg-primary/10 px-3 py-2 text-sm font-medium text-primary transition-colors hover:bg-primary/15 disabled:cursor-not-allowed disabled:opacity-60"
               >
@@ -1354,8 +1522,8 @@ const PromptBuilder: React.FC<{
               </button>
               <button
                 type="button"
-                disabled={!seedreamReady || isSendingToCowork}
-                title={seedreamHint}
+                disabled={!seedreamReady || isSendingToCowork || hasLintErrors}
+                title={hasLintErrors ? i18nService.t('creatorPromptLintBlocksExecution') : seedreamHint}
                 onClick={() => onSendToCowork(promptSpec, prompt, materials, true)}
                 className="inline-flex items-center gap-2 rounded-lg border border-border px-3 py-2 text-sm font-medium text-secondary transition-colors hover:bg-surface-raised hover:text-foreground disabled:cursor-not-allowed disabled:opacity-55"
               >
@@ -1364,7 +1532,9 @@ const PromptBuilder: React.FC<{
               </button>
             </div>
           </div>
-          <pre className="max-h-[420px] max-w-full whitespace-pre-wrap break-words overflow-auto p-4 text-sm leading-6 text-foreground">{prompt}</pre>
+          <pre className="max-h-[420px] max-w-full whitespace-pre-wrap break-words overflow-auto p-4 text-sm leading-6 text-foreground">
+            {previewTab === PromptBuilderPreviewTab.Prompt ? prompt : promptSpecJson}
+          </pre>
         </div>
         <div className="min-w-0 rounded-lg border border-border bg-surface">
           <div className="border-b border-border px-4 py-3">
@@ -1433,20 +1603,6 @@ const PromptBuilder: React.FC<{
             })}
           </div>
           <p className="mt-3 text-xs leading-5 text-muted">{seedreamHint}</p>
-        </div>
-        <div className="min-w-0 rounded-lg border border-border bg-surface">
-          <div className="flex items-center justify-between border-b border-border px-4 py-3">
-            <h2 className="text-sm font-semibold">{i18nService.t('creatorPromptSpec')}</h2>
-            <button
-              type="button"
-              onClick={() => void copyText(JSON.stringify(promptSpec, null, 2))}
-              className="inline-flex items-center gap-2 rounded-lg border border-border px-3 py-2 text-sm font-medium text-secondary transition-colors hover:bg-surface-raised hover:text-foreground"
-            >
-              <DocumentDuplicateIcon className="h-4 w-4" />
-              {i18nService.t('copy')}
-            </button>
-          </div>
-          <pre className="max-h-64 max-w-full whitespace-pre-wrap break-words overflow-auto p-4 text-xs leading-5 text-secondary">{JSON.stringify(promptSpec, null, 2)}</pre>
         </div>
       </div>
     </section>
@@ -1706,6 +1862,16 @@ const BuilderInput: React.FC<{
       className="mt-1 h-10 w-full rounded-lg border border-border bg-background px-3 text-sm outline-none focus:border-primary"
     />
   </label>
+);
+
+const BuilderSection: React.FC<{
+  title: string;
+  children: React.ReactNode;
+}> = ({ title, children }) => (
+  <section className="space-y-3 rounded-lg border border-border bg-background p-3">
+    <h3 className="text-xs font-semibold uppercase text-muted">{title}</h3>
+    {children}
+  </section>
 );
 
 const BuilderTextarea: React.FC<{
