@@ -829,19 +829,24 @@ const CoworkPromptInput = React.forwardRef<CoworkPromptInputRef, CoworkPromptInp
     if (runtimeLocked) {
       return (
         <div
-          className="flex min-w-0 items-center gap-1.5 rounded-xl border border-border bg-surface px-2.5 py-1.5 text-xs text-foreground"
+          className="flex min-w-0 items-center gap-1.5"
           title={i18nService.t('coworkRuntimeLockedTooltip')
             .replace('{engine}', lockedEngineLabel)
             .replace('{model}', lockedModelLabel)}
         >
-          <span className="max-w-[120px] truncate font-medium">{lockedEngineLabel}</span>
-          <span className="text-muted">·</span>
-          <span className="max-w-[160px] truncate text-secondary">{lockedModelLabel}</span>
+          <span className="max-w-[130px] truncate rounded-xl border border-border bg-surface px-2.5 py-1.5 text-xs font-medium text-foreground">
+            {lockedEngineLabel}
+          </span>
           {lockedPermissionLabel && (
-            <>
-              <span className="text-muted">·</span>
-              <span className="max-w-[90px] truncate text-secondary">{lockedPermissionLabel}</span>
-            </>
+            <span className="max-w-[90px] truncate rounded-xl border border-border bg-surface px-2.5 py-1.5 text-xs text-secondary">
+              {lockedPermissionLabel}
+            </span>
+          )}
+          {showModelSelector && (
+            <CoworkModelSelector
+              dropdownDirection="up"
+              effectiveEngine={lockedRuntimeSnapshot?.agentEngine}
+            />
           )}
         </div>
       );
@@ -866,6 +871,7 @@ const CoworkPromptInput = React.forwardRef<CoworkPromptInputRef, CoworkPromptInp
           <CoworkModelSelector
             dropdownDirection="up"
             readOnly={modelSelectorReadOnly}
+            effectiveEngine={selectorEngine}
           />
         )}
       </div>

@@ -35,8 +35,8 @@ html.desktop-pet-page main {
   left: 50%;
   bottom: 2px;
   transform: translateX(-50%);
-  width: 156px;
-  height: 166px;
+  width: 116px;
+  height: 122px;
   display: grid;
   place-items: center;
   pointer-events: auto;
@@ -45,16 +45,16 @@ html.desktop-pet-page main {
 .desktop-pet-bubble {
   position: absolute;
   left: 50%;
-  top: 4px;
+  top: 2px;
   transform: translate(-50%, 4px) scale(0.97);
-  min-width: 86px;
-  max-width: 146px;
-  padding: 7px 10px;
+  min-width: 72px;
+  max-width: 112px;
+  padding: 6px 8px;
   border: 1px solid rgba(148, 163, 184, 0.35);
   border-radius: 12px;
   background: rgba(255, 255, 255, 0.9);
   color: #111827;
-  font-size: 12px;
+  font-size: 11px;
   line-height: 1.35;
   text-align: center;
   box-shadow: 0 12px 30px rgba(15, 23, 42, 0.22);
@@ -67,17 +67,17 @@ html.desktop-pet-page main {
 .desktop-pet-task-card {
   position: absolute;
   left: 50%;
-  top: 8px;
-  width: 258px;
-  min-height: 92px;
+  top: 6px;
+  width: 214px;
+  min-height: 78px;
   transform: translateX(-50%);
   border: 1px solid rgba(148, 89, 39, 0.28);
-  border-radius: 14px;
+  border-radius: 12px;
   background: rgba(255, 255, 255, 0.94);
   color: #1f2933;
   box-shadow: 0 16px 34px rgba(58, 42, 24, 0.2);
   backdrop-filter: blur(18px);
-  padding: 10px 12px 11px;
+  padding: 8px 10px 9px;
   cursor: pointer;
   pointer-events: auto;
   animation: desktop-pet-task-in 220ms ease-out;
@@ -86,7 +86,7 @@ html.desktop-pet-page main {
 .desktop-pet-task-card::after {
   content: '';
   position: absolute;
-  right: 55px;
+  right: 44px;
   bottom: -7px;
   width: 12px;
   height: 12px;
@@ -100,14 +100,14 @@ html.desktop-pet-page main {
   position: absolute;
   left: 7px;
   top: 8px;
-  width: 18px;
-  height: 18px;
+  width: 16px;
+  height: 16px;
   border: 0;
   border-radius: 999px;
   background: rgba(243, 244, 246, 0.95);
   color: #4b5563;
-  font-size: 14px;
-  line-height: 18px;
+  font-size: 13px;
+  line-height: 16px;
   cursor: pointer;
 }
 
@@ -117,7 +117,7 @@ html.desktop-pet-page main {
   justify-content: space-between;
   gap: 8px;
   padding-left: 22px;
-  font-size: 11px;
+  font-size: 10px;
   line-height: 1.2;
 }
 
@@ -128,14 +128,14 @@ html.desktop-pet-page main {
 
 .desktop-pet-task-source {
   color: #a16207;
-  font-size: 10px;
+  font-size: 9px;
 }
 
 .desktop-pet-task-title {
   margin-top: 4px;
-  min-height: 18px;
+  min-height: 16px;
   color: #111827;
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 700;
   line-height: 1.35;
   padding-left: 22px;
@@ -145,11 +145,11 @@ html.desktop-pet-page main {
 .desktop-pet-task-meta {
   display: flex;
   align-items: center;
-  gap: 6px;
-  margin-top: 5px;
+  gap: 5px;
+  margin-top: 4px;
   padding-left: 22px;
   color: #6b7280;
-  font-size: 10px;
+  font-size: 9px;
   line-height: 1.25;
 }
 
@@ -161,11 +161,11 @@ html.desktop-pet-page main {
 }
 
 .desktop-pet-task-meta span:first-child {
-  max-width: 82px;
+  max-width: 66px;
 }
 
 .desktop-pet-task-meta span:last-child {
-  max-width: 142px;
+  max-width: 116px;
 }
 
 .desktop-pet-task-footer {
@@ -173,7 +173,7 @@ html.desktop-pet-page main {
   align-items: center;
   justify-content: space-between;
   gap: 10px;
-  margin-top: 8px;
+  margin-top: 6px;
   padding-left: 22px;
 }
 
@@ -183,7 +183,7 @@ html.desktop-pet-page main {
   gap: 5px;
   min-width: 0;
   color: #6b7280;
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 700;
 }
 
@@ -223,27 +223,27 @@ html.desktop-pet-page main {
   font-size: 11px;
   font-weight: 700;
   line-height: 1;
-  padding: 6px 8px;
+  padding: 5px 7px;
   cursor: pointer;
 }
 
 .desktop-pet-task-pill {
   position: absolute;
   left: 50%;
-  bottom: 10px;
+  bottom: 7px;
   display: inline-flex;
   align-items: center;
   gap: 7px;
-  transform: translateX(18px);
+  transform: translateX(12px);
   border: 1px solid rgba(148, 89, 39, 0.24);
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.93);
   color: #374151;
   box-shadow: 0 8px 18px rgba(58, 42, 24, 0.18);
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 700;
   line-height: 1;
-  padding: 7px 10px;
+  padding: 6px 8px;
   cursor: pointer;
   backdrop-filter: blur(14px);
 }
@@ -270,16 +270,16 @@ html.desktop-pet-page main {
 .desktop-pet-sprite-wrap {
   position: absolute;
   left: 50%;
-  bottom: 3px;
+  bottom: 2px;
   transform: translateX(-50%);
 }
 
 .desktop-pet-action-dot {
   position: absolute;
-  right: 18px;
-  bottom: 22px;
-  width: 9px;
-  height: 9px;
+  right: 8px;
+  bottom: 16px;
+  width: 8px;
+  height: 8px;
   border-radius: 999px;
   background: #22c55e;
   box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.18);

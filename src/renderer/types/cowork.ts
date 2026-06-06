@@ -8,7 +8,7 @@ import type {
   QwenCodePermissionMode,
 } from '@shared/cowork/constants';
 export type { CoworkFileActivity } from '@shared/cowork/fileActivity';
-import type { CoworkSessionRuntimeSnapshot } from '@shared/cowork/runtimeSnapshot';
+import type { CoworkModelOverride, CoworkSessionRuntimeSnapshot } from '@shared/cowork/runtimeSnapshot';
 export type {
   RuntimeCallRecord,
   RuntimeMetricsDetailResult,
@@ -247,6 +247,7 @@ export interface CoworkStartOptions {
   activeSkillIds?: string[];
   agentId?: string;
   teamId?: string;
+  modelOverride?: CoworkModelOverride | null;
   imageAttachments?: CoworkImageAttachment[];
 }
 
@@ -256,6 +257,7 @@ export interface CoworkContinueOptions {
   prompt: string;
   systemPrompt?: string;
   activeSkillIds?: string[];
+  modelOverride?: CoworkModelOverride | null;
   imageAttachments?: CoworkImageAttachment[];
 }
 

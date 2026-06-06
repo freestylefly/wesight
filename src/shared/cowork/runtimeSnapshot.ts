@@ -1,5 +1,12 @@
 import type { CoworkAgentEngine } from './constants';
 
+export interface CoworkModelOverride {
+  modelId: string;
+  modelName?: string | null;
+  providerKey?: string | null;
+  providerName?: string | null;
+}
+
 export interface CoworkSessionRuntimeSnapshot {
   agentEngine: CoworkAgentEngine;
   engineLabel: string;

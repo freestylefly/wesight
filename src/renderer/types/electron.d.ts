@@ -13,7 +13,7 @@ import type {
   RuntimeMetricsFilters,
   RuntimeMetricsSummary,
 } from '@shared/cowork/runtimeMetrics';
-import type { CoworkSessionRuntimeSnapshot } from '@shared/cowork/runtimeSnapshot';
+import type { CoworkModelOverride, CoworkSessionRuntimeSnapshot } from '@shared/cowork/runtimeSnapshot';
 import type { CoworkStudioAssetsResult } from '@shared/cowork/studioAssets';
 import type { FeishuEngineKeyType, FeishuManagementModeType, FeishuRuntimeOwnershipType, WeixinOwnershipType } from '@shared/im/constants';
 import type { DesktopPetTaskSnapshot, PetConfig, PetPosition } from '@shared/pet/constants';
@@ -660,8 +660,8 @@ interface IElectronAPI {
     onStateChanged: (callback: (state: WindowState) => void) => () => void;
   };
   cowork: {
-    startSession: (options: { prompt: string; cwd?: string; systemPrompt?: string; title?: string; activeSkillIds?: string[]; agentId?: string; teamId?: string; imageAttachments?: Array<{ name: string; mimeType: string; base64Data: string }> }) => Promise<{ success: boolean; session?: CoworkSession; error?: string; code?: string; engineStatus?: OpenClawEngineStatus }>;
-    continueSession: (options: { sessionId: string; prompt: string; systemPrompt?: string; activeSkillIds?: string[]; imageAttachments?: Array<{ name: string; mimeType: string; base64Data: string }> }) => Promise<{ success: boolean; session?: CoworkSession; error?: string; code?: string; engineStatus?: OpenClawEngineStatus }>;
+    startSession: (options: { prompt: string; cwd?: string; systemPrompt?: string; title?: string; activeSkillIds?: string[]; agentId?: string; teamId?: string; modelOverride?: CoworkModelOverride | null; imageAttachments?: Array<{ name: string; mimeType: string; base64Data: string }> }) => Promise<{ success: boolean; session?: CoworkSession; error?: string; code?: string; engineStatus?: OpenClawEngineStatus }>;
+    continueSession: (options: { sessionId: string; prompt: string; systemPrompt?: string; activeSkillIds?: string[]; modelOverride?: CoworkModelOverride | null; imageAttachments?: Array<{ name: string; mimeType: string; base64Data: string }> }) => Promise<{ success: boolean; session?: CoworkSession; error?: string; code?: string; engineStatus?: OpenClawEngineStatus }>;
     stopSession: (sessionId: string) => Promise<{ success: boolean; error?: string }>;
     deleteSession: (sessionId: string) => Promise<{ success: boolean; error?: string }>;
     deleteSessions: (sessionIds: string[]) => Promise<{ success: boolean; error?: string }>;
@@ -931,6 +931,7 @@ interface IElectronAPI {
     applyPreview: (config: Partial<PetConfig>) => Promise<PetConfig>;
     getBounds: () => Promise<{ x: number; y: number; width: number; height: number } | null>;
     setPosition: (position: PetPosition & { persist?: boolean }) => Promise<{ x: number; y: number; width: number; height: number } | null>;
+    setMouseInteractive: (interactive: boolean) => Promise<boolean>;
     openMainWindow: () => Promise<boolean>;
     getTaskSnapshot: () => Promise<DesktopPetTaskSnapshot | null>;
     openTask: (sessionId: string) => Promise<boolean>;

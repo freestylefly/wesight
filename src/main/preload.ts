@@ -3,6 +3,7 @@ import { contextBridge, ipcRenderer, type IpcRendererEvent } from 'electron';
 import { IpcChannel as ScheduledTaskIpc } from '../scheduledTask/constants';
 import { CoworkIpcChannel } from '../shared/cowork/constants';
 import type { CoworkFileActivity } from '../shared/cowork/fileActivity';
+import type { CoworkModelOverride } from '../shared/cowork/runtimeSnapshot';
 import { DialogIpcChannel } from '../shared/dialog/constants';
 import { type FeishuEngineKeyType, type FeishuManagementModeType, type FeishuRuntimeOwnershipType, ImIpcChannel } from '../shared/im/constants';
 import { DesktopPetIpcChannel, type DesktopPetTaskSnapshot, type PetConfig, type PetPosition } from '../shared/pet/constants';
@@ -73,6 +74,8 @@ contextBridge.exposeInMainWorld('electron', {
     getBounds: () => ipcRenderer.invoke(DesktopPetIpcChannel.GetBounds),
     setPosition: (position: PetPosition & { persist?: boolean }) =>
       ipcRenderer.invoke(DesktopPetIpcChannel.SetPosition, position),
+    setMouseInteractive: (interactive: boolean) =>
+      ipcRenderer.invoke(DesktopPetIpcChannel.SetMouseInteractive, { interactive }),
     openMainWindow: () => ipcRenderer.invoke(DesktopPetIpcChannel.OpenMainWindow),
     getTaskSnapshot: () => ipcRenderer.invoke(DesktopPetIpcChannel.GetTaskSnapshot),
     openTask: (sessionId: string) => ipcRenderer.invoke(DesktopPetIpcChannel.OpenTask, { sessionId }),
@@ -278,9 +281,9 @@ contextBridge.exposeInMainWorld('electron', {
   },
   cowork: {
     // Session management
-    startSession: (options: { prompt: string; cwd?: string; systemPrompt?: string; activeSkillIds?: string[]; agentId?: string; teamId?: string; imageAttachments?: Array<{ name: string; mimeType: string; base64Data: string }> }) =>
+    startSession: (options: { prompt: string; cwd?: string; systemPrompt?: string; activeSkillIds?: string[]; agentId?: string; teamId?: string; modelOverride?: CoworkModelOverride | null; imageAttachments?: Array<{ name: string; mimeType: string; base64Data: string }> }) =>
       ipcRenderer.invoke(CoworkIpcChannel.SessionStart, options),
-    continueSession: (options: { sessionId: string; prompt: string; systemPrompt?: string; activeSkillIds?: string[]; imageAttachments?: Array<{ name: string; mimeType: string; base64Data: string }> }) =>
+    continueSession: (options: { sessionId: string; prompt: string; systemPrompt?: string; activeSkillIds?: string[]; modelOverride?: CoworkModelOverride | null; imageAttachments?: Array<{ name: string; mimeType: string; base64Data: string }> }) =>
       ipcRenderer.invoke(CoworkIpcChannel.SessionContinue, options),
     stopSession: (sessionId: string) =>
       ipcRenderer.invoke(CoworkIpcChannel.SessionStop, sessionId),

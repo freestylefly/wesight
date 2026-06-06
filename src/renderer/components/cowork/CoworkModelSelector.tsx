@@ -24,50 +24,54 @@ interface CoworkModelSelectorProps {
   readOnly?: boolean;
   labelOverride?: string;
   titleOverride?: string;
+  effectiveEngine?: CoworkAgentEngine;
 }
 
-const resolveLocalCliAppType = (config: RootState['cowork']['config']): ExternalAgentProviderAppType | null => {
+const resolveLocalCliAppType = (
+  config: RootState['cowork']['config'],
+  effectiveEngine: CoworkAgentEngine = config.agentEngine,
+): ExternalAgentProviderAppType | null => {
   if (
-    config.agentEngine === CoworkAgentEngine.OpenClaw
+    effectiveEngine === CoworkAgentEngine.OpenClaw
     && config.openclawConfigSource === ExternalAgentConfigSource.LocalCli
   ) {
     return 'openclaw';
   }
   if (
-    config.agentEngine === CoworkAgentEngine.ClaudeCode
+    effectiveEngine === CoworkAgentEngine.ClaudeCode
     && config.claudeCodeConfigSource === ExternalAgentConfigSource.LocalCli
   ) {
     return 'claude';
   }
   if (
-    config.agentEngine === CoworkAgentEngine.Codex
+    effectiveEngine === CoworkAgentEngine.Codex
     && config.codexConfigSource === ExternalAgentConfigSource.LocalCli
   ) {
     return 'codex';
   }
   if (
-    config.agentEngine === CoworkAgentEngine.Hermes
+    effectiveEngine === CoworkAgentEngine.Hermes
     && config.hermesConfigSource === ExternalAgentConfigSource.LocalCli
   ) {
     return 'hermes';
   }
   if (
-    config.agentEngine === CoworkAgentEngine.OpenCode
+    effectiveEngine === CoworkAgentEngine.OpenCode
     && config.opencodeConfigSource === ExternalAgentConfigSource.LocalCli
   ) {
     return 'opencode';
   }
-  if (config.agentEngine === CoworkAgentEngine.GrokBuild) {
+  if (effectiveEngine === CoworkAgentEngine.GrokBuild) {
     return 'grok';
   }
   if (
-    config.agentEngine === CoworkAgentEngine.QwenCode
+    effectiveEngine === CoworkAgentEngine.QwenCode
     && config.qwenCodeConfigSource === ExternalAgentConfigSource.LocalCli
   ) {
     return 'qwen';
   }
   if (
-    config.agentEngine === CoworkAgentEngine.DeepSeekTui
+    effectiveEngine === CoworkAgentEngine.DeepSeekTui
     && config.deepseekTuiConfigSource === ExternalAgentConfigSource.LocalCli
   ) {
     return 'deepseek_tui';
@@ -99,9 +103,11 @@ const CoworkModelSelector: React.FC<CoworkModelSelectorProps> = ({
   readOnly = false,
   labelOverride,
   titleOverride,
+  effectiveEngine,
 }) => {
   const config = useSelector((state: RootState) => state.cowork.config);
-  const appType = resolveLocalCliAppType(config);
+  const resolvedEngine = effectiveEngine ?? config.agentEngine;
+  const appType = resolveLocalCliAppType(config, resolvedEngine);
   const [isOpen, setIsOpen] = React.useState(false);
   const [providerResult, setProviderResult] = React.useState<ExternalAgentProviderListResult | null>(null);
   const [isLoading, setIsLoading] = React.useState(false);
@@ -171,7 +177,7 @@ const CoworkModelSelector: React.FC<CoworkModelSelectorProps> = ({
     );
   }
 
-  if (config.agentEngine === CoworkAgentEngine.CodexApp) {
+  if (resolvedEngine === CoworkAgentEngine.CodexApp) {
     return (
       <div
         className="max-w-[260px] truncate rounded-xl bg-surface px-3 py-1.5 text-sm font-medium text-foreground"

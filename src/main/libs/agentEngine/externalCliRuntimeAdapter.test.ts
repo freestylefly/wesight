@@ -1,5 +1,12 @@
 import { describe, expect, test, vi } from 'vitest';
 
+vi.mock('electron', () => ({
+  app: {
+    getAppPath: () => process.cwd(),
+    isPackaged: false,
+  },
+}));
+
 import {
   CoworkAgentEngine,
   ExternalAgentConfigSource,
@@ -93,7 +100,7 @@ describe('appendNodeRequireOption', () => {
 });
 
 describe('ExternalCliRuntimeAdapter Codex local config', () => {
-  test('does not override the local Codex CLI config with a selected provider', () => {
+  test('uses the selected Codex provider when running with local CLI config', () => {
     const { store } = createStore();
     const adapter = new ExternalCliRuntimeAdapter({
       engine: CoworkAgentEngine.Codex,
@@ -118,16 +125,18 @@ describe('ExternalCliRuntimeAdapter Codex local config', () => {
       ) => string[];
     };
 
-    expect(internals.getSelectedProviderForLocalCli()).toBeNull();
-    expect(internals.prepareCodexHomeForExecMode(env, codexProvider)).toBeNull();
-    expect(env.CODEX_HOME).toBeUndefined();
-    expect(env.OPENAI_API_KEY).toBeUndefined();
+    const selectedProvider = internals.getSelectedProviderForLocalCli();
+    expect(selectedProvider).toBe(codexProvider);
+    const codexHomeDir = internals.prepareCodexHomeForExecMode(env, selectedProvider);
+    expect(codexHomeDir).toBeTruthy();
+    expect(env.CODEX_HOME).toBe(codexHomeDir);
+    expect(env.OPENAI_API_KEY).toBe('sk-test-provider-key');
 
     const args = internals.buildCommandArgs(
       'D:\\LHA\\wesight',
       'hello',
       [],
-      codexProvider,
+      selectedProvider,
       'session',
       null,
     );
@@ -136,6 +145,7 @@ describe('ExternalCliRuntimeAdapter Codex local config', () => {
     expect(args).toContain('--json');
     expect(args).not.toContain('model_provider="ccswitch_tokln"');
     expect(args).not.toContain('model="gpt-5.5"');
+    internals.cleanupCodexHomeDir(codexHomeDir);
   });
 
   test('builds a Codex runtime config for WeSight model routing', () => {

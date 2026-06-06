@@ -81,6 +81,23 @@ const DesktopPetWindow: React.FC = () => {
     }, durationMs);
   }, []);
 
+  const setMouseInteractive = useCallback((interactive: boolean) => {
+    void window.electron.desktopPet.setMouseInteractive(interactive).catch((error) => {
+      console.debug('[DesktopPet] failed to update mouse interactivity:', error);
+    });
+  }, []);
+
+  const handleInteractiveEnter = useCallback(() => {
+    setMouseInteractive(true);
+  }, [setMouseInteractive]);
+
+  const handleInteractiveLeave = useCallback(() => {
+    if (dragRef.current.phase !== DragPhase.Idle) {
+      return;
+    }
+    setMouseInteractive(false);
+  }, [setMouseInteractive]);
+
   useEffect(() => {
     document.documentElement.classList.add('desktop-pet-page');
     void i18nService.initialize();
@@ -140,6 +157,7 @@ const DesktopPetWindow: React.FC = () => {
 
     return () => {
       active = false;
+      setMouseInteractive(false);
       unsubscribe();
       unsubscribeTask();
       document.documentElement.classList.remove('desktop-pet-page');
@@ -150,7 +168,7 @@ const DesktopPetWindow: React.FC = () => {
         window.clearTimeout(taskCollapseTimerRef.current);
       }
     };
-  }, [showBubble]);
+  }, [setMouseInteractive, showBubble]);
 
   const updateMoodForClick = useCallback(() => {
     setMood((current) => {
@@ -396,6 +414,8 @@ const DesktopPetWindow: React.FC = () => {
           className="desktop-pet-task-card"
           onClick={handleOpenTask}
           onPointerDown={(event) => event.stopPropagation()}
+          onMouseEnter={handleInteractiveEnter}
+          onMouseLeave={handleInteractiveLeave}
         >
           <button
             type="button"
@@ -434,6 +454,8 @@ const DesktopPetWindow: React.FC = () => {
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
         onDoubleClick={handleDoubleClick}
+        onMouseEnter={handleInteractiveEnter}
+        onMouseLeave={handleInteractiveLeave}
         role="button"
         tabIndex={0}
         aria-label={i18nService.t('desktopPetAria')}
@@ -446,7 +468,7 @@ const DesktopPetWindow: React.FC = () => {
             variant={config.variant}
             motion={config.motion}
             mood={resolvedMood}
-            size={138}
+            size={108}
           />
         </div>
         <span className="desktop-pet-action-dot" aria-hidden="true" />

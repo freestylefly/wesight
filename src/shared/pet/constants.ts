@@ -24,6 +24,7 @@ export const DesktopPetIpcChannel = {
   ApplyPreview: 'desktopPet:applyPreview',
   GetBounds: 'desktopPet:getBounds',
   SetPosition: 'desktopPet:setPosition',
+  SetMouseInteractive: 'desktopPet:setMouseInteractive',
   OpenMainWindow: 'desktopPet:openMainWindow',
   GetTaskSnapshot: 'desktopPet:getTaskSnapshot',
   OpenTask: 'desktopPet:openTask',

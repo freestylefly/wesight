@@ -29,7 +29,7 @@ import {
 } from '../shared/cowork/constants';
 import type { CoworkFileActivity } from '../shared/cowork/fileActivity';
 import type { RuntimeMetricsFilters } from '../shared/cowork/runtimeMetrics';
-import type { CoworkSessionRuntimeSnapshot } from '../shared/cowork/runtimeSnapshot';
+import type { CoworkModelOverride, CoworkSessionRuntimeSnapshot } from '../shared/cowork/runtimeSnapshot';
 import { DialogIpcChannel } from '../shared/dialog/constants';
 import {
   FeishuEngineKey,
@@ -102,6 +102,7 @@ import { saveCoworkApiConfig } from './libs/coworkConfigStore';
 import { getCoworkLogPath } from './libs/coworkLogger';
 import { registerProxyTokenRefresher,startCoworkOpenAICompatProxy, stopCoworkOpenAICompatProxy } from './libs/coworkOpenAICompatProxy';
 import { CoworkRunner } from './libs/coworkRunner';
+import { resolveContinuationRuntimeSnapshot } from './libs/coworkRuntimeSnapshot';
 import { ensureCoworkStudioAssets } from './libs/coworkStudioAssets';
 import { generateSessionTitle, probeCoworkModelReadiness } from './libs/coworkUtil';
 import { DeepSeekTuiRuntimeManager } from './libs/deepSeekTuiRuntimeManager';
@@ -1207,8 +1208,14 @@ const getExternalProviderAppTypeForEngine = (
   return null;
 };
 
-const resolveRuntimeModelSnapshot = (engine: CoworkAgentEngine): RuntimeModelSnapshot => {
-  const configSource = getConfigSourceForEngine(engine);
+const resolveRuntimeModelSnapshot = (
+  engine: CoworkAgentEngine,
+  options: {
+    configSource?: string | null;
+    modelOverride?: CoworkModelOverride | null;
+  } = {},
+): RuntimeModelSnapshot => {
+  const configSource = options.configSource ?? getConfigSourceForEngine(engine);
   if (engine === CoworkAgentEngineValue.CodexApp) {
     return {
       providerKey: 'codex_app',
@@ -1231,12 +1238,16 @@ const resolveRuntimeModelSnapshot = (engine: CoworkAgentEngine): RuntimeModelSna
   }
 
   try {
-    const resolution = resolveCurrentApiConfig();
+    const modelOverride = options.modelOverride;
+    const resolution = resolveCurrentApiConfig('local', modelOverride?.modelId ? {
+      modelId: modelOverride.modelId,
+      providerName: modelOverride.providerKey || modelOverride.providerName,
+    } : {});
     return {
-      providerKey: resolution.providerMetadata?.providerName ?? null,
+      providerKey: modelOverride?.providerKey ?? resolution.providerMetadata?.providerName ?? null,
       providerName: resolution.providerMetadata?.providerName ?? null,
       modelId: resolution.config?.model ?? null,
-      modelName: resolution.providerMetadata?.modelName ?? resolution.config?.model ?? null,
+      modelName: modelOverride?.modelName ?? resolution.providerMetadata?.modelName ?? resolution.config?.model ?? null,
       configSource,
     };
   } catch {
@@ -1273,8 +1284,12 @@ const getClaudeCodePermissionLabel = (mode: string | null | undefined): string |
 
 const resolveSessionRuntimeSnapshot = (
   engine: CoworkAgentEngine,
+  options: {
+    configSource?: string | null;
+    modelOverride?: CoworkModelOverride | null;
+  } = {},
 ): CoworkSessionRuntimeSnapshot => {
-  const model = resolveRuntimeModelSnapshot(engine);
+  const model = resolveRuntimeModelSnapshot(engine, options);
   const config = getCoworkStore().getConfig();
   const permissionMode = engine === CoworkAgentEngineValue.ClaudeCode
     ? config.claudeCodePermissionMode
@@ -2811,11 +2826,11 @@ const updateTitleBarOverlay = () => {
 };
 
 const DESKTOP_PET_WINDOW_SIZE = {
-  width: 292,
-  height: 236,
+  width: 236,
+  height: 192,
 } as const;
 
-const DESKTOP_PET_TASK_TITLE_MAX_CHARS = 42;
+const DESKTOP_PET_TASK_TITLE_MAX_CHARS = 34;
 let desktopPetTaskSnapshot: DesktopPetTaskSnapshot | null = null;
 
 const getStoredDesktopPetConfig = (): PetConfig => {
@@ -2954,9 +2969,15 @@ const updateDesktopPetTaskSnapshot = (sessionId: string, status: DesktopPetTaskS
     return;
   }
 
-  const config = getCoworkStore().getConfig();
-  const engine = config.agentEngine;
-  const model = resolveRuntimeModelSnapshot(engine);
+  const snapshot = session.runtimeSnapshot;
+  const engine = snapshot?.agentEngine ?? getCoworkStore().getConfig().agentEngine;
+  const fallbackModel = snapshot ? null : resolveRuntimeModelSnapshot(engine);
+  const modelLabel = snapshot?.modelLabel
+    || snapshot?.modelName
+    || snapshot?.modelId
+    || fallbackModel?.modelName
+    || fallbackModel?.modelId
+    || '-';
   const projectName = session.cwd ? path.basename(session.cwd) || APP_NAME : APP_NAME;
   desktopPetTaskSnapshot = {
     sessionId,
@@ -2965,7 +2986,7 @@ const updateDesktopPetTaskSnapshot = (sessionId: string, status: DesktopPetTaskS
     source: getDesktopPetTaskSource(session),
     status,
     engineLabel: getDesktopPetEngineLabel(engine),
-    modelLabel: model.modelName || model.modelId || '-',
+    modelLabel,
     activityText: getDesktopPetTaskActivityText(status),
     updatedAt: Date.now(),
   };
@@ -3037,6 +3058,7 @@ const createDesktopPetWindow = (config: PetConfig): BrowserWindow => {
   petWindow.setVisibleOnAllWorkspaces(true, {
     visibleOnFullScreen: true,
   });
+  petWindow.setIgnoreMouseEvents(true, { forward: true });
 
   petWindow.once('ready-to-show', () => {
     if (petWindow.isDestroyed()) return;
@@ -3411,6 +3433,14 @@ if (!gotTheLock) {
       persistDesktopPetPosition(position);
     }
     return desktopPetWindow.getBounds();
+  });
+
+  ipcMain.handle(DesktopPetIpcChannel.SetMouseInteractive, (_event, input: { interactive?: boolean }) => {
+    if (!desktopPetWindow || desktopPetWindow.isDestroyed()) {
+      return false;
+    }
+    desktopPetWindow.setIgnoreMouseEvents(input?.interactive !== true, { forward: true });
+    return true;
   });
 
   ipcMain.handle(DesktopPetIpcChannel.OpenMainWindow, () => {
@@ -4339,6 +4369,7 @@ if (!gotTheLock) {
     imageAttachments?: Array<{ name: string; mimeType: string; base64Data: string }>;
     agentId?: string;
     teamId?: string;
+    modelOverride?: CoworkModelOverride | null;
   }) => {
     try {
       const coworkStoreInstance = getCoworkStore();
@@ -4367,7 +4398,9 @@ if (!gotTheLock) {
         };
       }
       applyExternalAgentConfigSourceForEngine(activeEngine);
-      const runtimeSnapshot = resolveSessionRuntimeSnapshot(activeEngine);
+      const runtimeSnapshot = resolveSessionRuntimeSnapshot(activeEngine, {
+        modelOverride: options.modelOverride,
+      });
       prepareRuntimeSnapshotForTurn(runtimeSnapshot);
       console.log(
         `[CoworkSession] starting session with ${getDesktopPetEngineLabel(activeEngine)} using ${runtimeSnapshot.configSource} config.`,
@@ -4456,6 +4489,7 @@ if (!gotTheLock) {
         imageAttachments: options.imageAttachments,
         agentId: targetAgentId,
         agentEngine: activeEngine,
+        modelOverride: options.modelOverride,
         runtimeSnapshot,
       }).catch(error => {
         console.error('Cowork session error:', error);
@@ -4498,6 +4532,7 @@ if (!gotTheLock) {
     systemPrompt?: string;
     activeSkillIds?: string[];
     imageAttachments?: Array<{ name: string; mimeType: string; base64Data: string }>;
+    modelOverride?: CoworkModelOverride | null;
   }) => {
     try {
       subscribeSenderToCoworkSession(event.sender, options.sessionId);
@@ -4505,9 +4540,13 @@ if (!gotTheLock) {
       const inferredEngine = existingSession?.teamId
         ? resolveCoworkAgentEngine()
         : resolveAgentRuntimeEngine(existingSession?.agentId || 'main');
-      const runtimeSnapshot = existingSession?.runtimeSnapshot
-        ?? resolveSessionRuntimeSnapshot(inferredEngine);
-      if (existingSession && !existingSession.runtimeSnapshot) {
+      const runtimeSnapshot = resolveContinuationRuntimeSnapshot({
+        existingSnapshot: existingSession?.runtimeSnapshot,
+        inferredEngine,
+        resolveSnapshot: resolveSessionRuntimeSnapshot,
+        modelOverride: options.modelOverride,
+      });
+      if (existingSession) {
         getCoworkStore().updateSession(options.sessionId, { runtimeSnapshot });
       }
       const activeEngine = runtimeSnapshot.agentEngine;
@@ -4565,6 +4604,7 @@ if (!gotTheLock) {
         imageAttachments: options.imageAttachments,
         agentId: existingSession?.agentId || 'main',
         agentEngine: activeEngine,
+        modelOverride: options.modelOverride,
         runtimeSnapshot,
       }).catch(error => {
         console.error('Cowork continue error:', error);

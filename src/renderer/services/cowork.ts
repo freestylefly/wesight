@@ -479,6 +479,7 @@ class CoworkService {
       prompt: options.prompt,
       systemPrompt: options.systemPrompt,
       activeSkillIds: options.activeSkillIds,
+      modelOverride: options.modelOverride,
       imageAttachments: options.imageAttachments,
     });
     if (!result.success) {

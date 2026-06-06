@@ -4,7 +4,7 @@ import type {
   CoworkAgentEngine,
   RuntimeCallSource,
 } from '../../../shared/cowork/constants';
-import type { CoworkSessionRuntimeSnapshot } from '../../../shared/cowork/runtimeSnapshot';
+import type { CoworkModelOverride, CoworkSessionRuntimeSnapshot } from '../../../shared/cowork/runtimeSnapshot';
 import type { CoworkMessage } from '../../coworkStore';
 
 export type { CoworkAgentEngine, RuntimeCallSource };
@@ -59,6 +59,7 @@ export type CoworkStartOptions = {
   imageAttachments?: CoworkImageAttachment[];
   agentId?: string;
   agentEngine?: CoworkAgentEngine;
+  modelOverride?: CoworkModelOverride | null;
   runtimeSnapshot?: CoworkSessionRuntimeSnapshot | null;
   runtimeSource?: RuntimeCallSource;
 };
@@ -69,6 +70,7 @@ export type CoworkContinueOptions = {
   imageAttachments?: CoworkImageAttachment[];
   agentId?: string;
   agentEngine?: CoworkAgentEngine;
+  modelOverride?: CoworkModelOverride | null;
   runtimeSnapshot?: CoworkSessionRuntimeSnapshot | null;
   runtimeSource?: RuntimeCallSource;
 };

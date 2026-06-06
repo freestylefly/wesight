@@ -1,5 +1,6 @@
 import { ShieldCheckIcon } from '@heroicons/react/24/outline';
 import { AgentRunTargetType, CoworkAgentEngine, DefaultAgent, ExternalAgentConfigSource } from '@shared/cowork/constants';
+import type { CoworkModelOverride } from '@shared/cowork/runtimeSnapshot';
 import React, { useEffect, useRef,useState } from 'react';
 import { useDispatch,useSelector } from 'react-redux';
 
@@ -104,6 +105,18 @@ const getCliAppTypeForEngine = (engine: CoworkAgentEngine): ExternalAgentProvide
   if (engine === CoworkAgentEngine.QwenCode) return 'qwen';
   if (engine === CoworkAgentEngine.DeepSeekTui) return 'deepseek_tui';
   return null;
+};
+
+const buildSelectedModelOverride = (
+  model: RootState['model']['selectedModel'] | null | undefined,
+): CoworkModelOverride | null => {
+  if (!model?.id) return null;
+  return {
+    modelId: model.id,
+    modelName: model.name || model.id,
+    providerKey: model.providerKey ?? null,
+    providerName: model.provider ?? null,
+  };
 };
 
 const getEngineLabelKey = (engine: CoworkAgentEngine): string => {
@@ -447,6 +460,7 @@ const CoworkView: React.FC<CoworkViewProps> = ({ onRequestAppSettings, onShowSki
         activeSkillIds: sessionSkillIds,
         agentId: currentAgentId,
         teamId: currentTargetType === AgentRunTargetType.Team && currentTeamId ? currentTeamId : undefined,
+        modelOverride: buildSelectedModelOverride(selectedModel),
         imageAttachments,
       });
 
@@ -537,6 +551,7 @@ const CoworkView: React.FC<CoworkViewProps> = ({ onRequestAppSettings, onShowSki
         prompt,
         systemPrompt: combinedSystemPrompt,
         activeSkillIds: sessionSkillIds.length > 0 ? sessionSkillIds : undefined,
+        modelOverride: buildSelectedModelOverride(selectedModel),
         imageAttachments,
       });
     } finally {
@@ -681,17 +696,6 @@ const CoworkView: React.FC<CoworkViewProps> = ({ onRequestAppSettings, onShowSki
     const normalizedCommand = command.toLowerCase();
     switch (normalizedCommand) {
       case '/model':
-        if (currentSession) {
-          const runtime = currentSession.runtimeSnapshot;
-          showSlashToast(
-            runtime
-              ? i18nService.t('coworkRuntimeLockedToast')
-                .replace('{engine}', runtime.engineLabel)
-                .replace('{model}', runtime.modelLabel || runtime.modelName || runtime.modelId || '-')
-              : i18nService.t('coworkRuntimeLocked'),
-          );
-          return true;
-        }
         openModelSelector();
         return true;
       case '/context':
