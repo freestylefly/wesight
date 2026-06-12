@@ -73,6 +73,7 @@ const makeActivity = (toolName?: string, summary?: string): CoworkActivitySnapsh
       status: ActivityItemStatus.Running,
       timestamp: 11,
       filePath: null,
+      skillName: null,
     }
     : null,
   toolTimeline: [],

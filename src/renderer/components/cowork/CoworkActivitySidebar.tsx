@@ -198,6 +198,11 @@ const ToolRow: React.FC<{ item: CoworkActivityToolItem }> = ({ item }) => (
     <div className="min-w-0 flex-1">
       <div className="flex min-w-0 items-center gap-2">
         <span className="truncate text-xs font-medium text-foreground">{item.toolName}</span>
+        {item.skillName && (
+          <span className="shrink-0 rounded bg-violet-500/10 px-1.5 py-0.5 text-[10px] text-violet-600 dark:text-violet-300">
+            {item.skillName}
+          </span>
+        )}
         <span className="shrink-0 text-[10px] text-muted">
           {i18nService.t(statusLabelKey[item.status])}
         </span>

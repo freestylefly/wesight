@@ -72,6 +72,7 @@ export interface CoworkActivityToolItem {
   status: ActivityItemStatus;
   timestamp: number;
   filePath: string | null;
+  skillName: string | null;
 }
 
 export interface CoworkActivitySnapshot {
@@ -419,6 +420,11 @@ export function buildCoworkActivitySnapshot(
     }
 
     const filePath = extractPath(input);
+    const isSkillTool = normalized === 'skill';
+    const skillInputId = isSkillTool ? extractString(input, ['skill', 'skillId', 'skill_id', 'name']) : null;
+    const skillName = skillInputId
+      ? (skillById.get(skillInputId)?.name ?? skillInputId)
+      : null;
     toolTimeline.push({
       id: entry.toolUse.id,
       toolName,
@@ -426,11 +432,21 @@ export function buildCoworkActivitySnapshot(
       status,
       timestamp: entry.toolUse.timestamp,
       filePath,
+      skillName,
     });
     fileChanges.push(...buildFileChangeFromTool(entry));
   }
 
-  const activeTool = [...toolTimeline].reverse().find((item) => item.status === ActivityItemStatus.Running) ?? null;
+  const sessionDone = session.status === 'completed' || session.status === 'error';
+  const finalizeTimeline = (items: CoworkActivityToolItem[]): CoworkActivityToolItem[] =>
+    sessionDone
+      ? items.map((item) => item.status === ActivityItemStatus.Running
+        ? { ...item, status: ActivityItemStatus.Completed }
+        : item)
+      : items;
+  const activeTool = sessionDone
+    ? null
+    : ([...toolTimeline].reverse().find((item) => item.status === ActivityItemStatus.Running) ?? null);
   const activitySkills = Array.from(activeSkillIds)
     .map((id) => {
       const skill = skillById.get(id);
@@ -447,6 +463,6 @@ export function buildCoworkActivitySnapshot(
     fileChanges: fileChanges.sort((left, right) => right.timestamp - left.timestamp),
     artifacts: Array.from(artifacts.values()).sort((left, right) => right.timestamp - left.timestamp),
     activeTool,
-    toolTimeline: toolTimeline.slice(-12).reverse(),
+    toolTimeline: finalizeTimeline(toolTimeline.slice(-12).reverse()),
   };
 }
