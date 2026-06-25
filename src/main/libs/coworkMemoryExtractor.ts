@@ -172,11 +172,15 @@ function extractImplicit(options: ExtractTurnMemoryOptions): ExtractedMemoryChan
       isExplicit: false,
       reason,
     });
-
-    if (result.length >= maxImplicitAdds) break;
   }
 
-  return result;
+  // Keep the highest-confidence candidates rather than the first ones seen, so a
+  // low-value preference appearing early cannot crowd out a high-value profile
+  // fact appearing later in the same turn. Array.prototype.sort is stable, so
+  // candidates that tie on confidence preserve their original order.
+  return result
+    .sort((a, b) => b.confidence - a.confidence)
+    .slice(0, maxImplicitAdds);
 }
 
 export function extractTurnMemoryChanges(options: ExtractTurnMemoryOptions): ExtractedMemoryChange[] {
