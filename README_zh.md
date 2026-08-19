@@ -345,7 +345,7 @@ WeSight 内置了一组覆盖日常 Agent 工作的技能，并接入 SkillHub �
 
 ## Star 趋势图
 
-[![Star History Chart](https://api.star-history.com/svg?repos=freestylefly/wesight&type=Date)](https://star-history.com/#freestylefly/wesight&Date)
+[![Star History Chart](https://star-history.dera.page/svg?repos=freestylefly/wesight&type=Date)](https://star-history.dera.page/#freestylefly/wesight&Date)
 
 ## 公众号
 

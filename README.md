@@ -377,7 +377,7 @@ Scan the QR code below to join the WeSight WeChat group and talk with other buil
 
 ## Star History
 
-[![Star History Chart](https://api.star-history.com/svg?repos=freestylefly/wesight&type=Date)](https://star-history.com/#freestylefly/wesight&Date)
+[![Star History Chart](https://star-history.dera.page/svg?repos=freestylefly/wesight&type=Date)](https://star-history.dera.page/#freestylefly/wesight&Date)
 
 ## WeChat Official Account
 
