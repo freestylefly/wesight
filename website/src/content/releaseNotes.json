@@ -3,6 +3,65 @@
   "windowsUnsignedNotice": "Windows x64 安装包当前尚未签名。安装时，Microsoft Defender SmartScreen 可能显示“Windows 已保护你的电脑”，请确认安装包来自 WeSight 官方 GitHub Release 后继续安装。",
   "releases": [
     {
+      "version": "1.0.5",
+      "date": "2026-08-24",
+      "title": "任务看板与运行环境升级",
+      "summary": "新增本地任务看板入口，统一 WeSight 共享运行环境，并完善聊天操作、官网展示和桌面端服务入口。",
+      "compareUrl": "https://github.com/freestylefly/wesight/compare/v1.0.4...v1.0.5",
+      "releaseUrl": "https://github.com/freestylefly/wesight/releases/tag/v1.0.5",
+      "sections": [
+        {
+          "kind": "feature",
+          "title": "新增",
+          "items": [
+            {
+              "text": "侧边栏新增任务看板入口，可在应用内连接本地任务看板服务并同步深浅色主题",
+              "areas": [
+                "desktop"
+              ]
+            },
+            {
+              "text": "聊天内容支持文本选择和右键复制，输入框同时提供剪切、粘贴和全选操作",
+              "areas": [
+                "desktop"
+              ]
+            },
+            {
+              "text": "官网新增 Obsidian 插件专区，集中展示笔记对话、Skills 与任务协同能力",
+              "areas": [
+                "website"
+              ]
+            }
+          ]
+        },
+        {
+          "kind": "improvement",
+          "title": "优化",
+          "items": [
+            {
+              "text": "统一识别 WeSight 共享运行环境与 Agent Skills 目录，让 Cowork、外部 Agent 和 Skills 复用同一套工具环境",
+              "areas": [
+                "desktop"
+              ]
+            },
+            {
+              "text": "桌面端服务与账户入口切换到新的账单和账户页面",
+              "areas": [
+                "desktop"
+              ]
+            },
+            {
+              "text": "优化官网、安装界面和社区图片资源，减小静态资源体积",
+              "areas": [
+                "website",
+                "release"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
       "version": "1.0.4",
       "date": "2026-08-03",
       "title": "跟随本机 Claude Code 配置",
