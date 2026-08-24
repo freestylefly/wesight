@@ -223,6 +223,7 @@ import { RuntimeTelemetryStore } from './runtimeTelemetryStore';
 import { SkillManager } from './skillManager';
 import { getSkillServiceManager } from './skillServices';
 import { SqliteStore } from './sqliteStore';
+import { ensureTaskboardServer, stopTaskboardServer } from './taskboardServer';
 import { createTray, destroyTray, updateTrayMenu } from './trayManager';
 
 // 设置应用程序名称
@@ -8329,6 +8330,9 @@ if (!gotTheLock) {
     await app.whenReady();
     markTiming('app_ready_ms');
     console.log('[Main] initApp: app is ready');
+
+    void ensureTaskboardServer();
+    app.on('will-quit', stopTaskboardServer);
 
     // Note: Calendar permission is checked on-demand when calendar operations are requested
     // We don't trigger permission dialogs at startup to avoid annoying users

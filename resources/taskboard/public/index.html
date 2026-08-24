@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>WeSight Taskboard</title>
+<link rel="stylesheet" href="/style.css" />
+</head>
+<body>
+<header class="topbar">
+  <div class="brand">📋 WeSight Taskboard</div>
+  <div class="view-toggle">
+    <button id="viewBoardBtn" class="active">看板</button>
+    <button id="viewDashBtn">总览</button>
+  </div>
+  <select id="projectSelect" title="切换项目"></select>
+  <button id="newProjectBtn" class="btn ghost" title="新建项目">＋ 项目</button>
+  <button id="scanBtn" class="btn ghost" title="扫描本机项目目录自动登记">🔍 扫描项目</button>
+  <div class="spacer"></div>
+  <input id="searchInput" class="search" placeholder="搜索议题…" />
+  <select id="labelFilter"><option value="">全部标签</option></select>
+  <select id="priorityFilter">
+    <option value="">全部优先级</option>
+    <option value="urgent">🔴 紧急</option>
+    <option value="high">🟠 高</option>
+    <option value="medium">🟡 中</option>
+    <option value="low">⚪ 低</option>
+  </select>
+  <button id="themeBtn" class="btn ghost" title="切换亮色/暗色主题">☀️</button>
+  <button id="msgBtn" class="btn ghost" title="给 agent 留言 / 查看回复">📮 留言<span id="msgBadge" class="badge hidden"></span></button>
+  <button id="newIssueBtn" class="btn primary">＋ 新建议题</button>
+</header>
+
+<main id="board" class="board"></main>
+<main id="dashboard" class="dashboard hidden"></main>
+
+<!-- 新建议题 / 新建项目 弹窗 -->
+<div id="modalMask" class="modal-mask hidden">
+  <div class="modal" id="issueModal">
+    <h2 id="modalTitle">新建议题</h2>
+    <form id="issueForm" class="form">
+      <label>标题<input name="title" required placeholder="要做什么？" /></label>
+      <label>描述<textarea name="description" rows="3" placeholder="补充说明（可选）"></textarea></label>
+      <div class="row">
+        <label>状态
+          <select name="status">
+            <option value="todo">待办</option>
+            <option value="in_progress">进行中</option>
+            <option value="in_review">待验收</option>
+          </select>
+        </label>
+        <label>优先级
+          <select name="priority">
+            <option value="low">低</option>
+            <option value="medium" selected>中</option>
+            <option value="high">高</option>
+            <option value="urgent">紧急</option>
+          </select>
+        </label>
+      </div>
+      <div class="row">
+        <label>标签<input name="labels" placeholder="逗号分隔，如 mvp,bug" /></label>
+        <label>分支<input name="branch" list="branchList" placeholder="feature/xxx" /></label>
+      </div>
+      <datalist id="branchList"></datalist>
+      <div class="actions">
+        <button type="button" class="btn ghost" data-close>取消</button>
+        <button type="submit" class="btn primary">创建</button>
+      </div>
+    </form>
+  </div>
+  <div class="modal small" id="projectModal">
+    <h2>新建项目</h2>
+    <form id="projectForm" class="form">
+      <label>项目 ID<input name="id" required placeholder="小写字母/数字/中划线，如 my-app" pattern="[a-zA-Z0-9][a-zA-Z0-9-]*" /></label>
+      <label>项目名称<input name="name" placeholder="显示名称（可选）" /></label>
+      <label>工作区路径<input name="workspacePath" placeholder="/绝对路径/到/你的/仓库（用于扫描分支）" /></label>
+      <div class="actions">
+        <button type="button" class="btn ghost" data-close>取消</button>
+        <button type="submit" class="btn primary">创建</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- 留言面板 -->
+<div id="msgMask" class="modal-mask hidden">
+  <div class="modal">
+    <h2>📮 留言给 agent <button class="close-x" id="msgClose" style="float:right">✕</button></h2>
+    <div class="form">
+      <label>留言内容<textarea id="msgInput" rows="2" placeholder="想对 agent 说什么？（可提需求、问进度、催验收…）"></textarea></label>
+      <label>关联议题（可选）<select id="msgIssueSelect"><option value="">不关联</option></select></label>
+      <div class="actions"><button id="msgSend" class="btn primary">发送</button></div>
+    </div>
+    <h2 style="margin-top:18px;font-size:13px;color:var(--muted)">留言记录</h2>
+    <div id="msgList"></div>
+  </div>
+</div>
+
+<!-- 议题详情 抽屉 -->
+<div id="drawerMask" class="drawer-mask hidden">
+  <aside id="drawer" class="drawer"></aside>
+</div>
+
+<script src="/app.js"></script>
+</body>
+</html>
