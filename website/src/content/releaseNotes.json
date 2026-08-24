@@ -3,6 +3,58 @@
   "windowsUnsignedNotice": "Windows x64 安装包当前尚未签名。安装时，Microsoft Defender SmartScreen 可能显示“Windows 已保护你的电脑”，请确认安装包来自 WeSight 官方 GitHub Release 后继续安装。",
   "releases": [
     {
+      "version": "1.0.6",
+      "date": "2026-08-24",
+      "title": "任务看板开箱即用",
+      "summary": "任务看板服务与界面现已随桌面端安装包提供，并加入本地数据迁移、服务就绪检测和失败重试提示。",
+      "compareUrl": "https://github.com/freestylefly/wesight/compare/v1.0.5...v1.0.6",
+      "releaseUrl": "https://github.com/freestylefly/wesight/releases/tag/v1.0.6",
+      "sections": [
+        {
+          "kind": "feature",
+          "title": "新增",
+          "items": [
+            {
+              "text": "任务看板内置本地 HTTP 与 SQLite 服务，无需额外安装独立插件即可使用",
+              "areas": [
+                "desktop"
+              ]
+            },
+            {
+              "text": "任务数据存入 WeSight 用户数据目录，并支持自动迁移已有任务看板插件数据",
+              "areas": [
+                "desktop"
+              ]
+            },
+            {
+              "text": "启动时自动发现 Documents 下的项目目录；待验收超过 24 小时的任务会自动转为已完成",
+              "areas": [
+                "desktop"
+              ]
+            }
+          ]
+        },
+        {
+          "kind": "improvement",
+          "title": "优化",
+          "items": [
+            {
+              "text": "启动时复用已有任务看板服务，并通过就绪检测、加载状态和重试入口减少空白页面",
+              "areas": [
+                "desktop"
+              ]
+            },
+            {
+              "text": "任务看板服务日志统一写入桌面端日志目录，并随应用退出停止由 WeSight 启动的服务",
+              "areas": [
+                "desktop"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
       "version": "1.0.5",
       "date": "2026-08-24",
       "title": "任务看板与运行环境升级",
