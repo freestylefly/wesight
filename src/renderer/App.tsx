@@ -15,6 +15,7 @@ import Settings, { type SettingsOpenOptions } from './components/Settings';
 import { SettingsTab } from './components/settings/constants';
 import Sidebar from './components/Sidebar';
 import { SkillsView } from './components/skills';
+import TaskboardView from './components/TaskboardView';
 import Toast from './components/Toast';
 import AppUpdateBadge from './components/update/AppUpdateBadge';
 import AppUpdateModal from './components/update/AppUpdateModal';
@@ -39,7 +40,7 @@ import type { CoworkPermissionResult } from './types/cowork';
 const App: React.FC = () => {
   const [showSettings, setShowSettings] = useState(false);
   const [settingsOptions, setSettingsOptions] = useState<SettingsOpenOptions>({});
-  const [mainView, setMainView] = useState<'cowork' | 'skills' | 'runtime' | 'agents'>('cowork');
+  const [mainView, setMainView] = useState<'cowork' | 'skills' | 'runtime' | 'agents' | 'taskboard'>('cowork');
   const [isInitialized, setIsInitialized] = useState(false);
   const [initError, setInitError] = useState<string | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
@@ -304,6 +305,10 @@ const App: React.FC = () => {
 
   const handleShowAgents = useCallback(() => {
     setMainView('agents');
+  }, []);
+
+  const handleShowTaskboard = useCallback(() => {
+    setMainView('taskboard');
   }, []);
 
   const handleShowAgentSettings = useCallback(() => {
@@ -733,6 +738,7 @@ const App: React.FC = () => {
           onShowCowork={handleShowCowork}
           onShowRuntimeDashboard={handleShowRuntimeDashboard}
           onShowAgents={handleShowAgents}
+          onShowTaskboard={handleShowTaskboard}
           onShowAgentSettings={handleShowAgentSettings}
           onNewChat={handleNewChat}
           isCollapsed={isSidebarCollapsed}
@@ -766,6 +772,13 @@ const App: React.FC = () => {
                 onToggleSidebar={handleToggleSidebar}
                 onNewChat={handleNewChat}
                 onShowCowork={handleShowCowork}
+                updateBadge={isSidebarCollapsed ? updateBadge : null}
+              />
+            ) : mainView === 'taskboard' ? (
+              <TaskboardView
+                isSidebarCollapsed={isSidebarCollapsed}
+                onToggleSidebar={handleToggleSidebar}
+                onNewChat={handleNewChat}
                 updateBadge={isSidebarCollapsed ? updateBadge : null}
               />
             ) : (

@@ -1,4 +1,4 @@
-import { ChartBarIcon, CheckIcon, ChevronDownIcon, ExclamationTriangleIcon } from '@heroicons/react/24/outline';
+import { ChartBarIcon, CheckIcon, ChevronDownIcon, ClipboardDocumentListIcon, ExclamationTriangleIcon } from '@heroicons/react/24/outline';
 import { AgentRunTargetType } from '@shared/cowork/constants';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useSelector } from 'react-redux';
@@ -23,11 +23,12 @@ import LoginButton from './LoginButton';
 interface SidebarProps {
   onShowSettings: () => void;
   onShowLogin?: () => void;
-  activeView: 'cowork' | 'skills' | 'runtime' | 'agents';
+  activeView: 'cowork' | 'skills' | 'runtime' | 'agents' | 'taskboard';
   onShowSkills: () => void;
   onShowCowork: () => void;
   onShowRuntimeDashboard: () => void;
   onShowAgents: () => void;
+  onShowTaskboard: () => void;
   onShowAgentSettings: () => void;
   onNewChat: () => void;
   isCollapsed: boolean;
@@ -43,6 +44,7 @@ const Sidebar: React.FC<SidebarProps> = ({
   onShowCowork,
   onShowRuntimeDashboard,
   onShowAgents,
+  onShowTaskboard,
   onShowAgentSettings,
   onNewChat,
   isCollapsed,
@@ -242,6 +244,21 @@ const Sidebar: React.FC<SidebarProps> = ({
           >
             <UserGroupIcon className="h-4 w-4" />
             {i18nService.t('agentTeams')}
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setIsSearchOpen(false);
+              onShowTaskboard();
+            }}
+            className={`w-full inline-flex items-center gap-2 rounded-lg px-2.5 py-2 text-sm font-medium transition-colors ${
+              activeView === 'taskboard'
+                ? 'bg-primary/10 text-primary hover:bg-primary/20'
+                : 'text-secondary hover:text-foreground hover:bg-surface-raised'
+            }`}
+          >
+            <ClipboardDocumentListIcon className="h-4 w-4" />
+            {i18nService.t('taskboardNav')}
           </button>
         </div>
       </div>
