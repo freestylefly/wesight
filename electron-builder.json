@@ -49,6 +49,11 @@
       "from": "resources/tray",
       "to": "tray",
       "filter": ["**/*"]
+    },
+    {
+      "from": "resources/taskboard",
+      "to": "taskboard",
+      "filter": ["**/*"]
     }
   ],
   "protocols": [
