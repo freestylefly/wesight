@@ -7815,7 +7815,7 @@ if (!gotTheLock) {
         "font-src 'self' data:",
         "media-src 'self' data: blob: file: localfile:",
         "worker-src 'self' blob:",
-        "frame-src 'self' http://127.0.0.1:18791"
+        "frame-src 'self' http://127.0.0.1:18791 http://127.0.0.1:47824"
       ];
 
       callback({
