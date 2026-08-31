@@ -402,6 +402,100 @@ test('mergeClaudeSettingsForWesightModel preserves the earliest original env sna
   });
 });
 
+test('mergeClaudeSettingsForWesightModel records the managed overlay env', () => {
+  const merged = mergeClaudeSettingsForWesightModel({}, apiConfig);
+  const managed = (merged.__wesight_managed as Record<string, unknown>).claudeCode as Record<string, unknown>;
+
+  expect(managed.managedEnv).toEqual({
+    ANTHROPIC_AUTH_TOKEN: apiConfig.apiKey,
+    ANTHROPIC_BASE_URL: apiConfig.baseURL,
+    ANTHROPIC_MODEL: apiConfig.model,
+    ANTHROPIC_REASONING_MODEL: apiConfig.model,
+    ANTHROPIC_DEFAULT_SONNET_MODEL: apiConfig.model,
+    ANTHROPIC_DEFAULT_OPUS_MODEL: apiConfig.model,
+    ANTHROPIC_DEFAULT_HAIKU_MODEL: apiConfig.model,
+    ANTHROPIC_SMALL_FAST_MODEL: apiConfig.model,
+  });
+});
+
+const externallySwitchedEnv = {
+  ANTHROPIC_AUTH_TOKEN: 'sk-local-b',
+  ANTHROPIC_BASE_URL: 'https://local-b.example/v1',
+  ANTHROPIC_MODEL: 'model-b',
+  ANTHROPIC_REASONING_MODEL: 'model-b',
+  ANTHROPIC_DEFAULT_SONNET_MODEL: 'model-b',
+  ANTHROPIC_DEFAULT_OPUS_MODEL: 'model-b',
+  ANTHROPIC_DEFAULT_HAIKU_MODEL: 'model-b',
+  ANTHROPIC_SMALL_FAST_MODEL: 'model-b',
+};
+
+test('removeWesightManagedClaudeSettings keeps an externally switched local env instead of restoring a stale snapshot', () => {
+  const merged = mergeClaudeSettingsForWesightModel({
+    env: {
+      ANTHROPIC_BASE_URL: 'https://local-a.example/v1',
+      ANTHROPIC_MODEL: 'model-a',
+    },
+  }, apiConfig);
+  // An external tool (or the user) switches the local provider while WeSight
+  // metadata is present, e.g. by rewriting settings.json wholesale.
+  const externallySwitched = {
+    ...merged,
+    env: { ...externallySwitchedEnv },
+  };
+
+  const cleaned = removeWesightManagedClaudeSettings(externallySwitched);
+
+  expect(cleaned.__wesight_managed).toBeUndefined();
+  expect(cleaned.env).toEqual(externallySwitchedEnv);
+});
+
+test('mergeClaudeSettingsForWesightModel refreshes a stale snapshot after an external local env change', () => {
+  const merged = mergeClaudeSettingsForWesightModel({
+    env: {
+      ANTHROPIC_BASE_URL: 'https://local-a.example/v1',
+      ANTHROPIC_MODEL: 'model-a',
+    },
+  }, apiConfig);
+  const externallySwitched = {
+    ...merged,
+    env: { ...externallySwitchedEnv },
+  };
+
+  const remerged = mergeClaudeSettingsForWesightModel(externallySwitched, apiConfig);
+  const runtimeEnv = remerged.env as Record<string, unknown>;
+  expect(runtimeEnv.ANTHROPIC_BASE_URL).toBe(apiConfig.baseURL);
+  expect(runtimeEnv.ANTHROPIC_MODEL).toBe(apiConfig.model);
+
+  const cleaned = removeWesightManagedClaudeSettings(remerged);
+  expect(cleaned.env).toEqual(externallySwitchedEnv);
+});
+
+test('removeWesightManagedClaudeSettings restores the snapshot for legacy metadata without managedEnv', () => {
+  const legacy = {
+    env: {
+      ANTHROPIC_BASE_URL: 'https://wesight-overlay.example/v1',
+      ANTHROPIC_MODEL: 'wesight-overlay-model',
+    },
+    __wesight_managed: {
+      claudeCode: {
+        envKeys: ['ANTHROPIC_BASE_URL', 'ANTHROPIC_MODEL'],
+        originalEnv: {
+          ANTHROPIC_BASE_URL: 'https://local.example/v1',
+          ANTHROPIC_MODEL: 'local-claude',
+        },
+      },
+    },
+  };
+
+  const cleaned = removeWesightManagedClaudeSettings(legacy);
+
+  expect(cleaned.__wesight_managed).toBeUndefined();
+  expect(cleaned.env).toEqual({
+    ANTHROPIC_BASE_URL: 'https://local.example/v1',
+    ANTHROPIC_MODEL: 'local-claude',
+  });
+});
+
 test('cleanupWesightManagedClaudeSettings restores settings on disk', () => {
   const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'wesight-claude-settings-'));
   const settingsPath = path.join(tempDir, 'settings.json');
