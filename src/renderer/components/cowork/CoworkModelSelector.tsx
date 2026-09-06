@@ -134,7 +134,7 @@ const CoworkModelSelector: React.FC<CoworkModelSelectorProps> = ({
   const [claudeLiveConfig, setClaudeLiveConfig] = React.useState<ClaudeCodeLiveConfigSnapshot | null>(null);
 
   const loadProviders = React.useCallback(async () => {
-    if (!appType || readOnly || isClaudeLocalConfig) return;
+    if (!appType || isClaudeLocalConfig) return;
     setIsLoading(true);
     try {
       const result = await coworkService.listAgentProviders(appType);
@@ -144,7 +144,7 @@ const CoworkModelSelector: React.FC<CoworkModelSelectorProps> = ({
     } finally {
       setIsLoading(false);
     }
-  }, [appType, readOnly]);
+  }, [appType]);
 
   React.useEffect(() => {
     void loadProviders();
@@ -199,13 +199,25 @@ const CoworkModelSelector: React.FC<CoworkModelSelectorProps> = ({
     };
   }, [appType]);
 
+  const providers = providerResult?.providers ?? [];
+  const currentProvider = providers.find((provider) => provider.id === providerResult?.currentProviderId)
+    ?? providers.find((provider) => provider.isCurrent)
+    ?? providers[0]
+    ?? null;
+
   if (readOnly) {
+    const label = labelOverride
+      || getProviderModelButtonLabel(currentProvider)
+      || i18nService.t('coworkAgentLocalModelUnknown');
+    const title = titleOverride
+      || getProviderModelFullLabel(currentProvider)
+      || i18nService.t('coworkRuntimeLocked');
     return (
       <div
         className="max-w-[260px] truncate rounded-xl bg-surface px-3 py-1.5 text-sm font-medium text-foreground"
-        title={titleOverride || labelOverride || i18nService.t('coworkRuntimeLocked')}
+        title={title}
       >
-        {labelOverride || i18nService.t('coworkAgentLocalModelUnknown')}
+        {label}
       </div>
     );
   }
@@ -240,11 +252,6 @@ const CoworkModelSelector: React.FC<CoworkModelSelectorProps> = ({
     return <ModelSelector dropdownDirection={dropdownDirection} />;
   }
 
-  const providers = providerResult?.providers ?? [];
-  const currentProvider = providers.find((provider) => provider.id === providerResult?.currentProviderId)
-    ?? providers.find((provider) => provider.isCurrent)
-    ?? providers[0]
-    ?? null;
   const dropdownPositionClass = dropdownDirection === 'up'
     ? 'bottom-full mb-1'
     : 'top-full mt-1';
