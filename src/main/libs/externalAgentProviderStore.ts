@@ -194,7 +194,13 @@ const homeDir = (): string => os.homedir();
 const readJsonObject = (filePath: string): Record<string, unknown> | null => {
   try {
     if (!fs.existsSync(filePath)) return null;
-    const parsed = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+    const raw = fs.readFileSync(filePath, 'utf8');
+    // Strip single-line (//) and block (/* */) comments for .jsonc files
+    const text = filePath.endsWith('.jsonc')
+      ? raw.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^
+]*/g, '')
+      : raw;
+    const parsed = JSON.parse(text);
     return parsed && typeof parsed === 'object' && !Array.isArray(parsed)
       ? parsed as Record<string, unknown>
       : null;
@@ -252,7 +258,10 @@ const getHermesEnvPath = (): string => path.join(getHermesConfigDir(), '.env');
 const getOpenClawConfigDir = (): string => path.join(homeDir(), '.openclaw');
 const getOpenClawConfigPath = (): string => path.join(getOpenClawConfigDir(), 'openclaw.json');
 const getOpenCodeConfigDir = (): string => path.join(homeDir(), '.config', 'opencode');
-const getOpenCodeConfigPath = (): string => path.join(getOpenCodeConfigDir(), 'opencode.json');
+const getOpenCodeConfigPath = (): string => {
+  const jsoncPath = path.join(getOpenCodeConfigDir(), 'opencode.jsonc');
+  return fs.existsSync(jsoncPath) ? jsoncPath : path.join(getOpenCodeConfigDir(), 'opencode.json');
+};
 const getOpenCodeAuthPath = (): string => path.join(homeDir(), '.local', 'share', 'opencode', 'auth.json');
 const getGrokBuildConfigDir = (): string => path.join(homeDir(), '.grok');
 const getGrokBuildConfigPath = (): string => path.join(getGrokBuildConfigDir(), 'config.toml');
