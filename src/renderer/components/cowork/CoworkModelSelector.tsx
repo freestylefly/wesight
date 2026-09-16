@@ -19,6 +19,7 @@ import type {
   ExternalAgentProviderListResult,
 } from '../../types/cowork';
 import ModelSelector from '../ModelSelector';
+import { resolveReadOnlyModelChipSource } from './coworkReadOnlyModelChip';
 
 interface CoworkModelSelectorProps {
   dropdownDirection?: 'up' | 'down';
@@ -175,7 +176,7 @@ const CoworkModelSelector: React.FC<CoworkModelSelectorProps> = ({
   }, [isOpen]);
 
   React.useEffect(() => {
-    if (!isClaudeLocalConfig || readOnly) return;
+    if (!isClaudeLocalConfig) return;
     let cancelled = false;
     void (async () => {
       const result = await coworkService.getClaudeCodeLiveConfig();
@@ -186,7 +187,7 @@ const CoworkModelSelector: React.FC<CoworkModelSelectorProps> = ({
     return () => {
       cancelled = true;
     };
-  }, [isClaudeLocalConfig, readOnly]);
+  }, [isClaudeLocalConfig]);
 
   React.useEffect(() => {
     if (!appType) return;
@@ -206,12 +207,43 @@ const CoworkModelSelector: React.FC<CoworkModelSelectorProps> = ({
     ?? null;
 
   if (readOnly) {
-    const label = labelOverride
-      || getProviderModelButtonLabel(currentProvider)
-      || i18nService.t('coworkAgentLocalModelUnknown');
-    const title = titleOverride
-      || getProviderModelFullLabel(currentProvider)
-      || i18nService.t('coworkRuntimeLocked');
+    // The read-only chip is shown for Team / non-default Agent run targets, so it
+    // must echo the real model for every engine family the interactive selector
+    // handles below - not just provider-backed CLI engines.
+    const chipSource = resolveReadOnlyModelChipSource({
+      hasLabelOverride: Boolean(labelOverride),
+      engine: resolvedEngine,
+      isClaudeLocalConfig,
+      hasProvider: Boolean(currentProvider),
+    });
+    let label: string;
+    let fullLabel: string;
+    switch (chipSource) {
+      case 'override':
+        label = labelOverride as string;
+        fullLabel = label;
+        break;
+      case 'codexApp':
+        label = i18nService.t('coworkAgentCodexAppModelSourceValue');
+        fullLabel = label;
+        break;
+      case 'claudeLive':
+        label = claudeLiveConfig?.resolvedModel
+          || i18nService.t('coworkAgentClaudeLiveConfigModelDefault');
+        fullLabel = claudeLiveConfig?.configPath || claudeLiveConfig?.sourceName
+          ? `${i18nService.t('coworkAgentClaudeLiveConfigSource')}: ${claudeLiveConfig?.configPath || claudeLiveConfig?.sourceName}`
+          : label;
+        break;
+      case 'provider':
+        label = getProviderModelButtonLabel(currentProvider);
+        fullLabel = getProviderModelFullLabel(currentProvider);
+        break;
+      default:
+        label = i18nService.t('coworkAgentLocalModelUnknown');
+        fullLabel = i18nService.t('coworkRuntimeLocked');
+        break;
+    }
+    const title = titleOverride || fullLabel;
     return (
       <div
         className="max-w-[260px] truncate rounded-xl bg-surface px-3 py-1.5 text-sm font-medium text-foreground"
