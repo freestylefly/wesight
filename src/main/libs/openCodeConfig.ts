@@ -30,6 +30,49 @@ const WESIGHT_PROVIDER_MARKER = 'wesight';
 
 export const DEFAULT_OPENCODE_MODEL = 'anthropic/claude-sonnet-4-5';
 
+// Credentials OpenCode writes to ~/.local/share/opencode/auth.json follow its
+// Auth.Info discriminated union:
+//   { "deepseek": { "type": "api", "key": "sk-..." } }
+//   { "anthropic": { "type": "oauth", "refresh": "...", "access": "...", "expires": 0 } }
+//   { "acme": { "type": "wellknown", "key": "...", "token": "..." } }
+// The provider IDs are the only reliable signal of which models a user can
+// actually run when opencode.json(c) carries no `model` field.
+const OPENCODE_PLACEHOLDER_SECRETS = new Set(['***', 'sk-wesight-local', 'wesight-openai-compat', 'qwen-oauth']);
+
+const isUsableAuthSecret = (value: unknown): boolean => {
+  if (typeof value !== 'string') return false;
+  const trimmed = value.trim();
+  if (!trimmed) return false;
+  if (trimmed.startsWith('$')) return false;
+  if (trimmed.includes('WESIGHT_APIKEY_')) return false;
+  return !OPENCODE_PLACEHOLDER_SECRETS.has(trimmed.toLowerCase());
+};
+
+export const openCodeAuthEntryLoggedIn = (entry: unknown): boolean => {
+  if (!isRecord(entry)) return false;
+  const hasValue = (field: string): boolean => isUsableAuthSecret(entry[field]);
+  switch (entry.type) {
+    case 'api':
+      return hasValue('key');
+    case 'oauth':
+      // Usable while a refresh token remains; a live access token alone also works.
+      return hasValue('refresh') || hasValue('access');
+    case 'wellknown':
+      return hasValue('key') || hasValue('token');
+    default:
+      // Tolerate older/future shapes that omit the discriminator.
+      return ['api', 'key', 'apiKey', 'token', 'access', 'refresh'].some(hasValue);
+  }
+};
+
+// Returns the provider IDs in an OpenCode auth.json that hold a usable credential.
+export const listOpenCodeAuthProviderIds = (authJson: unknown): string[] => {
+  if (!isRecord(authJson)) return [];
+  return Object.entries(authJson)
+    .filter(([providerKey, entry]) => Boolean(providerKey.trim()) && openCodeAuthEntryLoggedIn(entry))
+    .map(([providerKey]) => providerKey);
+};
+
 const isRecord = (value: unknown): value is Record<string, unknown> => {
   return Boolean(value && typeof value === 'object' && !Array.isArray(value));
 };
@@ -123,9 +166,33 @@ const getCurrentProviderModel = (config: OpenCodeConfig): string => {
   return getString(config.model) || DEFAULT_OPENCODE_MODEL;
 };
 
-export const listOpenCodeModelProviders = (config: OpenCodeConfig): OpenCodeModelProviderRecord[] => {
+export interface ListOpenCodeModelProvidersOptions {
+  /**
+   * Provider IDs known to hold a usable credential (see listOpenCodeAuthProviderIds).
+   * When supplied, the synthesized DEFAULT_OPENCODE_MODEL fallback is only kept if
+   * its provider is actually logged in, so WeSight stops advertising an Anthropic
+   * model to users who only authenticated DeepSeek/Google (issue #78).
+   * Omit the option entirely to preserve the previous unconditional behaviour.
+   */
+  authProviderIds?: string[];
+}
+
+export const listOpenCodeModelProviders = (
+  config: OpenCodeConfig,
+  options?: ListOpenCodeModelProvidersOptions,
+): OpenCodeModelProviderRecord[] => {
   const providerMap = isRecord(config.provider) ? config.provider as Record<string, OpenCodeProviderConfig> : {};
+  const explicitModel = getString(config.model);
   const currentModel = getCurrentProviderModel(config);
+  // Only gate the synthesized default: an explicitly configured model is the
+  // user's own declaration and must always be surfaced.
+  const authProviderIds = options?.authProviderIds;
+  const skipSynthesizedDefault = !explicitModel
+    && Array.isArray(authProviderIds)
+    && !authProviderIds.some(
+      (providerKey) => providerKey.trim().toLowerCase()
+        === splitOpenCodeModel(currentModel).providerKey.toLowerCase(),
+    );
   const records: OpenCodeModelProviderRecord[] = [];
   const seen = new Set<string>();
   const addRecord = (model: string, providerConfig?: OpenCodeProviderConfig) => {
@@ -149,7 +216,9 @@ export const listOpenCodeModelProviders = (config: OpenCodeConfig): OpenCodeMode
     });
   };
 
-  addRecord(currentModel);
+  if (!skipSynthesizedDefault) {
+    addRecord(currentModel);
+  }
   for (const [providerKey, provider] of Object.entries(providerMap)) {
     for (const modelId of getProviderModels(providerKey, provider)) {
       addRecord(buildOpenCodeModel(providerKey, modelId), provider);

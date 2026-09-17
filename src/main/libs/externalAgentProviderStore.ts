@@ -46,6 +46,7 @@ import {
 } from './hermesConfig';
 import {
   DEFAULT_OPENCODE_MODEL,
+  listOpenCodeAuthProviderIds,
   listOpenCodeModelProviders,
   mergeOpenCodeConfigForWesightModel,
   parseOpenCodeConfig,
@@ -1220,7 +1221,12 @@ export class ExternalAgentProviderStore {
       this.importLiveProviderIfEmpty(OPENCODE_APP_TYPE);
       return;
     }
-    const records = listOpenCodeModelProviders(parseOpenCodeConfig(config));
+    // Feed the logged-in provider IDs in so a config carrying no `model` does not
+    // advertise the synthesized Anthropic default to a user who only authenticated
+    // other providers (issue #78).
+    const records = listOpenCodeModelProviders(parseOpenCodeConfig(config), {
+      authProviderIds: listOpenCodeAuthProviderIds(readJsonObject(getOpenCodeAuthPath())),
+    });
     this.db
       .prepare('DELETE FROM external_agent_providers WHERE app_type = ? AND category = ?')
       .run(OPENCODE_APP_TYPE, 'local');

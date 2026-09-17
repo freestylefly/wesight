@@ -24,6 +24,7 @@ import {
   parseHermesDotenvText,
 } from './hermesConfig';
 import { readOpenClawGlobalConfig, summarizeOpenClawConfig } from './openclawSystemRuntime';
+import { openCodeAuthEntryLoggedIn } from './openCodeConfig';
 import { getWesightLarkCliBinDir } from './wesightSharedRuntime';
 
 export type CliAppType = 'claude' | 'codex' | 'hermes' | 'openclaw' | 'opencode' | 'grok' | 'qwen' | 'deepseek_tui' | 'opensquilla' | 'kimi';
@@ -195,34 +196,10 @@ const fileContainsCredential = (filePath: string): boolean => {
   }
 };
 
-// OpenCode stores credentials in ~/.local/share/opencode/auth.json as a map of
-// provider ID to a discriminated union (see OpenCode's Auth.Info schema):
-//   { "deepseek": { "type": "api", "key": "sk-..." } }
-//   { "anthropic": { "type": "oauth", "refresh": "...", "access": "...", "expires": 0 } }
-//   { "acme": { "type": "wellknown", "key": "...", "token": "..." } }
-// None of these shapes match the generic isCredentialLikeKey patterns, because
-// "key", "api", "access", and "refresh" are not credential-like on their own.
-// So OpenCode needs its own schema-aware check.
-export const openCodeAuthEntryLoggedIn = (entry: unknown): boolean => {
-  if (!entry || typeof entry !== 'object' || Array.isArray(entry)) return false;
-  const obj = entry as Record<string, unknown>;
-  const hasValue = (field: string): boolean => isNonPlaceholderSecret(obj[field]);
-
-  switch (obj.type) {
-    case 'api':
-      return hasValue('key');
-    case 'oauth':
-      // An OAuth login is usable while it still holds a refresh token; the access
-      // token alone is enough for a session that has not expired yet.
-      return hasValue('refresh') || hasValue('access');
-    case 'wellknown':
-      return hasValue('key') || hasValue('token');
-    default:
-      // Tolerate older or future OpenCode formats that omit the discriminator.
-      return ['api', 'key', 'apiKey', 'token', 'access', 'refresh']
-        .some((field) => hasValue(field));
-  }
-};
+// The OpenCode auth.json schema check lives in openCodeConfig.ts so that the
+// credential reader here and the model lister used by the provider store cannot
+// drift apart. Re-exported to keep the existing import path stable.
+export { openCodeAuthEntryLoggedIn };
 
 const openCodeAuthJsonLoggedIn = (filePath: string): boolean => {
   const parsed = readJsonObject(filePath);
