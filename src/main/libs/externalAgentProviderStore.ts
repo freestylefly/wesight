@@ -49,6 +49,7 @@ import {
   listOpenCodeAuthProviderIds,
   listOpenCodeModelProviders,
   mergeOpenCodeConfigForWesightModel,
+  OPENCODE_MODEL_UNSET_KEY,
   parseOpenCodeConfig,
   settingsConfigFromOpenCodeRecord,
   summarizeOpenCodeSettingsConfig,
@@ -1626,16 +1627,24 @@ export class ExternalAgentProviderStore {
     }
     if (provider.appType === OPENCODE_APP_TYPE) {
       const existingConfig = readJsonObject(getOpenCodeConfigPath()) ?? {};
+      const storedConfig = parseOpenCodeConfig(settingsConfig.config);
+      const baseConfig = {
+        ...existingConfig,
+        ...(Object.keys(storedConfig).length > 0 ? storedConfig : {}),
+      };
+      // A provider stored with the unset marker is credential-backed but carries no
+      // model. Falling through to DEFAULT_OPENCODE_LOCAL_MODEL here would persist the
+      // unauthenticated Anthropic default into the user's own opencode.json(c) — and
+      // once written it counts as an explicit model, permanently resurrecting the
+      // stall reported in issue #78. Leave the user's model declaration untouched.
+      if (settingsConfig[OPENCODE_MODEL_UNSET_KEY] === true) {
+        writeJsonFile(getOpenCodeConfigPath(), baseConfig);
+        return;
+      }
       const selectedModel = getString(settingsConfig.model)
         || summarizeOpenCodeSettingsConfig(settingsConfig).model
         || DEFAULT_OPENCODE_LOCAL_MODEL;
-      const storedConfig = parseOpenCodeConfig(settingsConfig.config);
-      const nextConfig = {
-        ...existingConfig,
-        ...(Object.keys(storedConfig).length > 0 ? storedConfig : {}),
-        model: selectedModel,
-      };
-      writeJsonFile(getOpenCodeConfigPath(), nextConfig);
+      writeJsonFile(getOpenCodeConfigPath(), { ...baseConfig, model: selectedModel });
       return;
     }
     if (provider.appType === HERMES_APP_TYPE) {

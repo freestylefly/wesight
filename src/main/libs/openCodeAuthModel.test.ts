@@ -44,7 +44,13 @@ describe('listOpenCodeModelProviders credential awareness (issue #78)', () => {
       authProviderIds: listOpenCodeAuthProviderIds(ISSUE_78_AUTH),
     });
     expect(records.map((record) => record.model)).not.toContain('anthropic/claude-sonnet-4-5');
-    expect(records.filter((record) => record.isCurrent)).toEqual([]);
+    // The list must not be left empty either: an empty list sends the store back
+    // to the raw live config, whose model is the same unusable Anthropic default.
+    // One credential-backed entry per logged-in provider is surfaced instead, with
+    // no model, so the runtime omits `--model`.
+    expect(records.map((record) => record.providerKey)).toEqual(['deepseek', 'google']);
+    expect(records.every((record) => record.model === '')).toBe(true);
+    expect(records.filter((record) => record.isCurrent)).toHaveLength(1);
   });
 
   test('keeps the synthesized default when the default provider is actually logged in', () => {
