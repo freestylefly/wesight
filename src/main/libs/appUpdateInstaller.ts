@@ -48,6 +48,17 @@ const PROGRESS_THROTTLE_MS = 200;
 const DOWNLOAD_INACTIVITY_TIMEOUT_MS = 60_000;
 
 /**
+ * Abort if the connect/response phase does not complete in this duration (ms).
+ *
+ * The inactivity timeout above only starts once a response body exists, so it
+ * cannot rescue a request that never produces a response at all. A proxy that
+ * accepts the TCP connection and then black-holes the request leaves
+ * `session.fetch()` pending indefinitely, which is precisely the "stuck at
+ * download" symptom reported in issue #73.
+ */
+const DOWNLOAD_RESPONSE_TIMEOUT_MS = 60_000;
+
+/**
  * Partition for the dedicated update-download session.
  *
  * Deliberately NOT prefixed with `persist:`: a persistent partition would be
@@ -133,11 +144,32 @@ export async function downloadUpdate(
     }, DOWNLOAD_INACTIVITY_TIMEOUT_MS);
   };
 
+  let responseTimer: ReturnType<typeof setTimeout> | null = null;
+
+  const clearResponseTimer = () => {
+    if (responseTimer) {
+      clearTimeout(responseTimer);
+      responseTimer = null;
+    }
+  };
+
   try {
     const updateSession = await prepareUpdateDownloadSession();
-    const response = await updateSession.fetch(url, {
-      signal: controller.signal,
-    });
+
+    // Guard the connect/response phase: see DOWNLOAD_RESPONSE_TIMEOUT_MS.
+    responseTimer = setTimeout(() => {
+      console.error('[AppUpdate] No response within 60s, aborting');
+      controller.abort('timeout');
+    }, DOWNLOAD_RESPONSE_TIMEOUT_MS);
+
+    let response: Awaited<ReturnType<Session['fetch']>>;
+    try {
+      response = await updateSession.fetch(url, {
+        signal: controller.signal,
+      });
+    } finally {
+      clearResponseTimer();
+    }
 
     console.log(`[AppUpdate] HTTP response: ${response.status} ${response.statusText}`);
 
@@ -231,6 +263,7 @@ export async function downloadUpdate(
     return finalPath;
   } catch (error) {
     clearInactivityTimer();
+    clearResponseTimer();
     console.error('[AppUpdate] Download error:', error);
 
     // Clean up partial download
@@ -251,6 +284,8 @@ export async function downloadUpdate(
     }
     throw error;
   } finally {
+    clearInactivityTimer();
+    clearResponseTimer();
     activeDownloadController = null;
   }
 }
