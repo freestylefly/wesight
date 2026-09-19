@@ -3,12 +3,12 @@
   "windowsUnsignedNotice": "Windows x64 安装包当前尚未签名。安装时，Microsoft Defender SmartScreen 可能显示“Windows 已保护你的电脑”，请确认安装包来自 WeSight 官方 GitHub Release 后继续安装。",
   "releases": [
     {
-      "version": "1.0.7",
+      "version": "1.0.8",
       "date": "2026-09-20",
       "title": "TokenDance 模型接入与观猹登录",
       "summary": "新增 TokenDance 一键授权和六个模型，按模型能力适配调用协议，并提供已上线的观猹登录入口。",
-      "compareUrl": "https://github.com/freestylefly/wesight/compare/v1.0.6...v1.0.7",
-      "releaseUrl": "https://github.com/freestylefly/wesight/releases/tag/v1.0.7",
+      "compareUrl": "https://github.com/freestylefly/wesight/compare/v1.0.6...v1.0.8",
+      "releaseUrl": "https://github.com/freestylefly/wesight/releases/tag/v1.0.8",
       "sections": [
         {
           "kind": "feature",
@@ -61,6 +61,12 @@
               "text": "处理授权取消、过期、目录刷新失败、密钥失效和额度不足，避免将上游敏感错误直接显示给用户。",
               "areas": [
                 "desktop"
+              ]
+            },
+            {
+              "text": "修复 macOS 打包依赖混用证书密码与临时钥匙串密码的问题，保留签名、公证和产物校验。",
+              "areas": [
+                "release"
               ]
             }
           ]
