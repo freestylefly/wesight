@@ -2,6 +2,8 @@ import { app } from 'electron';
 import { join } from 'path';
 
 import { ProviderName, ProviderRegistry, resolveCodingPlanBaseUrl } from '../../shared/providers';
+import { TokenDance, TokenDanceError } from '../../shared/tokendance/constants';
+import { t } from '../i18n';
 import type { SqliteStore } from '../sqliteStore';
 import type { CoworkApiConfig } from './coworkConfigStore';
 import { type AnthropicApiFormat,normalizeProviderApiFormat } from './coworkFormatTransform';
@@ -11,6 +13,7 @@ import {
   getCoworkOpenAICompatProxyStatus,
   type OpenAICompatProxyTarget,
 } from './coworkOpenAICompatProxy';
+import { getTokenDanceService } from './tokendance/service';
 
 type ProviderModel = {
   id: string;
@@ -251,7 +254,17 @@ function resolveMatchedProvider(
     }
   }
 
-  const [providerName, providerConfig] = providerEntry;
+  const [providerName, storedProviderConfig] = providerEntry;
+  let providerConfig = storedProviderConfig;
+  if (providerName === ProviderName.TokenDance) {
+    try {
+      const runtime = getTokenDanceService()?.runtimeConfig(modelId);
+      if (!runtime) return { matched: null, error: t(TokenDanceError.NotConnected) };
+      providerConfig = { ...storedProviderConfig, apiKey: runtime.apiKey, baseUrl: runtime.baseUrl, apiFormat: runtime.apiFormat };
+    } catch (error) {
+      return { matched: null, error: t(error instanceof Error ? error.message : TokenDanceError.NotConnected) };
+    }
+  }
   let apiFormat = getEffectiveProviderApiFormat(providerName, providerConfig.apiFormat);
   let baseURL = providerConfig.baseUrl?.trim();
 
@@ -319,6 +332,11 @@ export function resolveCurrentApiConfig(
     };
   }
 
+  if (matched.providerName === ProviderName.TokenDance) {
+    const runtime = getTokenDanceService()!.runtimeConfig(matched.modelId, true);
+    matched.baseURL = runtime.baseUrl;
+    matched.apiFormat = runtime.apiFormat;
+  }
   const resolvedBaseURL = matched.baseURL;
   let resolvedApiKey = matched.providerConfig.apiKey?.trim() || '';
   
@@ -435,6 +453,15 @@ export function resolveCodexWesightApiConfig(
 
   const effectiveApiKey = resolvedApiKey
     || (!providerRequiresApiKey(matched.providerName) ? 'sk-wesight-local' : '');
+  if (matched.providerName === ProviderName.TokenDance) {
+    const runtime = getTokenDanceService()!.runtimeConfig(matched.modelId);
+    if (runtime.nativeResponses) {
+      return {
+        config: { apiKey: runtime.apiKey, baseURL: runtime.baseUrl, model: matched.modelId, apiType: 'openai' },
+        providerMetadata: { providerName: matched.providerName, codingPlanEnabled: false, supportsImage: matched.supportsImage, modelName: matched.modelName },
+      };
+    }
+  }
   const upstreamBaseURL = resolveCodexOpenAICompatibleBaseURL(matched);
   if (!upstreamBaseURL) {
     return {
@@ -649,7 +676,9 @@ export function resolveAllProviderApiKeys(): Record<string, string> {
 
     for (const [providerName, providerConfig] of Object.entries(appConfig.providers)) {
       if (!providerConfig?.enabled) continue;
-      const apiKey = providerConfig.apiKey?.trim();
+      const apiKey = providerName === TokenDance.Provider
+        ? (() => { try { return getTokenDanceService()?.runtimeConfig(providerConfig.models?.[0]?.id ?? TokenDance.DefaultModel).apiKey; } catch { return undefined; } })()
+        : providerConfig.apiKey?.trim();
       if (!apiKey && providerRequiresApiKey(providerName)) continue;
       const envName = providerName.toUpperCase().replace(/[^A-Z0-9]/g, '_');
       result[envName] = apiKey || 'sk-wesight-local';
@@ -702,6 +731,13 @@ export function resolveAllEnabledProviderConfigs(): ProviderRawConfig[] {
     if (!providerConfig?.enabled) continue;
     if (providerName === ProviderName.WesightServer) continue;
 
+    if (providerName === ProviderName.TokenDance) {
+      try {
+        const runtime = getTokenDanceService()?.runtimeConfig(providerConfig.models?.[0]?.id ?? TokenDance.DefaultModel);
+        if (runtime) result.push({ providerName, baseURL: runtime.baseUrl, apiKey: runtime.apiKey, apiType: 'openai', codingPlanEnabled: false, models: providerConfig.models ?? [] });
+      } catch { /* A disconnected provider must not be sent to the gateway. */ }
+      continue;
+    }
     const apiKey = providerConfig.apiKey?.trim() || '';
     if (!apiKey && providerRequiresApiKey(providerName)) continue;
 

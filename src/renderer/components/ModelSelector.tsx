@@ -2,6 +2,7 @@ import { CheckIcon, ChevronDownIcon } from '@heroicons/react/24/outline';
 import React from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 
+import { TokenDance } from '../../shared/tokendance/constants';
 import { i18nService } from '../services/i18n';
 import { RootState } from '../store';
 import type { Model } from '../store/slices/modelSlice';
@@ -102,7 +103,9 @@ const ModelSelector: React.FC<ModelSelectorProps> = ({
       });
     });
 
-    return [...groups, ...userGroups.values()];
+    const tokenDanceGroup = userGroups.get(TokenDance.Provider);
+    userGroups.delete(TokenDance.Provider);
+    return [...(tokenDanceGroup ? [tokenDanceGroup] : []), ...groups, ...userGroups.values()];
   }, [availableModels]);
   const [activeGroupKey, setActiveGroupKey] = React.useState<string | null>(null);
   const [activeGroupTop, setActiveGroupTop] = React.useState(0);

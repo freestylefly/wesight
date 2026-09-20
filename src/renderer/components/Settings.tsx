@@ -34,6 +34,7 @@ import React, { useCallback,useEffect, useMemo, useRef, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 
 import { ProviderRegistry, resolveCodingPlanBaseUrl } from '../../shared/providers';
+import { TokenDance } from '../../shared/tokendance/constants';
 import { type AppConfig, defaultConfig, getCustomProviderDefaultName,getProviderDisplayName,getVisibleProviders, isCustomProvider } from '../config';
 import { APP_ID, EXPORT_FORMAT_TYPE, EXPORT_PASSWORD } from '../constants/app';
 import { apiService } from '../services/api';
@@ -46,7 +47,7 @@ import { i18nService, LanguageType } from '../services/i18n';
 import { imService } from '../services/im';
 import { themeService } from '../services/theme';
 import { RootState } from '../store';
-import { setAvailableModels } from '../store/slices/modelSlice';
+import { setAvailableModels, setSelectedModel } from '../store/slices/modelSlice';
 import type {
   ClaudeCodeLiveConfigSnapshot,
   ClaudeCodePermissionMode,
@@ -101,6 +102,7 @@ import PetSprite, { PetMood } from './pet/PetSprite';
 import { ScheduledTasksView } from './scheduledTasks';
 import { SettingsTab, type SettingsTab as SettingsTabType } from './settings/constants';
 import ThemeSkinSettings from './settings/ThemeSkinSettings';
+import { TokenDanceSettings } from './settings/TokenDanceSettings';
 import EmailSkillConfig from './skills/EmailSkillConfig';
 import ThemedSelect from './ui/ThemedSelect';
 
@@ -254,6 +256,7 @@ const CUSTOM_PROVIDER_KEYS = [
 ] as const;
 
 const providerKeys = [
+  TokenDance.Provider,
   'openai',
   'gemini',
   'anthropic',
@@ -334,6 +337,7 @@ interface ProvidersImportPayload {
 }
 
 const providerMeta: Record<ProviderType, { label: string; icon: React.ReactNode }> = {
+  [TokenDance.Provider]: { label: 'TokenDance', icon: <span aria-hidden className="text-lg font-bold text-primary">T</span> },
   openai: { label: 'OpenAI', icon: <OpenAIIcon /> },
   deepseek: { label: 'DeepSeek', icon: <DeepSeekIcon /> },
   gemini: { label: 'Google', icon: <GeminiIcon /> },
@@ -355,6 +359,7 @@ const providerMeta: Record<ProviderType, { label: string; icon: React.ReactNode 
 };
 
 const providerLinks: Partial<Record<ProviderType, { website: string; apiKey?: string }>> = {
+  [TokenDance.Provider]: { website: TokenDance.Origin },
   openai:       { website: 'https://platform.openai.com',              apiKey: 'https://platform.openai.com/api-keys' },
   gemini:       { website: 'https://aistudio.google.com',              apiKey: 'https://aistudio.google.com/apikey' },
   anthropic:    { website: 'https://console.anthropic.com',            apiKey: 'https://console.anthropic.com/settings/keys' },
@@ -451,6 +456,7 @@ const copyTextToClipboard = async (text: string): Promise<boolean> => {
 };
 
 const getFixedApiFormatForProvider = (provider: string): 'anthropic' | 'openai' | 'gemini' | null => {
+  if (provider === TokenDance.Provider) return 'openai';
   if (provider === 'openai' || provider === 'stepfun') {
     return 'openai';
   }
@@ -597,10 +603,7 @@ const getDefaultProviders = (): ProvidersConfig => {
 };
 
 const getDefaultActiveProvider = (): ProviderType => {
-  const providers = (defaultConfig.providers ?? {}) as ProvidersConfig;
-  const firstEnabledProvider = providerKeys.find(providerKey => providers[providerKey]?.enabled);
-  const defaultModelProvider = defaultConfig.model.defaultModelProvider as ProviderType | undefined;
-  return firstEnabledProvider ?? (defaultModelProvider && providers[defaultModelProvider] ? defaultModelProvider : providerKeys[0]);
+  return TokenDance.Provider;
 };
 
 /** Join workspace directory with a filename using platform-aware separator. */
@@ -739,6 +742,7 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, notice
 
   // Add state for active provider
   const [activeProvider, setActiveProvider] = useState<ProviderType>(getDefaultActiveProvider());
+  const [tokenDanceDefault, setTokenDanceDefault] = useState<string | null>(null);
   const [showApiKey, setShowApiKey] = useState(false);
 
   // MiniMax OAuth state
@@ -2437,6 +2441,10 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, notice
           key: primaryProvider.apiKey,
           baseUrl: primaryProvider.baseUrl,
         },
+        ...(tokenDanceDefault && normalizedProviders[TokenDance.Provider]?.enabled
+          && normalizedProviders[TokenDance.Provider].models?.some(model => model.id === tokenDanceDefault)
+          ? { model: { ...configService.getConfig().model, defaultModel: tokenDanceDefault, defaultModelProvider: TokenDance.Provider } }
+          : {}),
         providers: normalizedProviders, // Save all providers configuration
         language,
         useSystemProxy,
@@ -2492,6 +2500,10 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, notice
         }
       });
       dispatch(setAvailableModels(allModels));
+      if (tokenDanceDefault) {
+        const selected = allModels.find(model => model.providerKey === TokenDance.Provider && model.id === tokenDanceDefault);
+        if (selected) dispatch(setSelectedModel(selected));
+      }
 
       if (hasCoworkConfigChanges) {
         const updated = await coworkService.updateConfig({
@@ -3047,7 +3059,7 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, notice
   const buildProvidersExport = async (password: string): Promise<ProvidersExportPayload> => {
     const entries = await Promise.all(
       Object.entries(providers).map(async ([providerKey, providerConfig]) => {
-        const apiKey = await encryptWithPassword(providerConfig.apiKey, password);
+        const apiKey = await encryptWithPassword(providerKey === TokenDance.Provider ? '' : providerConfig.apiKey, password);
         const apiFormat = getEffectiveApiFormat(providerKey, providerConfig.apiFormat);
         return [
           providerKey,
@@ -6160,6 +6172,14 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, notice
                 </div>
               </div>
 
+              {activeProvider === TokenDance.Provider ? (
+                <TokenDanceSettings
+                  config={providers[TokenDance.Provider]}
+                  onChange={patch => setProviders(previous => ({ ...previous, [TokenDance.Provider]: { ...previous[TokenDance.Provider], ...patch } }))}
+                  onMakeDefault={setTokenDanceDefault}
+                  isDefault={tokenDanceDefault === (providers[TokenDance.Provider].defaultModel ?? TokenDance.DefaultModel)}
+                />
+              ) : <>
               {/* MiniMax OAuth auth section */}
               {activeProvider === 'minimax' && (
                 <div className="space-y-3">
@@ -6949,6 +6969,7 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, notice
                   )}
                 </div>
               </div>
+              </>}
             </div>
           </div>
         );

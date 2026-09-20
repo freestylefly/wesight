@@ -246,10 +246,14 @@ export interface AppConfig {
       oauthRefreshToken?: string;
       oauthTokenExpiresAt?: number;
       displayName?: string;
+      credentialRef?: string;
+      defaultModel?: string;
       models?: Array<{
         id: string;
         name: string;
         supportsImage?: boolean;
+        supportedProtocols?: string[];
+        contextLength?: number;
       }>;
     };
   };
@@ -355,6 +359,7 @@ export const OFFICIAL_GLOBAL_PROVIDERS = [
 ] as const;
 
 const BUILTIN_PROVIDER_DISPLAY_NAMES: Partial<Record<string, string>> = {
+  [ProviderName.TokenDance]: 'TokenDance · 词元跳动',
   [ProviderName.OpenAI]: 'OpenAI',
   [ProviderName.Anthropic]: 'Claude',
   [ProviderName.Gemini]: 'Google',
@@ -362,7 +367,7 @@ const BUILTIN_PROVIDER_DISPLAY_NAMES: Partial<Record<string, string>> = {
 
 export const getVisibleProviders = (language: 'zh' | 'en'): readonly string[] => {
   if (language === 'zh') {
-    return [...OFFICIAL_GLOBAL_PROVIDERS, ...CHINA_PROVIDERS];
+    return [ProviderName.TokenDance, ...OFFICIAL_GLOBAL_PROVIDERS, ...CHINA_PROVIDERS.filter(id => id !== ProviderName.TokenDance)];
   }
   return ProviderRegistry.idsForEnLocale();
 };

@@ -1,7 +1,9 @@
 import { resolveCodingPlanBaseUrl } from '../../shared/providers';
+import { TokenDanceError } from '../../shared/tokendance/constants';
 import { store } from '../store';
 import { ChatMessagePayload, ChatUserMessageInput, ImageAttachment } from '../types/chat';
 import { configService } from './config';
+import { i18nService } from './i18n';
 
 export interface ApiConfig {
   apiKey: string;
@@ -16,7 +18,7 @@ export class ApiError extends Error {
     public statusCode?: number,
     public response?: any
   ) {
-    super(message);
+    super(Object.values(TokenDanceError).includes(message as TokenDanceError) ? i18nService.t(message) : message);
     this.name = 'ApiError';
   }
 }

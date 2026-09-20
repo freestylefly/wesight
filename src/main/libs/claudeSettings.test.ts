@@ -177,3 +177,40 @@ describe('resolveCodexWesightApiConfig', () => {
     expect(configureProxy).not.toHaveBeenCalled();
   });
 });
+
+describe('TokenDance engine routing', () => {
+  afterEach(() => { setStoreGetter(() => null); vi.restoreAllMocks(); });
+
+  test('Claude uses native Messages; Codex uses native Responses only when declared', async () => {
+    const { TokenDance, TOKEN_DANCE_MODELS, TokenDanceProtocol } = await import('../../shared/tokendance/constants');
+    const { TokenDanceService, setTokenDanceService } = await import('./tokendance/service');
+    const service = new TokenDanceService({
+      read: key => key === TokenDance.CredentialStoreKey ? 'encrypted' : undefined,
+      write: () => {}, canEncrypt: () => true, encrypt: () => 'encrypted', decrypt: () => 'test-upstream-key',
+      fetch: async () => Response.json({}), openExternal: async () => {}, callbackHtml: '',
+    });
+    setTokenDanceService(service);
+    await service.start();
+    vi.spyOn(coworkOpenAICompatProxy, 'getCoworkOpenAICompatProxyStatus').mockReturnValue({ running: true, baseURL: 'http://127.0.0.1:12345/v1', hasUpstream: false, upstreamBaseURL: null, upstreamModel: null, lastError: null });
+    vi.spyOn(coworkOpenAICompatProxy, 'getCoworkOpenAICompatProxyBaseURL').mockReturnValue('http://127.0.0.1:12345/v1');
+    const configure = vi.spyOn(coworkOpenAICompatProxy, 'configureCoworkOpenAICompatProxy').mockImplementation(() => {});
+    setStoreGetter(() => ({ get: () => ({ model: { defaultModel: TokenDance.DefaultModel, defaultModelProvider: TokenDance.Provider }, providers: { [TokenDance.Provider]: {
+      enabled: true, apiKey: TokenDance.CredentialRef, baseUrl: TokenDance.BaseUrl, apiFormat: 'openai', models: TOKEN_DANCE_MODELS,
+    } } }) }) as never);
+    try {
+      for (const model of TOKEN_DANCE_MODELS) {
+        configure.mockClear();
+        const override = { providerName: TokenDance.Provider, modelId: model.id };
+        const claude = resolveCurrentApiConfig('local', override);
+        expect(claude.config).toBeTruthy();
+        expect(configure).toHaveBeenCalledTimes(model.supportedProtocols.includes(TokenDanceProtocol.Messages) ? 0 : 1);
+        expect(claude.config!.apiKey).not.toBe('test-upstream-key');
+        configure.mockClear();
+        const codex = resolveCodexWesightApiConfig('local', override);
+        expect(codex.config).toBeTruthy();
+        expect(configure).toHaveBeenCalledTimes(model.supportedProtocols.includes(TokenDanceProtocol.Responses) ? 0 : 1);
+        expect(codex.config!.apiKey).not.toBe('test-upstream-key');
+      }
+    } finally { service.close(); }
+  });
+});
