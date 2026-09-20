@@ -19,6 +19,7 @@ import type {
   ExternalAgentProviderListResult,
 } from '../../types/cowork';
 import ModelSelector from '../ModelSelector';
+import { resolveReadOnlyModelChipSource } from './coworkReadOnlyModelChip';
 
 interface CoworkModelSelectorProps {
   dropdownDirection?: 'up' | 'down';
@@ -134,7 +135,7 @@ const CoworkModelSelector: React.FC<CoworkModelSelectorProps> = ({
   const [claudeLiveConfig, setClaudeLiveConfig] = React.useState<ClaudeCodeLiveConfigSnapshot | null>(null);
 
   const loadProviders = React.useCallback(async () => {
-    if (!appType || readOnly || isClaudeLocalConfig) return;
+    if (!appType || isClaudeLocalConfig) return;
     setIsLoading(true);
     try {
       const result = await coworkService.listAgentProviders(appType);
@@ -144,7 +145,7 @@ const CoworkModelSelector: React.FC<CoworkModelSelectorProps> = ({
     } finally {
       setIsLoading(false);
     }
-  }, [appType, readOnly]);
+  }, [appType]);
 
   React.useEffect(() => {
     void loadProviders();
@@ -175,7 +176,7 @@ const CoworkModelSelector: React.FC<CoworkModelSelectorProps> = ({
   }, [isOpen]);
 
   React.useEffect(() => {
-    if (!isClaudeLocalConfig || readOnly) return;
+    if (!isClaudeLocalConfig) return;
     let cancelled = false;
     void (async () => {
       const result = await coworkService.getClaudeCodeLiveConfig();
@@ -186,7 +187,7 @@ const CoworkModelSelector: React.FC<CoworkModelSelectorProps> = ({
     return () => {
       cancelled = true;
     };
-  }, [isClaudeLocalConfig, readOnly]);
+  }, [isClaudeLocalConfig]);
 
   React.useEffect(() => {
     if (!appType) return;
@@ -199,13 +200,56 @@ const CoworkModelSelector: React.FC<CoworkModelSelectorProps> = ({
     };
   }, [appType]);
 
+  const providers = providerResult?.providers ?? [];
+  const currentProvider = providers.find((provider) => provider.id === providerResult?.currentProviderId)
+    ?? providers.find((provider) => provider.isCurrent)
+    ?? providers[0]
+    ?? null;
+
   if (readOnly) {
+    // The read-only chip is shown for Team / non-default Agent run targets, so it
+    // must echo the real model for every engine family the interactive selector
+    // handles below - not just provider-backed CLI engines.
+    const chipSource = resolveReadOnlyModelChipSource({
+      hasLabelOverride: Boolean(labelOverride),
+      engine: resolvedEngine,
+      isClaudeLocalConfig,
+      hasProvider: Boolean(currentProvider),
+    });
+    let label: string;
+    let fullLabel: string;
+    switch (chipSource) {
+      case 'override':
+        label = labelOverride as string;
+        fullLabel = label;
+        break;
+      case 'codexApp':
+        label = i18nService.t('coworkAgentCodexAppModelSourceValue');
+        fullLabel = label;
+        break;
+      case 'claudeLive':
+        label = claudeLiveConfig?.resolvedModel
+          || i18nService.t('coworkAgentClaudeLiveConfigModelDefault');
+        fullLabel = claudeLiveConfig?.configPath || claudeLiveConfig?.sourceName
+          ? `${i18nService.t('coworkAgentClaudeLiveConfigSource')}: ${claudeLiveConfig?.configPath || claudeLiveConfig?.sourceName}`
+          : label;
+        break;
+      case 'provider':
+        label = getProviderModelButtonLabel(currentProvider);
+        fullLabel = getProviderModelFullLabel(currentProvider);
+        break;
+      default:
+        label = i18nService.t('coworkAgentLocalModelUnknown');
+        fullLabel = i18nService.t('coworkRuntimeLocked');
+        break;
+    }
+    const title = titleOverride || fullLabel;
     return (
       <div
         className="max-w-[260px] truncate rounded-xl bg-surface px-3 py-1.5 text-sm font-medium text-foreground"
-        title={titleOverride || labelOverride || i18nService.t('coworkRuntimeLocked')}
+        title={title}
       >
-        {labelOverride || i18nService.t('coworkAgentLocalModelUnknown')}
+        {label}
       </div>
     );
   }
@@ -240,11 +284,6 @@ const CoworkModelSelector: React.FC<CoworkModelSelectorProps> = ({
     return <ModelSelector dropdownDirection={dropdownDirection} />;
   }
 
-  const providers = providerResult?.providers ?? [];
-  const currentProvider = providers.find((provider) => provider.id === providerResult?.currentProviderId)
-    ?? providers.find((provider) => provider.isCurrent)
-    ?? providers[0]
-    ?? null;
   const dropdownPositionClass = dropdownDirection === 'up'
     ? 'bottom-full mb-1'
     : 'top-full mt-1';
