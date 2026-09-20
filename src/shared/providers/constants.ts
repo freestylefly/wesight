@@ -1,3 +1,5 @@
+import { TOKEN_DANCE_MODELS, TokenDance } from '../tokendance/constants';
+
 /**
  * Provider Constants & Registry — Single Source of Truth
  *
@@ -23,6 +25,7 @@
 // ─── Provider Name ──────────────────────────────────────────────────────
 // providerName identifies the WeSight internal provider (config key).
 export const ProviderName = {
+  TokenDance: TokenDance.Provider,
   OpenAI: 'openai',
   Gemini: 'gemini',
   Anthropic: 'anthropic',
@@ -46,6 +49,7 @@ export type ProviderName = typeof ProviderName[keyof typeof ProviderName];
 // ─── OpenClaw Provider ID ───────────────────────────────────────────────
 // OpenClaw gateway provider identifiers. May differ from ProviderName.
 export const OpenClawProviderId = {
+  TokenDance: TokenDance.Provider,
   WesightServer: 'wesight-server',
   Moonshot: 'moonshot',
   Google: 'google',
@@ -164,6 +168,17 @@ interface ProviderDefInput {
 // ═══════════════════════════════════════════════════════
 
 const PROVIDER_DEFINITIONS = [
+  {
+    id: ProviderName.TokenDance,
+    openClawProviderId: OpenClawProviderId.TokenDance,
+    defaultBaseUrl: TokenDance.BaseUrl,
+    defaultApiFormat: ApiFormat.OpenAI,
+    codingPlanSupported: false,
+    switchableBaseUrls: { openai: TokenDance.BaseUrl, anthropic: TokenDance.MessagesBaseUrl },
+    region: 'china',
+    enPriority: 0,
+    defaultModels: TOKEN_DANCE_MODELS,
+  },
   // ── China ──
   {
     id: ProviderName.DeepSeek,
@@ -565,7 +580,7 @@ class ProviderRegistryImpl {
       unique.splice(ollamaIdx, 1);
     }
     unique.push(ProviderName.Ollama);
-    return unique;
+    return [ProviderName.TokenDance, ...unique.filter(id => id !== ProviderName.TokenDance)];
   }
 }
 

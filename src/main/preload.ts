@@ -24,6 +24,7 @@ import {
   ThemeSkinIpcChannel,
   type ThemeSkinPruneResult,
 } from '../shared/theme/constants';
+import { TokenDanceIpc } from '../shared/tokendance/constants';
 
 // 暴露安全的 API 到渲染进程
 contextBridge.exposeInMainWorld('electron', {
@@ -745,6 +746,14 @@ contextBridge.exposeInMainWorld('electron', {
   },
   networkStatus: {
     send: (status: 'online' | 'offline') => ipcRenderer.send('network:status-change', status),
+  },
+  tokendance: {
+    status: () => ipcRenderer.invoke(TokenDanceIpc.Status),
+    authorize: () => ipcRenderer.invoke(TokenDanceIpc.Authorize),
+    cancel: () => ipcRenderer.invoke(TokenDanceIpc.Cancel),
+    disconnect: () => ipcRenderer.invoke(TokenDanceIpc.Disconnect),
+    catalog: () => ipcRenderer.invoke(TokenDanceIpc.Catalog),
+    test: (model: string) => ipcRenderer.invoke(TokenDanceIpc.Test, model),
   },
   qwen: {
     // OAuth登录

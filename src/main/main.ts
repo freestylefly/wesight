@@ -217,6 +217,7 @@ import {
   setSystemProxyEnabled,
 } from './libs/systemProxy';
 import { ThemeSkinAssetStore } from './libs/themeSkinAssets';
+import { registerTokenDanceIpc, routeTokenDanceRequest, startTokenDance } from './libs/tokendance/integration';
 import { getLogFilePath, getRecentMainLogEntries,initLogger } from './logger';
 import { type McpServerFormData,McpStore } from './mcpStore';
 import { RuntimeTelemetryStore } from './runtimeTelemetryStore';
@@ -7549,6 +7550,8 @@ if (!gotTheLock) {
     }
   };
 
+  registerTokenDanceIpc();
+
   // API 代理处理程序 - 解决 CORS 问题
   ipcMain.handle('api:fetch', async (_event, options: {
     url: string;
@@ -7587,6 +7590,7 @@ if (!gotTheLock) {
     };
 
     try {
+      options = routeTokenDanceRequest(options);
       let result = await doFetch(options.headers);
       const isExpectedStatus = Array.isArray(options.expectedStatuses)
         && options.expectedStatuses.includes(result.status);
@@ -7634,6 +7638,7 @@ if (!gotTheLock) {
     activeStreamControllers.set(options.requestId, controller);
 
     try {
+      options = routeTokenDanceRequest(options);
       let response = await session.defaultSession.fetch(options.url, {
         method: options.method,
         headers: options.headers,
@@ -8404,6 +8409,12 @@ if (!gotTheLock) {
     }, { degradedOnError: true });
     // Inject store getter into claudeSettings
     setStoreGetter(() => store);
+    try {
+      const tokenDanceService = await startTokenDance(store);
+      app.once('before-quit', () => tokenDanceService.close());
+    } catch (error) {
+      console.warn('[TokenDance] local gateway could not start; other providers remain available:', error);
+    }
     // Inject auth getters for wesight-server provider routing
     // The getter proactively triggers a background token refresh when the
     // accessToken is within 5 minutes of expiry, so that the SDK always
