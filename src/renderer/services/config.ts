@@ -1,11 +1,12 @@
 import { normalizePetConfig } from '@shared/pet/constants';
 
+import { TokenDance } from '../../shared/tokendance/constants';
 import { AppConfig, CONFIG_KEYS, defaultConfig, isCustomProvider } from '../config';
 import { normalizeThemeSkinState } from '../theme/skin/config';
 import { localStore } from './store';
 
 const getFixedProviderApiFormat = (providerKey: string): 'anthropic' | 'openai' | 'gemini' | null => {
-  if (providerKey === 'openai' || providerKey === 'stepfun' || providerKey === 'youdaozhiyun' || providerKey === 'github-copilot') {
+  if (providerKey === TokenDance.Provider || providerKey === 'openai' || providerKey === 'stepfun' || providerKey === 'youdaozhiyun' || providerKey === 'github-copilot') {
     return 'openai';
   }
   if (providerKey === 'anthropic') {
@@ -18,6 +19,7 @@ const getFixedProviderApiFormat = (providerKey: string): 'anthropic' | 'openai' 
 };
 
 const normalizeProviderBaseUrl = (providerKey: string, baseUrl: unknown): string => {
+  if (providerKey === TokenDance.Provider) return TokenDance.BaseUrl;
   if (typeof baseUrl !== 'string') {
     return '';
   }
@@ -71,6 +73,10 @@ const normalizeProvidersConfig = (providers: AppConfig['providers']): AppConfig[
         ...providerConfig,
         baseUrl: normalizeProviderBaseUrl(providerKey, providerConfig.baseUrl),
         apiFormat: normalizeProviderApiFormat(providerKey, providerConfig.apiFormat),
+        ...(providerKey === TokenDance.Provider ? {
+          apiKey: providerConfig.apiKey ? TokenDance.CredentialRef : '',
+          credentialRef: providerConfig.apiKey ? TokenDance.CredentialRef : undefined,
+        } : {}),
       },
     ])
   ) as AppConfig['providers'];

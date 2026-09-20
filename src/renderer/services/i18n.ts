@@ -1,3 +1,4 @@
+import { TOKEN_DANCE_TRANSLATIONS } from '../../shared/tokendance/translations';
 import { configService } from './config';
 
 // 支持的语言类型
@@ -6,6 +7,7 @@ export type LanguageType = 'zh' | 'en';
 // 语言文本映射
 const translations: Record<LanguageType, Record<string, string>> = {
   zh: {
+    ...TOKEN_DANCE_TRANSLATIONS.zh,
     // 通用
     save: '保存',
     cancel: '取消',
@@ -2144,6 +2146,7 @@ const translations: Record<LanguageType, Record<string, string>> = {
     'settings.enterprise.managed': '由企业统一管理',
   },
   en: {
+    ...TOKEN_DANCE_TRANSLATIONS.en,
     // Common
     save: 'Save',
     cancel: 'Cancel',

@@ -1,3 +1,5 @@
+import { TOKEN_DANCE_TRANSLATIONS } from '../shared/tokendance/translations';
+
 /**
  * Lightweight i18n module for the Electron main process.
  *
@@ -16,6 +18,8 @@ export type LanguageType = 'zh' | 'en';
 
 const translations: Record<LanguageType, Record<string, string>> = {
   zh: {
+    ...TOKEN_DANCE_TRANSLATIONS.zh,
+    tokendanceCallbackReceived: '已收到授权，请返回 WeSight 查看连接结果。',
     // Tray menu
     trayShowWindow: '打开 WeSight',
     trayNewTask: '新建任务',
@@ -224,6 +228,8 @@ const translations: Record<LanguageType, Record<string, string>> = {
     'enterprise.updateBlocked': '版本更新由企业统一管理',
   },
   en: {
+    ...TOKEN_DANCE_TRANSLATIONS.en,
+    tokendanceCallbackReceived: 'Authorization received. Return to WeSight to check the connection.',
     // Tray menu
     trayShowWindow: 'Open WeSight',
     trayNewTask: 'New Task',

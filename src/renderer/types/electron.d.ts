@@ -34,6 +34,8 @@ import type {
   ThemeSkinPruneResult,
 } from '@shared/theme/constants';
 
+import type { TokenDanceApi } from '../../shared/tokendance/constants';
+
 interface ApiResponse {
   ok: boolean;
   status: number;
@@ -1016,6 +1018,7 @@ interface IElectronAPI {
     getAccessToken: () => Promise<string | null>;
     onCallback: (callback: (data: { code: string }) => void) => () => void;
   };
+  tokendance: TokenDanceApi;
   qwen: {
     oauthLogin: () => Promise<{ success: boolean; data?: QwenOAuthToken; error?: string }>;
     oauthRefresh: (refreshToken: string) => Promise<{ success: boolean; data?: QwenOAuthToken; error?: string }>;

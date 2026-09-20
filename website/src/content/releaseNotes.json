@@ -3,6 +3,102 @@
   "windowsUnsignedNotice": "Windows x64 安装包当前尚未签名。安装时，Microsoft Defender SmartScreen 可能显示“Windows 已保护你的电脑”，请确认安装包来自 WeSight 官方 GitHub Release 后继续安装。",
   "releases": [
     {
+      "version": "1.0.8",
+      "date": "2026-09-20",
+      "title": "TokenDance 模型接入与观猹登录",
+      "summary": "新增 TokenDance 一键授权和六个模型，按模型能力适配调用协议，并提供已上线的观猹登录入口。",
+      "compareUrl": "https://github.com/freestylefly/wesight/compare/v1.0.6...v1.0.8",
+      "releaseUrl": "https://github.com/freestylefly/wesight/releases/tag/v1.0.8",
+      "sections": [
+        {
+          "kind": "feature",
+          "title": "新增",
+          "items": [
+            {
+              "text": "TokenDance 加入模型供应商首位，支持浏览器 OAuth 授权、实时目录刷新、默认模型选择与连接测试。",
+              "areas": [
+                "desktop"
+              ]
+            },
+            {
+              "text": "接入 deepseek-v4.1-flash、glm-5.3-flash、glm-5.3、deepseek-v4-pro-0813、kimi-k3 和 hy4-preview 六个模型。",
+              "areas": [
+                "desktop"
+              ]
+            },
+            {
+              "text": "云端登录页已提供「使用观猹登录」，与 Google 登录并列；登录后沿用桌面端回调流程。",
+              "areas": [
+                "desktop",
+                "website"
+              ]
+            }
+          ]
+        },
+        {
+          "kind": "improvement",
+          "title": "变更",
+          "items": [
+            {
+              "text": "按照实时模型目录声明的协议，为 Claude、Codex、OpenClaw 和普通对话选择调用方式；保留原有默认模型，按需切换。",
+              "areas": [
+                "desktop"
+              ]
+            },
+            {
+              "text": "TokenDance API Key 由系统安全存储加密保存，前端和配置导出使用凭据引用；上游密钥仅在主进程发往 TokenDance。",
+              "areas": [
+                "desktop"
+              ]
+            }
+          ]
+        },
+        {
+          "kind": "fix",
+          "title": "修复与防护",
+          "items": [
+            {
+              "text": "处理授权取消、过期、目录刷新失败、密钥失效和额度不足，避免将上游敏感错误直接显示给用户。",
+              "areas": [
+                "desktop"
+              ]
+            },
+            {
+              "text": "修复 macOS 打包依赖混用证书密码与临时钥匙串密码的问题，保留签名、公证和产物校验。",
+              "areas": [
+                "release"
+              ]
+            }
+          ]
+        },
+        {
+          "kind": "improvement",
+          "title": "使用说明与已知限制",
+          "items": [
+            {
+              "text": "观猹与 Google 账号独立，会员和积分保留在原账号；已有账号请继续使用原登录方式。",
+              "areas": [
+                "desktop",
+                "website"
+              ]
+            },
+            {
+              "text": "外部 Agent 使用 TokenDance 时需保持 WeSight 运行；重启后从 WeSight 重新应用配置并启动 Agent。",
+              "areas": [
+                "desktop"
+              ]
+            },
+            {
+              "text": "本次已通过模拟授权和协议路由测试；TokenDance 真实账号授权及六个模型的付费推理尚未逐项验收。",
+              "areas": [
+                "release"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
       "version": "1.0.6",
       "date": "2026-08-24",
       "title": "任务看板开箱即用",

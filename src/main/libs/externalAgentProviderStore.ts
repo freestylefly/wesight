@@ -5,10 +5,12 @@ import os from 'os';
 import path from 'path';
 
 import { ExternalAgentConfigSource } from '../../shared/cowork/constants';
+import { TokenDance, TokenDanceError } from '../../shared/tokendance/constants';
 import {
   getClaudeCodeModelFromSettingsConfig,
   getClaudeConfigDir as resolveClaudeConfigDir,
 } from './claudeCodeLiveConfig';
+import { resolveCodexWesightApiConfig, resolveCurrentApiConfig, resolveRawApiConfig } from './claudeSettings';
 import {
   DEFAULT_DEEPSEEK_TUI_MODEL,
   listDeepSeekTuiModelProviders,
@@ -1601,6 +1603,25 @@ export class ExternalAgentProviderStore {
         `[ExternalAgentProviderStore] skipped writing live ${provider.appType} config because it follows the local CLI.`,
       );
       return;
+    }
+    // Keep the stored profile portable: resolve only when applying it to a running engine.
+    if (provider.summary.apiKey === TokenDance.CredentialRef) {
+      const override = { providerName: TokenDance.Provider, modelId: provider.summary.model };
+      const resolved = provider.appType === CLAUDE_APP_TYPE
+        ? resolveCurrentApiConfig('local', override)
+        : provider.appType === CODEX_APP_TYPE
+          ? resolveCodexWesightApiConfig('local', override)
+          : resolveRawApiConfig(override);
+      if (!resolved.config) throw new Error(resolved.error ?? TokenDanceError.NotConnected);
+      const config = resolved.config;
+      provider = {
+        ...provider,
+        summary: { ...provider.summary, apiKey: config.apiKey, baseUrl: config.baseURL },
+        settingsConfig: buildSettingsConfigFromInput({
+          appType: provider.appType, name: provider.name, model: config.model,
+          apiKey: config.apiKey, baseUrl: config.baseURL,
+        }),
+      };
     }
     const settingsConfig = this.stripInternalSettingsConfig(provider.settingsConfig);
     this.writeCcSwitchCurrentProvider(provider.appType, provider);
