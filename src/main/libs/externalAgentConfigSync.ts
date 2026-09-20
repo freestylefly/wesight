@@ -697,6 +697,17 @@ const buildClaudeEnvForConfig = (
   };
 };
 
+const getOwnValue = (record: Record<string, unknown>, key: string): unknown => (
+  Object.prototype.hasOwnProperty.call(record, key) ? record[key] : undefined
+);
+
+const claudeEnvMatchesManagedOverlay = (
+  env: Record<string, unknown>,
+  managedEnv: Record<string, unknown>,
+): boolean => CLAUDE_MANAGED_ENV_KEYS.every(
+  (key) => getOwnValue(env, key) === getOwnValue(managedEnv, key),
+);
+
 export const mergeClaudeSettingsForWesightModel = (
   existingSettings: Record<string, unknown>,
   config: CoworkApiConfig,
@@ -707,10 +718,16 @@ export const mergeClaudeSettingsForWesightModel = (
   const previousEnvKeys = getStringArray(existingClaude.envKeys);
   const previousCreatedEnvKeys = getStringArray(existingClaude.createdEnvKeys);
   const previousOriginalEnv = getNestedRecord(existingClaude, 'originalEnv');
+  const previousManagedEnv = getNestedRecord(existingClaude, 'managedEnv');
   const hasRecoverableSnapshot = Object.keys(previousOriginalEnv).length > 0 || previousCreatedEnvKeys.length > 0;
   const baselineEnv = { ...getNestedRecord(existingSettings, 'env') };
+  // When the live env no longer matches the overlay WeSight last wrote, an
+  // external tool (or the user) changed the local config; the stored snapshot
+  // is stale and must be refreshed from the live env instead of restored.
+  const overlayModifiedExternally = Object.keys(previousManagedEnv).length > 0
+    && !claudeEnvMatchesManagedOverlay(baselineEnv, previousManagedEnv);
 
-  if (hasRecoverableSnapshot) {
+  if (hasRecoverableSnapshot && !overlayModifiedExternally) {
     for (const key of previousEnvKeys) {
       if (Object.prototype.hasOwnProperty.call(previousOriginalEnv, key)) {
         baselineEnv[key] = previousOriginalEnv[key];
@@ -731,11 +748,14 @@ export const mergeClaudeSettingsForWesightModel = (
   const createdEnvKeys = new Set(previousCreatedEnvKeys);
   for (const key of CLAUDE_MANAGED_ENV_KEYS) {
     if (Object.prototype.hasOwnProperty.call(baselineEnv, key)) {
-      if (!Object.prototype.hasOwnProperty.call(originalEnv, key)) {
+      if (overlayModifiedExternally || !Object.prototype.hasOwnProperty.call(originalEnv, key)) {
         originalEnv[key] = baselineEnv[key];
       }
       createdEnvKeys.delete(key);
     } else {
+      if (overlayModifiedExternally) {
+        delete originalEnv[key];
+      }
       createdEnvKeys.add(key);
     }
   }
@@ -743,6 +763,11 @@ export const mergeClaudeSettingsForWesightModel = (
   const credentialKey = chooseClaudeCredentialEnvKey(baselineEnv, options.credentialKey);
   const env = buildClaudeEnvForConfig(baselineEnv, config, credentialKey);
   const envKeys = [...CLAUDE_MANAGED_ENV_KEYS];
+  const managedEnv = Object.fromEntries(
+    envKeys
+      .filter((key) => Object.prototype.hasOwnProperty.call(env, key))
+      .map((key) => [key, env[key]]),
+  );
   return {
     ...existingSettings,
     env,
@@ -753,6 +778,7 @@ export const mergeClaudeSettingsForWesightModel = (
         envKeys,
         createdEnvKeys: envKeys.filter((key) => createdEnvKeys.has(key)),
         originalEnv,
+        managedEnv,
         credentialKey,
       },
     },
@@ -769,6 +795,7 @@ const removeClaudeManagedMetadata = (
   delete claudeManaged.envKeys;
   delete claudeManaged.createdEnvKeys;
   delete claudeManaged.originalEnv;
+  delete claudeManaged.managedEnv;
   delete claudeManaged.credentialKey;
 
   const managed = { ...existingManaged };
@@ -814,6 +841,15 @@ export const removeWesightManagedClaudeSettings = (
   }
 
   const env = { ...getNestedRecord(existingSettings, 'env') };
+  const previousManagedEnv = getNestedRecord(existingClaude, 'managedEnv');
+  if (
+    Object.keys(previousManagedEnv).length > 0
+    && !claudeEnvMatchesManagedOverlay(env, previousManagedEnv)
+  ) {
+    // The local env was changed externally after WeSight applied its overlay;
+    // keep the user's current values instead of restoring the stale snapshot.
+    return removeClaudeManagedMetadata(existingSettings, existingManaged, existingClaude, env);
+  }
   for (const key of previousEnvKeys) {
     if (Object.prototype.hasOwnProperty.call(previousOriginalEnv, key)) {
       env[key] = previousOriginalEnv[key];
