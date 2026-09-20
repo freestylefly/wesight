@@ -115,7 +115,43 @@ export const screen = {
   }),
 };
 
+type MockSessionOptions = { cache?: boolean } | undefined;
+
+export interface MockPartitionSession {
+  partition: string;
+  options: MockSessionOptions;
+  proxyConfig: unknown;
+  setProxyCalls: unknown[];
+  setProxy: (config: unknown) => Promise<void>;
+  fetch: typeof globalThis.fetch;
+}
+
+/** Sessions created via `session.fromPartition`, keyed by partition name. */
+export const mockPartitionSessions = new Map<string, MockPartitionSession>();
+
+/** Test helper: forget all partition sessions created so far. */
+export function __resetMockPartitionSessions(): void {
+  mockPartitionSessions.clear();
+}
+
 export const session = {
+  fromPartition: (partition: string, options?: { cache?: boolean }): MockPartitionSession => {
+    const existing = mockPartitionSessions.get(partition);
+    if (existing) return existing;
+    const created: MockPartitionSession = {
+      partition,
+      options,
+      proxyConfig: undefined,
+      setProxyCalls: [],
+      setProxy: async (config: unknown) => {
+        created.setProxyCalls.push(config);
+        created.proxyConfig = config;
+      },
+      fetch: globalThis.fetch,
+    };
+    mockPartitionSessions.set(partition, created);
+    return created;
+  },
   defaultSession: {
     clearCache: asyncNoop,
     clearStorageData: asyncNoop,
