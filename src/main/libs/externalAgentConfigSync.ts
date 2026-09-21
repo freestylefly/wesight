@@ -30,7 +30,11 @@ import {
   parseHermesDotenvText,
   summarizeHermesSettingsConfig,
 } from './hermesConfig';
-import { readJsonOrJsoncObject } from './jsoncUtil';
+import {
+  readJsonOrJsoncObject,
+  readTextFileOrNull,
+  stringifyJsoncPreservingComments,
+} from './jsoncUtil';
 import {
   DEFAULT_OPENCODE_MODEL,
   mergeOpenCodeConfigForWesightModel,
@@ -223,6 +227,19 @@ const readJsonObject = readJsonOrJsoncObject;
 
 const writeJsonObject = (filePath: string, value: Record<string, unknown>): void => {
   atomicWrite(filePath, `${JSON.stringify(value, null, 2)}\n`);
+};
+
+// Comment-preserving counterpart for the CLI config files that may now resolve to a
+// .jsonc path. `changedKeys` names the top-level keys the caller intends to write.
+const writeJsonConfigObject = (
+  filePath: string,
+  value: Record<string, unknown>,
+  changedKeys: string[],
+): void => {
+  atomicWrite(
+    filePath,
+    stringifyJsoncPreservingComments(filePath, readTextFileOrNull(filePath), value, changedKeys),
+  );
 };
 
 const getNestedRecord = (value: unknown, key: string): Record<string, unknown> => {
@@ -910,9 +927,12 @@ export const syncOpenCodeGlobalConfigFromWesightModel = (): void => {
   const config = requireApiConfig(resolved);
   const paths = getCliConfigPaths('opencode');
   const existing = readJsonObject(paths.primaryConfigPath) ?? {};
-  writeJsonObject(
+  // mergeOpenCodeConfigForWesightModel only ever sets `model` and `provider`; keep the
+  // rest of a .jsonc file, comments included, exactly as the user left it.
+  writeJsonConfigObject(
     paths.primaryConfigPath,
     mergeOpenCodeConfigForWesightModel(existing, config, resolved.providerMetadata?.providerName),
+    ['model', 'provider'],
   );
 };
 

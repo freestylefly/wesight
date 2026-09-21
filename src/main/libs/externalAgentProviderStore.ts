@@ -46,7 +46,12 @@ import {
   settingsConfigFromHermesRecord,
   summarizeHermesSettingsConfig,
 } from './hermesConfig';
-import { readJsonOrJsoncObject, stripJsonComments } from './jsoncUtil';
+import {
+  readJsonOrJsoncObject,
+  readTextFileOrNull,
+  stringifyJsoncPreservingComments,
+  stripJsonComments,
+} from './jsoncUtil';
 import {
   DEFAULT_OPENCODE_MODEL,
   listOpenCodeModelProviders,
@@ -344,6 +349,21 @@ const atomicWrite = (filePath: string, content: string): void => {
 
 const writeJsonFile = (filePath: string, value: unknown): void => {
   atomicWrite(filePath, `${JSON.stringify(value, null, 2)}\n`);
+};
+
+// Same contract as writeJsonFile, except that a .jsonc target keeps the comments
+// the user wrote by hand. `changedKeys` names the top-level keys this call intends
+// to modify; anything else in the file is left byte-for-byte alone. Falls back to
+// writeJsonFile whenever the in-place edit cannot be made safely.
+const writeJsonConfigFile = (
+  filePath: string,
+  value: Record<string, unknown>,
+  changedKeys: string[],
+): void => {
+  atomicWrite(
+    filePath,
+    stringifyJsoncPreservingComments(filePath, readTextFileOrNull(filePath), value, changedKeys),
+  );
 };
 
 const sanitizeProviderKey = (value: string): string => {
@@ -1645,7 +1665,14 @@ export class ExternalAgentProviderStore {
         ...(Object.keys(storedConfig).length > 0 ? storedConfig : {}),
         model: selectedModel,
       };
-      writeJsonFile(getOpenCodeConfigPath(), nextConfig);
+      // Now that this path can resolve to opencode.jsonc, a blind JSON rewrite would
+      // delete the user's own comments. Only the keys this merge actually sets are
+      // rewritten in place.
+      writeJsonConfigFile(
+        getOpenCodeConfigPath(),
+        nextConfig,
+        ['model', ...Object.keys(storedConfig)],
+      );
       return;
     }
     if (provider.appType === HERMES_APP_TYPE) {
