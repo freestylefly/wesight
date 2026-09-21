@@ -47,6 +47,12 @@ import {
   summarizeHermesSettingsConfig,
 } from './hermesConfig';
 import {
+  readJsonOrJsoncObject,
+  readTextFileOrNull,
+  stringifyJsoncPreservingComments,
+  stripJsonComments,
+} from './jsoncUtil';
+import {
   DEFAULT_OPENCODE_MODEL,
   listOpenCodeModelProviders,
   mergeOpenCodeConfigForWesightModel,
@@ -193,17 +199,8 @@ const DEFAULT_KIMI_CODE_LOCAL_MODEL = 'local-kimi-code';
 
 const homeDir = (): string => os.homedir();
 
-const readJsonObject = (filePath: string): Record<string, unknown> | null => {
-  try {
-    if (!fs.existsSync(filePath)) return null;
-    const parsed = JSON.parse(fs.readFileSync(filePath, 'utf8'));
-    return parsed && typeof parsed === 'object' && !Array.isArray(parsed)
-      ? parsed as Record<string, unknown>
-      : null;
-  } catch {
-    return null;
-  }
-};
+
+const readJsonObject = readJsonOrJsoncObject;
 
 const normalizePathSetting = (value: unknown): string | null => {
   if (typeof value !== 'string') return null;
@@ -254,7 +251,10 @@ const getHermesEnvPath = (): string => path.join(getHermesConfigDir(), '.env');
 const getOpenClawConfigDir = (): string => path.join(homeDir(), '.openclaw');
 const getOpenClawConfigPath = (): string => path.join(getOpenClawConfigDir(), 'openclaw.json');
 const getOpenCodeConfigDir = (): string => path.join(homeDir(), '.config', 'opencode');
-const getOpenCodeConfigPath = (): string => path.join(getOpenCodeConfigDir(), 'opencode.json');
+const getOpenCodeConfigPath = (): string => {
+  const jsoncPath = path.join(getOpenCodeConfigDir(), 'opencode.jsonc');
+  return fs.existsSync(jsoncPath) ? jsoncPath : path.join(getOpenCodeConfigDir(), 'opencode.json');
+};
 const getOpenCodeAuthPath = (): string => path.join(homeDir(), '.local', 'share', 'opencode', 'auth.json');
 const getGrokBuildConfigDir = (): string => path.join(homeDir(), '.grok');
 const getGrokBuildConfigPath = (): string => path.join(getGrokBuildConfigDir(), 'config.toml');
@@ -349,6 +349,21 @@ const atomicWrite = (filePath: string, content: string): void => {
 
 const writeJsonFile = (filePath: string, value: unknown): void => {
   atomicWrite(filePath, `${JSON.stringify(value, null, 2)}\n`);
+};
+
+// Same contract as writeJsonFile, except that a .jsonc target keeps the comments
+// the user wrote by hand. `changedKeys` names the top-level keys this call intends
+// to modify; anything else in the file is left byte-for-byte alone. Falls back to
+// writeJsonFile whenever the in-place edit cannot be made safely.
+const writeJsonConfigFile = (
+  filePath: string,
+  value: Record<string, unknown>,
+  changedKeys: string[],
+): void => {
+  atomicWrite(
+    filePath,
+    stringifyJsoncPreservingComments(filePath, readTextFileOrNull(filePath), value, changedKeys),
+  );
 };
 
 const sanitizeProviderKey = (value: string): string => {
@@ -1650,7 +1665,14 @@ export class ExternalAgentProviderStore {
         ...(Object.keys(storedConfig).length > 0 ? storedConfig : {}),
         model: selectedModel,
       };
-      writeJsonFile(getOpenCodeConfigPath(), nextConfig);
+      // Now that this path can resolve to opencode.jsonc, a blind JSON rewrite would
+      // delete the user's own comments. Only the keys this merge actually sets are
+      // rewritten in place.
+      writeJsonConfigFile(
+        getOpenCodeConfigPath(),
+        nextConfig,
+        ['model', ...Object.keys(storedConfig)],
+      );
       return;
     }
     if (provider.appType === HERMES_APP_TYPE) {
@@ -1784,3 +1806,5 @@ export class ExternalAgentProviderStore {
     );
   }
 }
+
+export { stripJsonComments };

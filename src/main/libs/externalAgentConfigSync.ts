@@ -31,6 +31,11 @@ import {
   summarizeHermesSettingsConfig,
 } from './hermesConfig';
 import {
+  readJsonOrJsoncObject,
+  readTextFileOrNull,
+  stringifyJsoncPreservingComments,
+} from './jsoncUtil';
+import {
   DEFAULT_OPENCODE_MODEL,
   mergeOpenCodeConfigForWesightModel,
   summarizeOpenCodeSettingsConfig,
@@ -216,20 +221,25 @@ export const writeJsonObjectWithBackupIfChanged = (filePath: string, value: Reco
   return writeTextFileWithBackupIfChanged(filePath, `${JSON.stringify(value, null, 2)}\n`);
 };
 
-const readJsonObject = (filePath: string): Record<string, unknown> | null => {
-  try {
-    if (!fs.existsSync(filePath)) return null;
-    const parsed = JSON.parse(fs.readFileSync(filePath, 'utf8'));
-    return parsed && typeof parsed === 'object' && !Array.isArray(parsed)
-      ? parsed as Record<string, unknown>
-      : null;
-  } catch {
-    return null;
-  }
-};
+// Reads .json and .jsonc alike: getCliConfigPaths('opencode') may point at
+// opencode.jsonc, which JSON.parse cannot handle without comment stripping.
+const readJsonObject = readJsonOrJsoncObject;
 
 const writeJsonObject = (filePath: string, value: Record<string, unknown>): void => {
   atomicWrite(filePath, `${JSON.stringify(value, null, 2)}\n`);
+};
+
+// Comment-preserving counterpart for the CLI config files that may now resolve to a
+// .jsonc path. `changedKeys` names the top-level keys the caller intends to write.
+const writeJsonConfigObject = (
+  filePath: string,
+  value: Record<string, unknown>,
+  changedKeys: string[],
+): void => {
+  atomicWrite(
+    filePath,
+    stringifyJsoncPreservingComments(filePath, readTextFileOrNull(filePath), value, changedKeys),
+  );
 };
 
 const getNestedRecord = (value: unknown, key: string): Record<string, unknown> => {
@@ -644,7 +654,7 @@ const getCliConfigPaths = (appType: CliAppType): { primaryConfigPath: string; se
         : appType === 'openclaw'
           ? path.join(configDir, 'openclaw.json')
         : appType === 'opencode'
-          ? path.join(configDir, 'opencode.json')
+          ? (fs.existsSync(path.join(configDir, 'opencode.jsonc')) ? path.join(configDir, 'opencode.jsonc') : path.join(configDir, 'opencode.json'))
           : appType === 'grok'
             ? path.join(configDir, 'config.toml')
           : appType === 'qwen'
@@ -917,9 +927,12 @@ export const syncOpenCodeGlobalConfigFromWesightModel = (): void => {
   const config = requireApiConfig(resolved);
   const paths = getCliConfigPaths('opencode');
   const existing = readJsonObject(paths.primaryConfigPath) ?? {};
-  writeJsonObject(
+  // mergeOpenCodeConfigForWesightModel only ever sets `model` and `provider`; keep the
+  // rest of a .jsonc file, comments included, exactly as the user left it.
+  writeJsonConfigObject(
     paths.primaryConfigPath,
     mergeOpenCodeConfigForWesightModel(existing, config, resolved.providerMetadata?.providerName),
+    ['model', 'provider'],
   );
 };
 
