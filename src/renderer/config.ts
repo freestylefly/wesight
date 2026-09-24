@@ -138,6 +138,17 @@ export interface AppConfig {
         supportsImage?: boolean;
       }>;
     };
+    requesty: {
+      enabled: boolean;
+      apiKey: string;
+      baseUrl: string;
+      apiFormat?: 'anthropic' | 'openai' | 'gemini';
+      models?: Array<{
+        id: string;
+        name: string;
+        supportsImage?: boolean;
+      }>;
+    };
     gemini: {
       enabled: boolean;
       apiKey: string;

@@ -90,7 +90,7 @@ Terminal-native coding agents are powerful, while their setup, model routing, pe
 
 - **Agent Engines** - Run Claude Code, Codex, Kimi Code, OpenClaw, Hermes Agent, OpenCode, Qwen Code, DeepSeek-TUI, or the built-in runtime from the same workspace.
 - **One-click setup** - On macOS, WeSight can install supported local CLIs or detect the ones already present on the machine.
-- **Unified model providers** - Configure official OpenAI, Anthropic Claude, Google Gemini, DeepSeek, Qwen, Moonshot, Ollama, OpenRouter, GitHub Copilot, and custom OpenAI-compatible endpoints.
+- **Unified model providers** - Configure official OpenAI, Anthropic Claude, Google Gemini, DeepSeek, Qwen, Moonshot, Ollama, OpenRouter, Requesty, GitHub Copilot, and custom OpenAI-compatible endpoints.
 - **Local CLI configuration** - Use existing Claude Code, Codex, Kimi Code, OpenClaw, Hermes Agent, OpenCode, Qwen Code, or DeepSeek-TUI accounts and config when you already have a working terminal setup.
 - **Graphical tool execution** - View commands, files, permissions, slash commands, outputs, generated images, and tool results inside the chat flow.
 - **IM Agent Hub** - Route Feishu messages into OpenClaw, Hermes Agent, Claude Code, or Codex, with per-engine bot profiles.
@@ -130,7 +130,7 @@ WeSight keeps model setup in one place, then maps it into the selected engine wh
 
 - Add multiple providers and models.
 - Use official OpenAI, Anthropic Claude, and Google Gemini providers.
-- Add OpenAI-compatible providers for DeepSeek, Qwen, Moonshot, Ollama, OpenRouter, GitHub Copilot, local gateways, or private endpoints.
+- Add OpenAI-compatible providers for DeepSeek, Qwen, Moonshot, Ollama, OpenRouter, Requesty, GitHub Copilot, local gateways, or private endpoints.
 - Switch between WeSight-managed model settings and existing local CLI configuration.
 - Import or sync local engine configuration when you want WeSight to manage it.
 

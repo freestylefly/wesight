@@ -603,6 +603,12 @@ const PROVIDER_REGISTRY: Record<string, ProviderDescriptor> = {
     normalizeBaseUrl: stripChatCompletionsSuffix,
   },
 
+  [ProviderName.Requesty]: {
+    providerId: OpenClawProviderId.Requesty,
+    resolveApi: ({ apiType, baseURL }) => mapApiTypeToOpenClawApi(apiType, undefined, baseURL),
+    normalizeBaseUrl: stripChatCompletionsSuffix,
+  },
+
   [ProviderName.Ollama]: {
     providerId: OpenClawProviderId.Ollama,
     resolveApi: () => OpenClawApiConst.OpenAICompletions as OpenClawProviderApi,
