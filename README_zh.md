@@ -90,7 +90,7 @@ WeSight 是一个开源桌面 AI Agent 控制台。它可以安装或复用 Clau
 
 - **Agent 引擎**：统一运行 Claude Code、Codex、Kimi Code、OpenClaw、Hermes Agent、OpenCode、Qwen Code、DeepSeek-TUI 和内置 runtime。
 - **一键准备环境**：macOS 下可自动安装支持的本机 CLI，也可以检测已经存在的本机安装。
-- **统一模型供应商**：配置官方 OpenAI、Anthropic Claude、Google Gemini、DeepSeek、Qwen、Moonshot、Ollama、OpenRouter、GitHub Copilot 和自定义 OpenAI-compatible 接口。
+- **统一模型供应商**：配置官方 OpenAI、Anthropic Claude、Google Gemini、DeepSeek、Qwen、Moonshot、Ollama、OpenRouter、Requesty、GitHub Copilot 和自定义 OpenAI-compatible 接口。
 - **本机 CLI 配置复用**：如果 Claude Code、Codex、Kimi Code、OpenClaw、Hermes Agent、OpenCode、Qwen Code 或 DeepSeek-TUI 已经在终端中可用，可以继续使用原有账号和配置。
 - **图形化工具执行**：在 Chat 中查看命令、文件、权限、Slash 指令、输出、生成图片和工具结果。
 - **IM Agent Hub**：把飞书消息接入 OpenClaw、Hermes Agent、Claude Code 或 Codex，并支持按引擎配置机器人。
@@ -130,7 +130,7 @@ WeSight 把模型配置集中在一个设置页。某个引擎选择“跟随 We
 
 - 添加多个供应商和多个模型。
 - 使用官方 OpenAI、Anthropic Claude 和 Google Gemini 供应商。
-- 为 DeepSeek、Qwen、Moonshot、Ollama、OpenRouter、GitHub Copilot、本地网关或私有 endpoint 添加 OpenAI-compatible 配置。
+- 为 DeepSeek、Qwen、Moonshot、Ollama、OpenRouter、Requesty、GitHub Copilot、本地网关或私有 endpoint 添加 OpenAI-compatible 配置。
 - 在 WeSight 托管模型配置和本机 CLI 配置之间切换。
 - 在需要统一管理时导入或同步本机引擎配置。
 

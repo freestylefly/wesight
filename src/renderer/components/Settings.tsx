@@ -89,6 +89,7 @@ import {
   OpenAIIcon,
   OpenRouterIcon,
   QwenIcon,
+  RequestyIcon,
   StepfunIcon,
   VolcengineIcon,
   XiaomiIcon,
@@ -270,6 +271,7 @@ const providerKeys = [
   'stepfun',
   'xiaomi',
   'openrouter',
+  'requesty',
   'github-copilot',
   'ollama',
   ...CUSTOM_PROVIDER_KEYS,
@@ -351,6 +353,7 @@ const providerMeta: Record<ProviderType, { label: string; icon: React.ReactNode 
   stepfun: { label: 'StepFun', icon: <StepfunIcon /> },
   volcengine: { label: 'Volcengine', icon: <VolcengineIcon /> },
   openrouter: { label: 'OpenRouter', icon: <OpenRouterIcon /> },
+  requesty: { label: 'Requesty', icon: <RequestyIcon /> },
   'github-copilot': { label: 'GitHub Copilot', icon: <GitHubCopilotIcon /> },
   ollama: { label: 'Ollama', icon: <OllamaIcon /> },
   ...Object.fromEntries(
@@ -373,6 +376,7 @@ const providerLinks: Partial<Record<ProviderType, { website: string; apiKey?: st
   stepfun:      { website: 'https://platform.stepfun.com',             apiKey: 'https://platform.stepfun.com/interface-key' },
   xiaomi:       { website: 'https://dev.mi.com/platform',              apiKey: 'https://dev.mi.com/platform' },
   openrouter:   { website: 'https://openrouter.ai',                    apiKey: 'https://openrouter.ai/keys' },
+  requesty:     { website: 'https://requesty.ai',                      apiKey: 'https://app.requesty.ai/api-keys' },
   ollama:       { website: 'https://ollama.com' },
 };
 
@@ -1606,6 +1610,17 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, notice
             ...prev,
             openrouter: {
               ...prev.openrouter,
+              enabled: true,
+              apiKey: config.api.key,
+              baseUrl: config.api.baseUrl
+            }
+          }));
+        } else if (normalizedApiBaseUrl.includes('requesty.ai')) {
+          setActiveProvider('requesty');
+          setProviders(prev => ({
+            ...prev,
+            requesty: {
+              ...prev.requesty,
               enabled: true,
               apiKey: config.api.key,
               baseUrl: config.api.baseUrl
