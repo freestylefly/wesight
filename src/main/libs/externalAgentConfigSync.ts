@@ -644,7 +644,9 @@ const getCliConfigPaths = (appType: CliAppType): { primaryConfigPath: string; se
         : appType === 'openclaw'
           ? path.join(configDir, 'openclaw.json')
         : appType === 'opencode'
-          ? path.join(configDir, 'opencode.json')
+          ? (fs.existsSync(path.join(configDir, 'opencode.jsonc'))
+              ? path.join(configDir, 'opencode.jsonc')
+              : path.join(configDir, 'opencode.json'))
           : appType === 'grok'
             ? path.join(configDir, 'config.toml')
           : appType === 'qwen'

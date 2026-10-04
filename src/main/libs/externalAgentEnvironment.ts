@@ -255,6 +255,14 @@ const resolveClaudeSettingsPath = (configDir: string): string => {
 
 const getOpenCodeDataDir = (): string => path.join(homeDir(), '.local', 'share', 'opencode');
 
+/** Resolve the OpenCode primary config path, preferring opencode.jsonc (v1.x+) over opencode.json. */
+const resolveOpenCodeConfigPath = (configDir: string): string => {
+  const jsoncPath = path.join(configDir, 'opencode.jsonc');
+  if (fs.existsSync(jsoncPath)) return jsoncPath;
+  return path.join(configDir, 'opencode.json');
+};
+
+
 const getHermesConfigDir = (): string => path.join(homeDir(), '.hermes');
 
 const getOpenClawConfigDir = (): string => path.join(homeDir(), '.openclaw');
@@ -1022,7 +1030,7 @@ const buildCliConfigSnapshot = (
     : appType === 'openclaw'
       ? path.join(configDir, 'openclaw.json')
     : appType === 'opencode'
-      ? path.join(configDir, 'opencode.json')
+      ? resolveOpenCodeConfigPath(configDir)
       : appType === 'grok'
         ? path.join(configDir, 'config.toml')
         : appType === 'qwen'
