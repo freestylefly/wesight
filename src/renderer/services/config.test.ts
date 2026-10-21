@@ -10,6 +10,37 @@ vi.mock('./store', () => ({ localStore: storage }));
 
 import { configService } from './config';
 
+test.each(['MiniMax-M2.5', 'MiniMax-text-01', 'abab7-chat-preview', 'MiniMax-M2.7', 'my-custom-model'])('MiniMax migration preserves saved %s and exposes Flash first', async (modelId) => {
+  const old = structuredClone(defaultConfig);
+  const saved = { id: modelId, name: 'Saved model', supportsImage: true };
+  old.providers![ProviderName.Minimax] = {
+    enabled: true, apiKey: 'existing-test-key', baseUrl: 'https://api.minimax.io/anthropic',
+    apiFormat: ApiFormat.Anthropic, defaultModel: modelId, models: [saved],
+  };
+  old.model.defaultModel = modelId;
+  old.model.defaultModelProvider = ProviderName.Minimax;
+  storage.getItem.mockResolvedValue(old);
+  await configService.init();
+  const config = configService.getConfig();
+  expect(config.providers![ProviderName.Minimax]).toMatchObject({
+    enabled: true, apiKey: 'existing-test-key', baseUrl: 'https://api.minimax.io/anthropic',
+    defaultModel: modelId,
+    models: [
+      { id: 'MiniMax-M3.1-Flash', supportsImage: false },
+      { id: 'MiniMax-M3', supportsImage: false },
+      saved,
+    ],
+  });
+  expect(config.model.defaultModel).toBe(modelId);
+  expect(config.model.defaultModelProvider).toBe(ProviderName.Minimax);
+});
+
+test('fresh MiniMax choices contain only Flash then M3', () => {
+  expect(defaultConfig.providers![ProviderName.Minimax].models?.map(model => model.id))
+    .toEqual(['MiniMax-M3.1-Flash', 'MiniMax-M3']);
+  expect(defaultConfig.model.defaultModel).toBe('deepseek-v4-flash');
+});
+
 test('old configurations gain a disabled OpenLux provider while preserving existing credentials and selection', async () => {
   const old = structuredClone(defaultConfig);
   delete old.providers![ProviderName.OpenLux];
