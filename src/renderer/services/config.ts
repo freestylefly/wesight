@@ -1,5 +1,5 @@
 import { normalizePetConfig } from '@shared/pet/constants';
-import { ApiFormat, ProviderName } from '@shared/providers';
+import { ApiFormat, MiniMaxModel, ProviderName } from '@shared/providers';
 
 import { TokenDance } from '../../shared/tokendance/constants';
 import { AppConfig, CONFIG_KEYS, defaultConfig, isCustomProvider } from '../config';
@@ -114,7 +114,6 @@ const REMOVED_PROVIDER_MODELS: Record<string, string[]> = {
   deepseek: ['deepseek-chat', 'deepseek-reasoner', 'deepseek-v3.2-exp'],
   openai: ['gpt-5.2-2025-12-11', 'gpt-5.2'],
   'github-copilot': ['gpt-4o'],
-  minimax: ['MiniMax-M2.5', 'MiniMax-text-01', 'abab7-chat-preview'],
   zhipu: ['glm-4.5', 'glm-4.6'],
   moonshot: ['kimi-k2.5'],
 };
@@ -135,7 +134,8 @@ const ADDED_PROVIDER_MODELS: Record<string, { models: Array<{ id: string; name: 
   },
   minimax: {
     models: [
-      { id: 'MiniMax-M3', name: 'MiniMax M3', supportsImage: false },
+      { id: MiniMaxModel.Flash, name: 'MiniMax M3.1 Flash', supportsImage: false },
+      { id: MiniMaxModel.M3, name: 'MiniMax M3', supportsImage: false },
     ],
     position: 'start',
   },

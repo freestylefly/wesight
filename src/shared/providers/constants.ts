@@ -48,6 +48,11 @@ export const ProviderName = {
 } as const;
 export type ProviderName = typeof ProviderName[keyof typeof ProviderName];
 
+export const MiniMaxModel = {
+  Flash: 'MiniMax-M3.1-Flash',
+  M3: 'MiniMax-M3',
+} as const;
+
 // ─── OpenClaw Provider ID ───────────────────────────────────────────────
 // OpenClaw gateway provider identifiers. May differ from ProviderName.
 export const OpenClawProviderId = {
@@ -294,8 +299,8 @@ const PROVIDER_DEFINITIONS = [
     region: 'china',
     enPriority: 0,
     defaultModels: [
-      { id: 'MiniMax-M2.7', name: 'MiniMax M2.7', supportsImage: false },
-      { id: 'MiniMax-M3', name: 'MiniMax M3', supportsImage: false },
+      { id: MiniMaxModel.Flash, name: 'MiniMax M3.1 Flash', supportsImage: false },
+      { id: MiniMaxModel.M3, name: 'MiniMax M3', supportsImage: false },
     ],
   },
   {

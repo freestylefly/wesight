@@ -9,6 +9,7 @@ import {
   buildSessionTitlePrompt,
   normalizeSessionTitleToPlainText,
 } from '../../shared/cowork/sessionTitle';
+import { MiniMaxModel } from '../../shared/providers';
 import { type ApiConfigOverride,buildEnvForConfig, getCurrentApiConfig, resolveCurrentApiConfig, resolveRawApiConfig } from './claudeSettings';
 import { coworkLog } from './coworkLogger';
 import {
@@ -1598,6 +1599,13 @@ function isAbortError(error: unknown): boolean {
   return error instanceof Error && error.name === 'AbortError';
 }
 
+function isMiniMaxFlash(config: SessionTitleApiConfig): boolean {
+  return config.model === MiniMaxModel.Flash
+    && (config.providerName === 'minimax'
+      || isMiniMaxApiBaseUrl(config.baseURL)
+      || matchesApiHostname(config.baseURL, 'minimax.io'));
+}
+
 export async function probeCoworkModelReadiness(
   timeoutMs = COWORK_MODEL_PROBE_TIMEOUT_MS
 ): Promise<{ ok: true } | { ok: false; error: string }> {
@@ -1652,13 +1660,15 @@ export async function probeCoworkModelReadiness(
                   model: config.model,
                   messages: [{ role: 'user', content: 'Reply with "ok".' }],
                   // 推理模型可能先消耗 reasoning tokens，过小会 HTTP 200 但正文为空。
-                  max_tokens: 128,
+                  max_tokens: isMiniMaxFlash(config) ? 4096 : 128,
+                  ...(isMiniMaxFlash(config) ? { reasoning_effort: 'low' } : {}),
                   temperature: 0,
                   stream: false,
                 }
             : {
                 model: config.model,
-                max_tokens: 1,
+                max_tokens: isMiniMaxFlash(config) ? 4096 : 1,
+                ...(isMiniMaxFlash(config) ? { output_config: { effort: 'low' } } : {}),
                 temperature: 0,
                 messages: [{ role: 'user', content: 'Reply with "ok".' }],
               }
@@ -1767,22 +1777,24 @@ export async function generateSessionTitle(userIntent: string | null): Promise<s
               ? {
                   model: config.model,
                   messages: [{ role: 'user', content: prompt }],
-                  // DeepSeek and MiniMax-M3 enable thinking by default and can
-                  // spend hidden tokens before emitting visible text. Disable
-                  // it for short title requests when the provider supports it.
-                  max_tokens: SESSION_TITLE_OUTPUT_TOKEN_BUDGET,
-                  ...(shouldDisableOpenAICompatTitleThinking(config.baseURL, config.providerName)
-                    ? { thinking: { type: 'disabled' } }
-                    : {}),
+                  // Flash always thinks; allow room for reasoning and keep titles fast.
+                  max_tokens: isMiniMaxFlash(config) ? 4096 : SESSION_TITLE_OUTPUT_TOKEN_BUDGET,
+                  ...(isMiniMaxFlash(config)
+                    ? { reasoning_effort: 'low' }
+                    : shouldDisableOpenAICompatTitleThinking(config.baseURL, config.providerName)
+                      ? { thinking: { type: 'disabled' } }
+                      : {}),
                   stream: false,
                 }
             : {
               model: config.model,
-              max_tokens: SESSION_TITLE_OUTPUT_TOKEN_BUDGET,
+              max_tokens: isMiniMaxFlash(config) ? 4096 : SESSION_TITLE_OUTPUT_TOKEN_BUDGET,
               temperature: 0,
-              ...(shouldDisableAnthropicTitleThinking(config.baseURL)
-                ? { thinking: { type: 'disabled' } }
-                : {}),
+              ...(isMiniMaxFlash(config)
+                ? { output_config: { effort: 'low' } }
+                : shouldDisableAnthropicTitleThinking(config.baseURL)
+                  ? { thinking: { type: 'disabled' } }
+                  : {}),
               messages: [{ role: 'user', content: prompt }],
             }
       ),
