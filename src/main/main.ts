@@ -168,6 +168,7 @@ import { syncHermesIMSessions } from './libs/hermesImSessionSync';
 import { exportLogsZip } from './libs/logExport';
 import { McpBridgeServer } from './libs/mcpBridgeServer';
 import { McpServerManager } from './libs/mcpServerManager';
+import { isAbortedNavigation } from './libs/navigationError';
 import {
   buildManagedSessionKey,
   DEFAULT_MANAGED_AGENT_ID,
@@ -7997,7 +7998,12 @@ if (!gotTheLock) {
 
       const tryLoadURL = () => {
         mainWindow?.loadURL(DEV_SERVER_URL).catch((err) => {
-          console.error('Failed to load URL:', err);
+          // A reload replaces an in-flight navigation and rejects it with ERR_ABORTED.
+          // The replacement navigation owns recovery; do not count the old one as a failure.
+          if (isAbortedNavigation(err)) {
+            return;
+          }
+          console.error('[Window] Failed to load the development server:', err);
           retryCount++;
 
           if (retryCount < maxRetries) {
@@ -8022,8 +8028,11 @@ if (!gotTheLock) {
     }
 
     // 添加错误处理
-    mainWindow.webContents.on('did-fail-load', (_event, errorCode, errorDescription) => {
-      console.error('Page failed to load:', errorCode, errorDescription);
+    mainWindow.webContents.on('did-fail-load', (_event, errorCode, errorDescription, _validatedURL, isMainFrame) => {
+      if (!isMainFrame || isAbortedNavigation(errorCode)) {
+        return;
+      }
+      console.error('[Window] Page failed to load:', errorCode, errorDescription);
       // 如果加载失败，尝试重新加载
       if (isDev) {
         setTimeout(() => {
