@@ -3,6 +3,80 @@
   "windowsUnsignedNotice": "Windows x64 安装包当前尚未签名。安装时，Microsoft Defender SmartScreen 可能显示“Windows 已保护你的电脑”，请确认安装包来自 WeSight 官方 GitHub Release 后继续安装。",
   "releases": [
     {
+      "version": "1.0.10",
+      "date": "2026-11-08",
+      "title": "Kimi 双模式配置与运行稳定性改进",
+      "summary": "新增 Kimi 双模式配置，包含 OpenLux 模型分类，并改进 OpenClaw 网关配置与窗口加载稳定性。",
+      "compareUrl": "https://github.com/freestylefly/wesight/compare/v1.0.8...v1.0.10",
+      "releaseUrl": "https://github.com/freestylefly/wesight/releases/tag/v1.0.10",
+      "sections": [
+        {
+          "kind": "feature",
+          "title": "新增",
+          "items": [
+            {
+              "text": "Kimi 设置新增 Code 模式和通用 API 切换，两种模式分别保存密钥、请求地址、模型列表和默认模型。",
+              "areas": ["desktop"]
+            },
+            {
+              "text": "包含 v1.0.9 的 OpenLux 模型供应商、模型原厂分类、搜索和默认模型管理功能。",
+              "areas": ["desktop"]
+            }
+          ]
+        },
+        {
+          "kind": "improvement",
+          "title": "变更",
+          "items": [
+            {
+              "text": "旧版 Kimi Code 配置自动迁移至 OpenAI 兼容端点与专用模型，配置导入导出加密保存两种模式的密钥。",
+              "areas": ["desktop"]
+            },
+            {
+              "text": "Kimi 模式支持点击与键盘切换，并显示当前模式、自动配置地址和连接测试状态。",
+              "areas": ["desktop"]
+            }
+          ]
+        },
+        {
+          "kind": "fix",
+          "title": "修复",
+          "items": [
+            {
+              "text": "处理 Moonshot 工具参数中的本地引用、联合类型和常量，服务端拒绝过大的工具定义时进行有限次数重试。",
+              "areas": ["desktop"]
+            },
+            {
+              "text": "OpenClaw 配置同步保留网关生成的认证凭据，并合并已有 HTTP 端点配置。",
+              "areas": ["desktop"]
+            },
+            {
+              "text": "开发环境的页面加载恢复忽略取消的导航与子框架失败，避免重复重试。",
+              "areas": ["desktop"]
+            }
+          ]
+        },
+        {
+          "kind": "improvement",
+          "title": "已知问题",
+          "items": [
+            {
+              "text": "OpenLux、Kimi 真实账号与付费推理尚未逐项验收。",
+              "areas": ["desktop"]
+            },
+            {
+              "text": "部分本地开发环境的任务看板后台服务启动仍有 stdio 错误，可查看 taskboard.log 排查。",
+              "areas": ["desktop"]
+            },
+            {
+              "text": "现有 ESLint 警告与主界面 bundle 体积问题仍待后续处理。",
+              "areas": ["release"]
+            }
+          ]
+        }
+      ]
+    },
+    {
       "version": "1.0.9",
       "date": "2026-10-01",
       "title": "OpenLux 接入与模型分类选择",
