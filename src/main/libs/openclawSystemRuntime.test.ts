@@ -10,6 +10,7 @@ import {
 import {
   detectOpenClawLocalFeishuConfig,
   importOpenClawLocalFeishuConfig,
+  mergeOpenClawGatewayConfig,
   summarizeOpenClawConfig,
   summarizeOpenClawProbe,
 } from './openclawSystemRuntime';
@@ -144,5 +145,79 @@ describe('openclawSystemRuntime', () => {
     expect(detection.secretNeedsInput).toBe(true);
     expect(imported.instanceConfig.appSecret).toBe('');
     expect(imported.instanceConfig.secretStatus).toBe(FeishuSecretStatus.NeedsInput);
+  });
+});
+
+describe('mergeOpenClawGatewayConfig', () => {
+  it('keeps the gateway owned auth credentials when a sync runs', () => {
+    const merged = mergeOpenClawGatewayConfig(
+      {
+        mode: 'local',
+        port: 18789,
+        bind: 'loopback',
+        auth: {
+          mode: 'token',
+          token: 'gateway-owned-token',
+        },
+      },
+      {
+        mode: 'local',
+      },
+    );
+
+    expect(merged).toEqual({
+      mode: 'local',
+      port: 18789,
+      bind: 'loopback',
+      auth: {
+        mode: 'token',
+        token: 'gateway-owned-token',
+      },
+    });
+  });
+
+  it('applies managed gateway overrides without dropping unmanaged keys', () => {
+    const merged = mergeOpenClawGatewayConfig(
+      {
+        mode: 'remote',
+        port: 18789,
+        auth: { mode: 'token', token: 'gateway-owned-token' },
+        controlUi: { allowInsecureAuth: true },
+      },
+      {
+        mode: 'local',
+        http: { endpoints: { chatCompletions: { enabled: true } } },
+      },
+    );
+
+    expect(merged.mode).toBe('local');
+    expect(merged.port).toBe(18789);
+    expect(merged.auth).toEqual({ mode: 'token', token: 'gateway-owned-token' });
+    expect(merged.controlUi).toEqual({ allowInsecureAuth: true });
+    expect(merged.http).toEqual({ endpoints: { chatCompletions: { enabled: true } } });
+  });
+
+  it('merges http endpoints instead of replacing them', () => {
+    const merged = mergeOpenClawGatewayConfig(
+      {
+        http: {
+          enabled: true,
+          endpoints: { health: { enabled: true } },
+        },
+      },
+      {
+        http: {
+          endpoints: { chatCompletions: { enabled: true } },
+        },
+      },
+    );
+
+    expect(merged.http).toEqual({
+      enabled: true,
+      endpoints: {
+        health: { enabled: true },
+        chatCompletions: { enabled: true },
+      },
+    });
   });
 });

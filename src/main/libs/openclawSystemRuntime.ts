@@ -469,6 +469,48 @@ export const summarizeOpenClawConfig = (
   };
 };
 
+/**
+ * Merge a WeSight-managed `gateway` section into the existing one.
+ *
+ * The OpenClaw gateway owns `gateway.auth`, `gateway.port`, `gateway.bind` and
+ * similar keys: it generates and persists `gateway.auth.token` on first start
+ * and every client (WeSight included) reads that value back to authenticate.
+ * Managed syncs therefore must keep those keys instead of replacing the whole
+ * section, otherwise the running gateway and its clients drift apart and every
+ * connection fails with "gateway token mismatch".
+ */
+export const mergeOpenClawGatewayConfig = (
+  existingGateway: Record<string, unknown> | null,
+  managedGateway: Record<string, unknown> | null,
+): Record<string, unknown> => {
+  const existing = existingGateway ?? {};
+  const managed = managedGateway ?? {};
+  const merged: Record<string, unknown> = {
+    ...existing,
+    ...managed,
+  };
+
+  const existingHttp = getNestedRecord(existing, 'http');
+  const managedHttp = getNestedRecord(managed, 'http');
+  if (Object.keys(existingHttp).length > 0 || Object.keys(managedHttp).length > 0) {
+    const existingEndpoints = getNestedRecord(existingHttp, 'endpoints');
+    const managedEndpoints = getNestedRecord(managedHttp, 'endpoints');
+    const http: Record<string, unknown> = {
+      ...existingHttp,
+      ...managedHttp,
+    };
+    if (Object.keys(existingEndpoints).length > 0 || Object.keys(managedEndpoints).length > 0) {
+      http.endpoints = {
+        ...existingEndpoints,
+        ...managedEndpoints,
+      };
+    }
+    merged.http = http;
+  }
+
+  return merged;
+};
+
 export const resolveOpenClawSystemRuntime = (): OpenClawSystemRuntimeMetadata => {
   const commandPath = resolveOpenClawCommandPath();
   const packageRoot = commandPath ? findPackageRoot(commandPath) : null;

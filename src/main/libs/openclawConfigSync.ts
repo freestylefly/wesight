@@ -16,6 +16,7 @@ import type { McpToolManifestEntry } from './mcpServerManager';
 import { parseChannelSessionKey } from './openclawChannelSessionSync';
 import type { OpenClawEngineManager } from './openclawEngineManager';
 import { hasBundledOpenClawExtension } from './openclawLocalExtensions';
+import { mergeOpenClawGatewayConfig } from './openclawSystemRuntime';
 import { getOpenClawTokenProxyPort } from './openclawTokenProxy';
 
 export type McpBridgeConfig = {
@@ -1596,6 +1597,14 @@ export class OpenClawConfigSync {
           : {}),
       },
     };
+
+    // The gateway section owns runtime credentials (gateway.auth.token) that the
+    // gateway itself generates and persists. Merging instead of replacing keeps
+    // WeSight's client token aligned with the running gateway.
+    managedConfig.gateway = mergeOpenClawGatewayConfig(
+      asRecord(existingConfigForMerge.gateway),
+      asRecord(managedConfig.gateway),
+    );
 
     const nextContent = `${JSON.stringify({
       ...existingConfigForMerge,
