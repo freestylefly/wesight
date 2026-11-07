@@ -1,0 +1,20 @@
+Use case: ui-mockup
+Asset type: WeSight 桌面应用模型设置高保真设计图
+Primary request: 基于现有 WeSight 设置界面，重新设计 Kimi 模型配置。将当前 Kimi Code 请求地址归入清晰的 Code 模式，并提供通用 API 模式切换。
+Reference image: docs/design/openlux-provider-model-groups-v1.png，仅作为暖米黄色、橙色强调、三栏桌面设置界面的视觉参考。请重新构图，不复刻 OpenLux 内容。
+Composition: 横向 3:2、约 1800 × 1200 的高清设计评审画板。上方简洁标题区，下方左侧约 72% 宽为完整桌面设置窗口，右侧约 25% 为通用 API 次级状态和三个简短交互说明。主体窗口须足够大，中文和 URL 必须清晰。
+Style: 精致、可信、可实现的原生桌面应用 UI。暖白色主面板、浅米黄色导航栏、柔和橙色选中背景、细灰色边框。清晰的现代中文无衬线字体，统一 12px 圆角，轻微阴影，紧凑而舒展的真实设置界面密度。禁止海报化、3D、装饰插画、渐变炫光。
+Layout: 设置窗口包含左侧设置导航、中间模型提供商列表、右侧 Kimi 配置内容。底部固定操作栏，包含取消和橙色保存配置按钮。
+Exact main title: "Kimi 模型配置 · 双模式设计"
+Exact subtitle: "WeSight / 设置 / 模型"
+Navigation text: "设置", "通用", "Agent 引擎", "模型", "IM 机器人", "邮箱", "记忆", "Agent", "快捷键", "关于"。选中模型。
+Provider list: 标题 "模型提供商"；列表 OpenAI、Claude、Google、DeepSeek、Kimi、Qwen、Zhipu、MiniMax。Kimi 以橙色选中边框标记，Kimi 行显示小的 "Code" 标签和开启的开关。其他行保持中性。底部 "添加自定义供应商"。
+Main Kimi panel: Kimi 黑色 K 形标识；标题 "Kimi"，副标题 "Moonshot AI"，右上角绿色 "已启用"。随后以重要但克制的视觉层级展示 "接入模式"。两张并列互斥选择卡，第一张选中并以橙色细边框、淡橙底和勾选图标显示，文字 "Code 模式"、"Kimi Code · 订阅套餐"，一个小标签 "当前使用"。第二张未选中，文字 "通用 API"、"Moonshot · 按量计费"。
+Then the selected Code configuration: 标题 "Kimi Code API Key"，右侧橙色文字链接 "获取密钥 ↗"。密钥框只显示圆点遮罩和眼睛图标，切勿生成真实密钥。下面辅助说明 "使用 Kimi Code 控制台生成的密钥"。
+Next field: "请求地址"，右侧小标签 "随模式自动配置"。输入框必须准确显示 "https://api.kimi.com/coding/v1"，右侧锁图标，文本保持可读，勿过度置灰。辅助行 "OpenAI 兼容协议"，附加小型中性胶囊 "系统默认"。
+Next section: "可用模型" 以及数字 "1"，右侧轻量操作 "刷新列表" 和 "添加模型"。一条精致模型行："Kimi K2.6"，下行等宽 "kimi-for-coding"，右侧 "图像输入" 和 "默认" 标记。不要使用其他模型 ID。
+Main actions above footer: 描边按钮 "测试连接"，旁边灰色状态 "待测试"，不要虚构测试成功。
+Footer: 左侧小的模式摘要 "当前配置：Kimi · Code 模式"，右侧按钮 "取消"、"保存配置"。
+Right secondary state: 小标题 "切换至通用 API"，说明 "同一供应商，按接入方式配置"。一张窄的次级状态示例卡片，显示迷你模式切换 "Code 模式" / "通用 API"，后者橙色选中。依次显示 "Moonshot API Key"、遮罩密钥框、"请求地址"、准确 URL "https://api.moonshot.cn/v1"、"OpenAI 兼容协议"、"Kimi K2.6"、等宽模型 ID "kimi-k2.6"。保留足够宽度确保 URL 不断行。
+Below secondary state: 三条简洁编号说明，橙色小数字圆标，文字依次 "先选模式，再填密钥"、"地址与模型随模式切换"、"两种模式分别保存配置"。画板底部小字 "设计稿 · 展示 Code 模式与通用 API 的配置关系"。
+Constraints: 严格保持所有 URL、模型 ID 和中文标签拼写正确，禁止乱码，禁止被截断的文本，不画鼠标光标，不添加真实凭据，不出现未经测试的成功状态。Code 模式是供应商接入配置，勿添加终端 CLI 安装、引擎管理或权限模式。所有文案采用直接陈述句。

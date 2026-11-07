@@ -224,7 +224,7 @@ const PROVIDER_DEFINITIONS = [
       openai: 'https://api.kimi.com/coding/v1',
       anthropic: 'https://api.kimi.com/coding',
     },
-    preferredCodingPlanFormat: 'anthropic',
+    preferredCodingPlanFormat: ApiFormat.OpenAI,
     switchableBaseUrls: {
       anthropic: 'https://api.moonshot.cn/anthropic',
       openai: 'https://api.moonshot.cn/v1',

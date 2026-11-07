@@ -1,5 +1,5 @@
 import { EyeIcon, EyeSlashIcon, XCircleIcon as XCircleIconSolid } from '@heroicons/react/20/solid';
-import { ArrowPathIcon, ArrowTopRightOnSquareIcon,ChatBubbleLeftIcon, CheckCircleIcon, ClockIcon, Cog6ToothIcon, CommandLineIcon, CpuChipIcon, CubeIcon, EnvelopeIcon, InformationCircleIcon, SignalIcon, SwatchIcon, UserCircleIcon, UserGroupIcon, XCircleIcon, XMarkIcon } from '@heroicons/react/24/outline';
+import { ArrowPathIcon, ArrowTopRightOnSquareIcon,ChatBubbleLeftIcon, CheckCircleIcon, ClockIcon, Cog6ToothIcon, CommandLineIcon, CpuChipIcon, CubeIcon, EnvelopeIcon, InformationCircleIcon, LockClosedIcon, SignalIcon, SwatchIcon, UserCircleIcon, UserGroupIcon, XCircleIcon, XMarkIcon } from '@heroicons/react/24/outline';
 import {
   ClaudeCodePermissionMode as ClaudeCodePermissionModeValue,
   CoworkAgentEngine as CoworkAgentEngineValue,
@@ -36,6 +36,7 @@ import { useDispatch, useSelector } from 'react-redux';
 import { mergeCatalogModels, parseOpenLuxCatalog } from '../../shared/models/catalog';
 import { OpenLux } from '../../shared/openlux/constants';
 import { ApiFormat, ProviderName, ProviderRegistry, resolveCodingPlanBaseUrl } from '../../shared/providers';
+import { KimiModelMode } from '../../shared/providers/kimi/constants';
 import { TokenDance } from '../../shared/tokendance/constants';
 import { type AppConfig, defaultConfig, getCustomProviderDefaultName,getProviderDisplayName,getVisibleProviders, isCustomProvider } from '../config';
 import { APP_ID, EXPORT_FORMAT_TYPE, EXPORT_PASSWORD } from '../constants/app';
@@ -47,6 +48,8 @@ import { coworkService } from '../services/cowork';
 import { decryptSecret, decryptWithPassword, EncryptedPayload, encryptWithPassword, PasswordEncryptedPayload } from '../services/encryption';
 import { i18nService, LanguageType } from '../services/i18n';
 import { imService } from '../services/im';
+import { getKimiModelMode, normalizeKimiProviderConfig, switchKimiModelMode } from '../services/kimiProvider';
+import { decryptKimiModeConfigs, type EncryptedKimiModeConfigs, encryptKimiModeConfigs, type ImportedKimiModeConfigs } from '../services/kimiProviderTransfer';
 import { themeService } from '../services/theme';
 import { RootState } from '../store';
 import { setAvailableModels, setSelectedModel } from '../store/slices/modelSlice';
@@ -104,6 +107,7 @@ import McpManager from './mcp/McpManager';
 import PetSprite, { PetMood } from './pet/PetSprite';
 import { ScheduledTasksView } from './scheduledTasks';
 import { SettingsTab, type SettingsTab as SettingsTabType } from './settings/constants';
+import { KimiModeTabs } from './settings/KimiModeTabs';
 import { OpenLuxModels } from './settings/OpenLuxModels';
 import ThemeSkinSettings from './settings/ThemeSkinSettings';
 import { TokenDanceSettings } from './settings/TokenDanceSettings';
@@ -306,6 +310,7 @@ interface ProviderExportEntry {
   codingPlanEnabled?: boolean;
   defaultModel?: string;
   models?: Model[];
+  kimiModeConfigs?: EncryptedKimiModeConfigs;
 }
 
 interface ProvidersExportPayload {
@@ -330,6 +335,7 @@ interface ProvidersImportEntry {
   codingPlanEnabled?: boolean;
   defaultModel?: string;
   models?: Model[];
+  kimiModeConfigs?: ImportedKimiModeConfigs;
 }
 
 interface ProvidersImportPayload {
@@ -350,7 +356,7 @@ const providerMeta: Record<ProviderType, { label: string; icon: React.ReactNode 
   deepseek: { label: 'DeepSeek', icon: <DeepSeekIcon /> },
   gemini: { label: 'Google', icon: <GeminiIcon /> },
   anthropic: { label: 'Claude', icon: <AnthropicIcon /> },
-  moonshot: { label: 'Moonshot', icon: <MoonshotIcon /> },
+  moonshot: { label: 'Kimi', icon: <MoonshotIcon /> },
   zhipu: { label: 'Zhipu', icon: <ZhipuIcon /> },
   minimax: { label: 'MiniMax', icon: <MiniMaxIcon /> },
   youdaozhiyun: { label: 'Youdao', icon: <YouDaoZhiYunIcon /> },
@@ -597,17 +603,17 @@ const getDefaultProviders = (): ProvidersConfig => {
   const entries = Object.entries(providers) as Array<[string, ProviderConfig]>;
   const secureSuffix = i18nService.t('modelSuffixSecure');
   return Object.fromEntries(
-    entries.map(([providerKey, providerConfig]) => [
-      providerKey,
-      {
+    entries.map(([providerKey, providerConfig]) => {
+      const normalized = {
         ...providerConfig,
         models: providerConfig.models?.map(model => ({
           ...model,
           name: model.name.replace('(Secure)', secureSuffix),
           supportsImage: model.supportsImage ?? false,
         })),
-      },
-    ])
+      };
+      return [providerKey, providerKey === ProviderName.Moonshot ? normalizeKimiProviderConfig(normalized) : normalized];
+    })
   ) as ProvidersConfig;
 };
 
@@ -761,7 +767,11 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, notice
 
   // Add state for providers configuration
   const [providers, setProviders] = useState<ProvidersConfig>(() => getDefaultProviders());
-
+  const kimiMode = getKimiModelMode(providers[ProviderName.Moonshot]);
+  const kimiIsCodeMode = kimiMode === KimiModelMode.Code;
+  const activeProviderApiKeyUrl = activeProvider === ProviderName.Moonshot && kimiIsCodeMode
+    ? 'https://www.kimi.com/code/console'
+    : providerLinks[activeProvider]?.apiKey;
 
   // authType defaults to undefined on first open, which should behave as OAuth mode
   const minimaxIsOAuthMode = providers.minimax.authType !== 'apikey';
@@ -1687,14 +1697,12 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, notice
                   supportsImage: model.supportsImage ?? false,
                 };
               });
-              return [
-                providerKey,
-                {
+              const normalized = {
                   ...providerConfig,
                   apiFormat: getEffectiveApiFormat(providerKey, (providerConfig as ProviderConfig).apiFormat),
                   models,
-                },
-              ];
+                };
+              return [providerKey, providerKey === ProviderName.Moonshot ? normalizeKimiProviderConfig(normalized) : normalized];
             })
           ) as ProvidersConfig;
         });
@@ -1852,8 +1860,31 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, notice
     setTestResult(null);
   };
 
+  const handleKimiModeChange = (mode: KimiModelMode) => {
+    if (mode === kimiMode) return;
+    const switched = switchKimiModelMode(providers[ProviderName.Moonshot], mode);
+    const next = { ...switched, enabled: switched.enabled && Boolean(switched.apiKey.trim()) };
+    setProviders(previous => ({ ...previous, [ProviderName.Moonshot]: next }));
+    const savedModel = configService.getConfig().model;
+    const defaultProvider = pendingDefaultModel?.providerKey ?? savedModel.defaultModelProvider;
+    if (defaultProvider === ProviderName.Moonshot && next.defaultModel) {
+      setPendingDefaultModel({ providerKey: ProviderName.Moonshot, id: next.defaultModel });
+    }
+    setShowApiKey(false);
+    setIsAddingModel(false);
+    setIsEditingModel(false);
+    setEditingModelId(null);
+    setModelFormError(null);
+    setIsTestResultModalOpen(false);
+    setTestResult(null);
+  };
+
   // Handle provider configuration change
   const handleProviderConfigChange = (provider: ProviderType, field: string, value: string) => {
+    if (provider === ProviderName.Moonshot) {
+      setTestResult(null);
+      setIsTestResultModalOpen(false);
+    }
     setProviders(prev => {
       if (field === 'apiFormat') {
         const nextApiFormat = getEffectiveApiFormat(provider, value);
@@ -2422,6 +2453,10 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, notice
     try {
       const normalizedProviders = Object.fromEntries(
         Object.entries(providers).map(([providerKey, providerConfig]) => {
+          if (providerKey === ProviderName.Moonshot) {
+            const normalized = normalizeKimiProviderConfig(providerConfig);
+            return [providerKey, { ...normalized, enabled: normalized.enabled && Boolean(normalized.apiKey.trim()) }];
+          }
           const apiFormat = getEffectiveApiFormat(providerKey, providerConfig.apiFormat);
           return [
             providerKey,
@@ -3087,7 +3122,8 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, notice
 
   const buildProvidersExport = async (password: string): Promise<ProvidersExportPayload> => {
     const entries = await Promise.all(
-      Object.entries(providers).map(async ([providerKey, providerConfig]) => {
+      Object.entries(providers).map(async ([providerKey, providerDraft]) => {
+        const providerConfig: ProviderConfig = providerKey === ProviderName.Moonshot ? normalizeKimiProviderConfig(providerDraft) : providerDraft;
         const apiKey = await encryptWithPassword(providerKey === TokenDance.Provider ? '' : providerConfig.apiKey, password);
         const apiFormat = getEffectiveApiFormat(providerKey, providerConfig.apiFormat);
         return [
@@ -3100,6 +3136,7 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, notice
             codingPlanEnabled: (providerConfig as ProviderConfig).codingPlanEnabled,
             models: providerConfig.models,
             defaultModel: providerConfig.defaultModel,
+            ...(providerKey === ProviderName.Moonshot ? { kimiModeConfigs: await encryptKimiModeConfigs(providerConfig.kimiModeConfigs, password) } : {}),
           },
         ] as const;
       })
@@ -3236,6 +3273,11 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, notice
           baseUrl: typeof providerData.baseUrl === 'string' ? providerData.baseUrl : providers[providerKey].baseUrl,
           apiFormat: getEffectiveApiFormat(providerKey, providerData.apiFormat ?? providers[providerKey].apiFormat),
           codingPlanEnabled: typeof providerData.codingPlanEnabled === 'boolean' ? providerData.codingPlanEnabled : (providers[providerKey] as ProviderConfig).codingPlanEnabled,
+          ...(providerKey === ProviderName.Moonshot ? {
+            kimiModeConfigs: await decryptKimiModeConfigs(providerData.kimiModeConfigs, async key => (
+              typeof key === 'string' ? key : decryptSecret(key as EncryptedPayload)
+            )),
+          } : {}),
           models: models ?? providers[providerKey].models,
           defaultModel: typeof providerData.defaultModel === 'string' ? providerData.defaultModel : providers[providerKey].defaultModel,
         };
@@ -3249,10 +3291,8 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, notice
       setProviders(prev => {
         const next = { ...prev };
         Object.entries(providerUpdates).forEach(([providerKey, update]) => {
-          next[providerKey] = {
-            ...prev[providerKey],
-            ...update,
-          };
+          const updated = { ...prev[providerKey], ...update };
+          next[providerKey] = providerKey === ProviderName.Moonshot ? normalizeKimiProviderConfig(updated) : updated;
         });
         return next;
       });
@@ -3315,6 +3355,11 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, notice
           baseUrl: typeof providerData.baseUrl === 'string' ? providerData.baseUrl : providers[providerKey].baseUrl,
           apiFormat: getEffectiveApiFormat(providerKey, providerData.apiFormat ?? providers[providerKey].apiFormat),
           codingPlanEnabled: typeof providerData.codingPlanEnabled === 'boolean' ? providerData.codingPlanEnabled : (providers[providerKey] as ProviderConfig).codingPlanEnabled,
+          ...(providerKey === ProviderName.Moonshot ? {
+            kimiModeConfigs: await decryptKimiModeConfigs(providerData.kimiModeConfigs, async key => (
+              typeof key === 'string' ? key : decryptWithPassword(key as PasswordEncryptedPayload, DEFAULT_EXPORT_PASSWORD)
+            )),
+          } : {}),
           models: models ?? providers[providerKey].models,
           defaultModel: typeof providerData.defaultModel === 'string' ? providerData.defaultModel : providers[providerKey].defaultModel,
         };
@@ -3339,10 +3384,8 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, notice
       setProviders(prev => {
         const next = { ...prev };
         Object.entries(providerUpdates).forEach(([providerKey, update]) => {
-          next[providerKey] = {
-            ...prev[providerKey],
-            ...update,
-          };
+          const updated = { ...prev[providerKey], ...update };
+          next[providerKey] = providerKey === ProviderName.Moonshot ? normalizeKimiProviderConfig(updated) : updated;
         });
         return next;
       });
@@ -6111,6 +6154,11 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, notice
                         }`}>
                           {displayLabel}
                         </span>
+                        {provider === ProviderName.Moonshot && kimiIsCodeMode && (
+                          <span className="mt-0.5 w-fit rounded border border-primary/30 px-1 text-[9px] leading-3 text-primary">
+                            {i18nService.t('kimiCodeBadge')}
+                          </span>
+                        )}
                         {isCustom && (
                           <span className="text-[9px] leading-tight mt-0.5 text-primary">
                             {i18nService.t('customBadge')}
@@ -6174,13 +6222,17 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, notice
             {/* Provider Settings - Right Side */}
             <div className="w-3/5 pl-4 pr-2 space-y-4 overflow-y-auto [scrollbar-gutter:stable]">
               <div className="flex items-center justify-between pb-2 border-b border-border">
-                <div className="flex items-center gap-1.5">
+                <div className="flex min-w-0 items-center gap-1.5">
+                  {activeProvider === ProviderName.Moonshot && <span className="mr-1 flex h-9 w-9 shrink-0 items-center justify-center text-foreground"><MoonshotIcon /></span>}
+                  <div>
                   <h3 className="text-base font-medium text-foreground">
                     {isCustomProvider(activeProvider)
                       ? ((providers[activeProvider] as ProviderConfig)?.displayName || getCustomProviderDefaultName(activeProvider))
                       : (providerMeta[activeProvider]?.label ?? getProviderDisplayName(activeProvider))
-                    } {i18nService.t('providerSettings')}
+                    } {activeProvider !== ProviderName.Moonshot && i18nService.t('providerSettings')}
                   </h3>
+                  {activeProvider === ProviderName.Moonshot && <p className="mt-0.5 text-[11px] text-secondary">{i18nService.t('kimiProviderSubtitle')}</p>}
+                  </div>
                   {providerLinks[activeProvider]?.website && (
                     <button
                       type="button"
@@ -6212,6 +6264,13 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, notice
                   isDefault={pendingDefaultModel?.providerKey === TokenDance.Provider && pendingDefaultModel.id === (providers[TokenDance.Provider].defaultModel ?? TokenDance.DefaultModel)}
                 />
               ) : <>
+              {activeProvider === ProviderName.Moonshot && <KimiModeTabs mode={kimiMode} onChange={handleKimiModeChange} disabled={isFetchingModels || isTesting} />}
+              <div
+                id={activeProvider === ProviderName.Moonshot ? 'kimi-model-mode-panel' : undefined}
+                role={activeProvider === ProviderName.Moonshot ? 'tabpanel' : undefined}
+                aria-labelledby={activeProvider === ProviderName.Moonshot ? `kimi-model-mode-panel-tab-${kimiMode}` : undefined}
+                className="space-y-4"
+              >
               {activeProvider === ProviderName.OpenLux && <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-secondary">
                 <span>{i18nService.t('openluxDescription')}</span>
                 <button type="button" onClick={() => void window.electron.shell.openExternal(OpenLux.DocsUrl)} className="text-primary hover:text-primary-hover">{i18nService.t('openluxDocs')} ↗</button>
@@ -6449,12 +6508,12 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, notice
                     <div>
                       <div className="flex items-center justify-between mb-1">
                         <label htmlFor={`${activeProvider}-apiKey`} className="block text-xs font-medium dark:text-claude-darkText text-claude-text">
-                          {i18nService.t('apiKey')}
+                          {i18nService.t(activeProvider === ProviderName.Moonshot ? (kimiIsCodeMode ? 'kimiCodeApiKey' : 'kimiApiApiKey') : 'apiKey')}
                         </label>
-                        {providerLinks[activeProvider]?.apiKey && (
+                        {activeProviderApiKeyUrl && (
                           <button
                             type="button"
-                            onClick={() => void window.electron.shell.openExternal(providerLinks[activeProvider]!.apiKey!)}
+                            onClick={() => void window.electron.shell.openExternal(activeProviderApiKeyUrl)}
                             className="text-[11px] text-claude-accent hover:underline transition-colors"
                           >
                             {i18nService.t('getApiKey')} →
@@ -6491,6 +6550,7 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, notice
                           </button>
                         </div>
                       </div>
+                      {activeProvider === ProviderName.Moonshot && <p className="mt-1.5 text-[11px] text-secondary">{i18nService.t(kimiIsCodeMode ? 'kimiCodeApiKeyHint' : 'kimiApiApiKeyHint')}</p>}
                     </div>
                   )}
 
@@ -6665,9 +6725,12 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, notice
 
               {!(activeProvider === 'minimax' && minimaxIsOAuthMode) && (
               <div>
-                <label htmlFor={`${activeProvider}-baseUrl`} className="block text-xs font-medium text-foreground mb-1">
-                  {i18nService.t('baseUrl')}
-                </label>
+                <div className="mb-1 flex items-center justify-between gap-2">
+                  <label htmlFor={`${activeProvider}-baseUrl`} className="block text-xs font-medium text-foreground">
+                    {i18nService.t(activeProvider === ProviderName.Moonshot ? 'kimiRequestUrl' : 'baseUrl')}
+                  </label>
+                  {activeProvider === ProviderName.Moonshot && kimiIsCodeMode && <span className="text-[10px] text-secondary">{i18nService.t('kimiAutoConfigured')}</span>}
+                </div>
                 <div className="relative">
                   <input
                     type="text"
@@ -6686,14 +6749,16 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, notice
                       })()
                     }
                     onChange={(e) => handleProviderConfigChange(activeProvider, 'baseUrl', e.target.value)}
-                    disabled={isBaseUrlLocked}
-                    className={`block w-full rounded-xl bg-claude-surfaceInset dark:bg-claude-darkSurfaceInset dark:border-claude-darkBorder border-claude-border border focus:border-claude-accent focus:ring-1 focus:ring-claude-accent/30 dark:text-claude-darkText text-claude-text px-3 py-2 pr-8 text-xs ${isBaseUrlLocked ? 'opacity-50 cursor-not-allowed' : ''}`}
+                    disabled={isBaseUrlLocked && activeProvider !== ProviderName.Moonshot}
+                    readOnly={isBaseUrlLocked && activeProvider === ProviderName.Moonshot}
+                    className={`block w-full rounded-xl bg-claude-surfaceInset dark:bg-claude-darkSurfaceInset dark:border-claude-darkBorder border-claude-border border focus:border-claude-accent focus:ring-1 focus:ring-claude-accent/30 dark:text-claude-darkText text-claude-text px-3 py-2 pr-8 text-xs ${isBaseUrlLocked && activeProvider !== ProviderName.Moonshot ? 'opacity-50 cursor-not-allowed' : ''}`}
                     placeholder={
                       activeProvider === 'qwen'
                         ? 'https://dashscope.aliyuncs.com/apps/anthropic'
                         : getProviderDefaultBaseUrl(activeProvider, getEffectiveApiFormat(activeProvider, providers[activeProvider].apiFormat)) || defaultConfig.providers?.[activeProvider]?.baseUrl || i18nService.t('baseUrlPlaceholder')
                     }
                   />
+                  {activeProvider === ProviderName.Moonshot && kimiIsCodeMode && <LockClosedIcon aria-hidden="true" className="pointer-events-none absolute right-2.5 top-2 h-4 w-4 text-secondary" />}
                   {providers[activeProvider].baseUrl && !isBaseUrlLocked && (
                     <div className="absolute right-2 inset-y-0 flex items-center">
                       <button
@@ -6707,6 +6772,10 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, notice
                     </div>
                   )}
                 </div>
+                {activeProvider === ProviderName.Moonshot && <div className="mt-1.5 flex flex-wrap items-center gap-2 text-[11px] text-secondary">
+                  <span>{i18nService.t('kimiCodeProtocolHint')}</span>
+                  {kimiIsCodeMode && <span className="rounded-md border border-border bg-surface px-1.5 py-0.5 text-[10px]">{i18nService.t('kimiDefaultEndpoint')}</span>}
+                </div>}
                 {isCustomProvider(activeProvider) && (
                 <div className="mt-1.5 space-y-0.5 text-[11px] text-secondary">
                   <p>
@@ -6742,14 +6811,6 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, notice
                   <div className="mt-1.5 p-2 rounded-lg bg-primary-muted border border-primary-muted">
                     <p className="text-[11px] text-primary dark:text-primary">
                       <span className="font-medium">Coding Plan:</span> {i18nService.t('volcengineCodingPlanEndpointHint')}
-                    </p>
-                  </div>
-                )}
-                {/* Moonshot Coding Plan 提示 */}
-                {activeProvider === 'moonshot' && providers.moonshot.codingPlanEnabled && (
-                  <div className="mt-1.5 p-2 rounded-lg bg-primary-muted border border-primary-muted">
-                    <p className="text-[11px] text-primary dark:text-primary">
-                      <span className="font-medium">Coding Plan:</span> {i18nService.t('moonshotCodingPlanEndpointHint')}
                     </p>
                   </div>
                 )}
@@ -6884,36 +6945,8 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, notice
                 </div>
               )}
 
-              {/* Moonshot Coding Plan 开关 (仅 Moonshot) */}
-              {activeProvider === 'moonshot' && (
-                <div className="flex items-center justify-between p-3 rounded-xl bg-surface border border-border">
-                  <div className="flex-1">
-                    <div className="flex items-center space-x-2">
-                      <span className="text-xs font-medium text-foreground">
-                        Coding Plan
-                      </span>
-                      <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-primary-muted text-primary">
-                        Beta
-                      </span>
-                    </div>
-                    <p className="mt-0.5 text-[11px] text-secondary">
-                      {i18nService.t('moonshotCodingPlanHint')}
-                    </p>
-                  </div>
-                  <label className="relative inline-flex items-center cursor-pointer ml-3">
-                    <input
-                      type="checkbox"
-                      checked={providers.moonshot.codingPlanEnabled ?? false}
-                      onChange={(e) => handleProviderConfigChange('moonshot', 'codingPlanEnabled', e.target.checked ? 'true' : 'false')}
-                      className="sr-only peer"
-                    />
-                    <div className="w-9 h-5 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-primary/50 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all dark:border-gray-600 peer-checked:bg-primary"></div>
-                  </label>
-                </div>
-              )}
-
               {/* 测试连接按钮 */}
-              {!(activeProvider === 'minimax' && minimaxIsOAuthMode) && (
+              {activeProvider !== ProviderName.Moonshot && !(activeProvider === 'minimax' && minimaxIsOAuthMode) && (
               <div className="flex items-center space-x-3">
                 <button
                   type="button"
@@ -6947,6 +6980,7 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, notice
                 <div className="flex items-center justify-between mb-1.5">
                   <h3 className="text-xs font-medium text-foreground">
                     {i18nService.t('availableModels')}
+                    {activeProvider === ProviderName.Moonshot && <span className="ml-1.5 rounded-md bg-surface px-1.5 text-secondary">{providers[activeProvider].models?.length ?? 0}</span>}
                   </h3>
                   <div className="flex items-center gap-2">
                     <button
@@ -6986,6 +7020,7 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, notice
                           </div>
                         </div>
                         <div className="flex items-center shrink-0 space-x-1">
+                          {activeProvider === ProviderName.Moonshot && model.id === providers[activeProvider].defaultModel && <span className="rounded-md border border-primary/40 px-1.5 py-0.5 text-[10px] text-primary">{i18nService.t('modelCatalogDefault')}</span>}
                           {model.supportsImage && (
                             <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-primary-muted text-primary">
                               {i18nService.t('imageInput')}
@@ -7025,6 +7060,18 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, notice
                   )}
                 </div>
               </div>}
+              {activeProvider === ProviderName.Moonshot && <div className="flex flex-wrap items-center gap-3" aria-live="polite">
+                <button type="button" onClick={handleTestConnection} disabled={isTesting || !providers[activeProvider].apiKey}
+                  className="inline-flex items-center rounded-xl border border-border px-4 py-2 text-xs font-medium text-foreground transition-colors hover:bg-surface-raised disabled:cursor-not-allowed disabled:opacity-50">
+                  <SignalIcon className="mr-1.5 h-3.5 w-3.5" />
+                  {i18nService.t(isTesting ? 'testing' : 'testConnection')}
+                </button>
+                <span className={`inline-flex items-center gap-1.5 text-[11px] ${testResult?.provider === ProviderName.Moonshot ? (testResult.success ? 'text-green-600 dark:text-green-400' : 'text-red-500') : 'text-secondary'}`}>
+                  <span aria-hidden="true" className="h-1.5 w-1.5 rounded-full bg-current" />
+                  {i18nService.t(isTesting ? 'testing' : testResult?.provider === ProviderName.Moonshot ? (testResult.success ? 'connectionSuccess' : 'connectionFailed') : 'kimiConnectionUntested')}
+                </span>
+              </div>}
+              </div>
               </>}
             </div>
           </div>

@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'vitest';
 
 import { resolveCodingPlanBaseUrl } from './codingPlan';
-import { ProviderName } from './constants';
+import { ApiFormat, ProviderName } from './constants';
 
 describe('resolveCodingPlanBaseUrl', () => {
   test('returns currentBaseUrl unchanged when codingPlanEnabled is false', () => {
@@ -30,17 +30,17 @@ describe('resolveCodingPlanBaseUrl', () => {
     });
   });
 
-  describe('Moonshot — preferredCodingPlanFormat: anthropic', () => {
-    test('returns anthropic coding plan URL when caller passes anthropic', () => {
-      const result = resolveCodingPlanBaseUrl(ProviderName.Moonshot, true, 'anthropic', '');
-      expect(result.baseUrl).toBe('https://api.kimi.com/coding');
-      expect(result.effectiveFormat).toBe('anthropic');
+  describe('Moonshot — OpenAI-compatible Code endpoint', () => {
+    test('migrates callers using the legacy Anthropic format to the displayed Code endpoint', () => {
+      const result = resolveCodingPlanBaseUrl(ProviderName.Moonshot, true, ApiFormat.Anthropic, 'https://api.kimi.com/coding');
+      expect(result.baseUrl).toBe('https://api.kimi.com/coding/v1');
+      expect(result.effectiveFormat).toBe(ApiFormat.OpenAI);
     });
 
-    test('overrides caller openai format to anthropic', () => {
-      const result = resolveCodingPlanBaseUrl(ProviderName.Moonshot, true, 'openai', '');
-      expect(result.baseUrl).toBe('https://api.kimi.com/coding');
-      expect(result.effectiveFormat).toBe('anthropic');
+    test('keeps the OpenAI endpoint and format used by the Code settings tab', () => {
+      const result = resolveCodingPlanBaseUrl(ProviderName.Moonshot, true, ApiFormat.OpenAI, 'https://api.kimi.com/coding/v1');
+      expect(result.baseUrl).toBe('https://api.kimi.com/coding/v1');
+      expect(result.effectiveFormat).toBe(ApiFormat.OpenAI);
     });
   });
 

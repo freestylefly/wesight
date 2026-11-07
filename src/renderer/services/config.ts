@@ -1,12 +1,15 @@
 import { normalizePetConfig } from '@shared/pet/constants';
-import { ApiFormat, ProviderName } from '@shared/providers';
+import { ApiFormat, ProviderName, ProviderRegistry } from '@shared/providers';
+import { KimiModelMode } from '@shared/providers/kimi/constants';
 
 import { TokenDance } from '../../shared/tokendance/constants';
 import { AppConfig, CONFIG_KEYS, defaultConfig, isCustomProvider } from '../config';
 import { normalizeThemeSkinState } from '../theme/skin/config';
+import { getKimiModelMode, normalizeKimiProviderConfig } from './kimiProvider';
 import { localStore } from './store';
 
 const getFixedProviderApiFormat = (providerKey: string): 'anthropic' | 'openai' | 'gemini' | null => {
+  if (providerKey === ProviderName.Moonshot) return ApiFormat.OpenAI;
   if (providerKey === ProviderName.OpenLux) return ApiFormat.OpenAI;
   if (providerKey === TokenDance.Provider || providerKey === 'openai' || providerKey === 'stepfun' || providerKey === 'youdaozhiyun' || providerKey === 'github-copilot') {
     return 'openai';
@@ -69,18 +72,23 @@ const normalizeProvidersConfig = (providers: AppConfig['providers']): AppConfig[
   }
 
   return Object.fromEntries(
-    Object.entries(providers).map(([providerKey, providerConfig]) => [
-      providerKey,
-      {
-        ...providerConfig,
-        baseUrl: normalizeProviderBaseUrl(providerKey, providerConfig.baseUrl),
-        apiFormat: normalizeProviderApiFormat(providerKey, providerConfig.apiFormat),
-        ...(providerKey === TokenDance.Provider ? {
-          apiKey: providerConfig.apiKey ? TokenDance.CredentialRef : '',
-          credentialRef: providerConfig.apiKey ? TokenDance.CredentialRef : undefined,
-        } : {}),
-      },
-    ])
+    Object.entries(providers).map(([providerKey, originalConfig]) => {
+      const providerConfig = providerKey === ProviderName.Moonshot
+        ? normalizeKimiProviderConfig(originalConfig)
+        : originalConfig;
+      return [
+        providerKey,
+        {
+          ...providerConfig,
+          baseUrl: normalizeProviderBaseUrl(providerKey, providerConfig.baseUrl),
+          apiFormat: normalizeProviderApiFormat(providerKey, providerConfig.apiFormat),
+          ...(providerKey === TokenDance.Provider ? {
+            apiKey: providerConfig.apiKey ? TokenDance.CredentialRef : '',
+            credentialRef: providerConfig.apiKey ? TokenDance.CredentialRef : undefined,
+          } : {}),
+        },
+      ];
+    })
   ) as AppConfig['providers'];
 };
 
@@ -217,6 +225,10 @@ class ConfigService {
                     ...(defaultConfig.providers as NonNullable<AppConfig['providers']>)?.[providerKey],
                     ...providerConfig,
                   };
+                  // Keep standard API model migrations out of the Code catalog.
+                  if (providerKey === ProviderName.Moonshot && getKimiModelMode(mergedProvider) === KimiModelMode.Code) {
+                    return normalizeKimiProviderConfig(mergedProvider);
+                  }
                   // Filter out removed models
                   const removedIds = REMOVED_PROVIDER_MODELS[providerKey];
                   if (removedIds && mergedProvider.models) {
@@ -235,11 +247,14 @@ class ConfigService {
                         : [...mergedProvider.models, ...newModels];
                     }
                   }
-                  return {
+                  const normalizedProvider = {
                     ...mergedProvider,
                     baseUrl: normalizeProviderBaseUrl(providerKey, mergedProvider.baseUrl),
                     apiFormat: normalizeProviderApiFormat(providerKey, mergedProvider.apiFormat),
                   };
+                  return providerKey === ProviderName.Moonshot
+                    ? normalizeKimiProviderConfig(normalizedProvider)
+                    : normalizedProvider;
                 })(),
               ])
             )
@@ -248,7 +263,21 @@ class ConfigService {
         // Migrate model.defaultModel if it was removed
         const allRemovedIds = Object.values(REMOVED_PROVIDER_MODELS).flat();
         const migratedModel = { ...defaultConfig.model, ...storedConfig.model };
-        if (allRemovedIds.includes(migratedModel.defaultModel)) {
+        const kimiDefinition = ProviderRegistry.get(ProviderName.Moonshot)!;
+        const knownKimiModelIds = [
+          ...kimiDefinition.defaultModels.map(model => model.id),
+          ...(kimiDefinition.codingPlanModels ?? []).map(model => model.id),
+          ...REMOVED_PROVIDER_MODELS[ProviderName.Moonshot],
+        ];
+        const kimiProvider = mergedProviders?.[ProviderName.Moonshot];
+        const isKimiSelection = migratedModel.defaultModelProvider === ProviderName.Moonshot
+          || (!migratedModel.defaultModelProvider && knownKimiModelIds.includes(migratedModel.defaultModel));
+        if (isKimiSelection && knownKimiModelIds.includes(migratedModel.defaultModel)
+          && kimiProvider?.defaultModel
+          && !kimiProvider.models?.some(model => model.id === migratedModel.defaultModel)) {
+          migratedModel.defaultModel = kimiProvider.defaultModel;
+          migratedModel.defaultModelProvider = ProviderName.Moonshot;
+        } else if (allRemovedIds.includes(migratedModel.defaultModel)) {
           migratedModel.defaultModel = defaultConfig.model.defaultModel;
         }
         if (migratedModel.availableModels) {

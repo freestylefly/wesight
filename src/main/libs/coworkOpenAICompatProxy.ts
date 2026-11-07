@@ -9,6 +9,7 @@ import {
   type OpenAIStreamChunk,
   openAIToAnthropic,
 } from './coworkFormatTransform';
+import { removeLargestMoonshotToolForSchemaSizeError, sanitizeToolsForMoonshot } from './moonshotToolSchema';
 
 export type OpenAICompatUpstreamConfig = {
   baseURL: string;
@@ -71,6 +72,23 @@ const PROXY_BIND_HOST = '127.0.0.1';
 const LOCAL_HOST = '127.0.0.1';
 const SANDBOX_HOST = '10.0.2.2';
 const GEMINI_FALLBACK_THOUGHT_SIGNATURE = 'skip_thought_signature_validator';
+const MAX_MOONSHOT_SCHEMA_SIZE_RETRIES = 2;
+
+async function sendWithMoonshotSchemaSizeFallback(
+  request: Record<string, unknown>,
+  config: OpenAICompatUpstreamConfig,
+  send: () => Promise<Response>,
+): Promise<Response> {
+  let response = await send();
+  for (let attempt = 0; attempt < MAX_MOONSHOT_SCHEMA_SIZE_RETRIES && response.status === 400; attempt += 1) {
+    const errorMessage = extractErrorMessage(await response.clone().text());
+    const removedTool = removeLargestMoonshotToolForSchemaSizeError(request, errorMessage, config.provider, config.baseURL);
+    if (!removedTool) break;
+    console.warn(`[CoworkProxy] Skipped ${removedTool} after Moonshot rejected its parameter schema size.`);
+    response = await send();
+  }
+  return response;
+}
 
 function isGeminiProvider(provider?: string, baseURL?: string): boolean {
   return provider === 'gemini'
@@ -2776,6 +2794,7 @@ async function handleRequest(
     remapMessageRolesForMiniMax(chatRequest, upstreamConfig.provider);
     hydrateOpenAIRequestToolCalls(chatRequest, upstreamConfig.provider, upstreamConfig.baseURL);
     sanitizeToolsForGemini(chatRequest, upstreamConfig.provider, upstreamConfig.baseURL);
+    sanitizeToolsForMoonshot(chatRequest, upstreamConfig.provider, upstreamConfig.baseURL);
     normalizeMaxTokensFieldForOpenAIProvider(chatRequest, upstreamConfig.provider);
     mergeSystemMessagesForProvider(chatRequest);
 
@@ -2794,11 +2813,11 @@ async function handleRequest(
 
     let upstreamResponse: Response;
     try {
-      upstreamResponse = await session.defaultSession.fetch(targetURL, {
+      upstreamResponse = await sendWithMoonshotSchemaSizeFallback(chatRequest, upstreamConfig, () => session.defaultSession.fetch(targetURL, {
         method: 'POST',
         headers,
         body: JSON.stringify(chatRequest),
-      });
+      }));
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Network error';
       lastProxyError = message;
@@ -2863,10 +2882,10 @@ async function handleRequest(
       return;
     }
     remapOpenAIRequestModelToUpstream(parsedBody, upstreamConfig);
+    sanitizeToolsForMoonshot(parsedBody, upstreamConfig.provider, upstreamConfig.baseURL);
     remapMessageRolesForMiniMax(parsedBody, upstreamConfig.provider);
     normalizeMaxTokensFieldForOpenAIProvider(parsedBody, upstreamConfig.provider);
     mergeSystemMessagesForProvider(parsedBody);
-    body = JSON.stringify(parsedBody);
     const upstreamHeaders: Record<string, string> = {
       'Content-Type': 'application/json',
     };
@@ -2888,11 +2907,12 @@ async function handleRequest(
     console.log(`[CoworkProxy] OpenAI passthrough → ${upstreamUrl} (provider: ${upstreamConfig.provider})`);
     try {
       const { session } = await import('electron');
-      let upstreamResponse = await session.defaultSession.fetch(upstreamUrl, {
+      const sendRequest = () => sendWithMoonshotSchemaSizeFallback(parsedBody, upstreamConfig!, () => session.defaultSession.fetch(upstreamUrl, {
         method: 'POST',
         headers: upstreamHeaders,
-        body,
-      });
+        body: JSON.stringify(parsedBody),
+      }));
+      let upstreamResponse = await sendRequest();
       // Auto-retry once for token expiry using provider-based refresher
       if (
         (upstreamResponse.status === 401 || upstreamResponse.status === 403)
@@ -2906,11 +2926,7 @@ async function handleRequest(
             if (newToken) {
               upstreamConfig.apiKey = newToken;
               upstreamHeaders.Authorization = `Bearer ${newToken}`;
-              upstreamResponse = await session.defaultSession.fetch(upstreamUrl, {
-                method: 'POST',
-                headers: upstreamHeaders,
-                body,
-              });
+              upstreamResponse = await sendRequest();
               console.log(`[CoworkProxy] OpenAI passthrough: retry status=${upstreamResponse.status}`);
             }
           } catch (refreshErr) {
@@ -3005,6 +3021,7 @@ async function handleRequest(
   remapMessageRolesForMiniMax(openAIRequest, upstreamConfig.provider);
   hydrateOpenAIRequestToolCalls(openAIRequest, upstreamConfig.provider, upstreamConfig.baseURL);
   sanitizeToolsForGemini(openAIRequest, upstreamConfig.provider, upstreamConfig.baseURL);
+  sanitizeToolsForMoonshot(openAIRequest, upstreamConfig.provider, upstreamConfig.baseURL);
 
   if (upstreamAPIType === 'chat_completions') {
     normalizeMaxTokensFieldForOpenAIProvider(openAIRequest, upstreamConfig.provider);
@@ -3049,11 +3066,11 @@ async function handleRequest(
   ): Promise<Response> => {
     currentTargetURL = targetURL;
     console.log(`[CoworkProxy] Sending upstream request to: ${targetURL}`);
-    return session.defaultSession.fetch(targetURL, {
+    return sendWithMoonshotSchemaSizeFallback(payload, upstreamConfig!, () => session.defaultSession.fetch(targetURL, {
       method: 'POST',
       headers,
       body: JSON.stringify(payload),
-    });
+    }));
   };
 
   let upstreamResponse: Response;

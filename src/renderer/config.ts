@@ -1,5 +1,6 @@
 import { DEFAULT_PET_CONFIG, type PetConfig } from '@shared/pet/constants';
 import { ProviderName, ProviderRegistry } from '@shared/providers';
+import type { KimiModeConfigs } from '@shared/providers/kimi/constants';
 import {
   createDefaultThemeSkinState,
   ThemeAppearanceMode,
@@ -61,6 +62,7 @@ export interface AppConfig {
       defaultModel?: string;
       /** 是否启用 Moonshot Coding Plan 模式（使用专属 Coding API 端点） */
       codingPlanEnabled?: boolean;
+      kimiModeConfigs?: KimiModeConfigs;
       models?: Array<{
         id: string;
         name: string;
@@ -267,6 +269,7 @@ export interface AppConfig {
       apiFormat?: 'anthropic' | 'openai' | 'gemini';
       defaultModel?: string;
       codingPlanEnabled?: boolean;
+      kimiModeConfigs?: KimiModeConfigs;
       oauthCredentials?: {
         access: string;
         refresh: string;
