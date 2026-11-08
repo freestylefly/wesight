@@ -44,4 +44,4 @@ GitHub release note 应从 `CHANGELOG.md` 的对应版本条目生成。
 
 恢复产物可与同一标签下其他已通过校验的平台产物汇总，生成 SHA256 校验和后发布。失败任务保留应用签名归档和 DMG，公证请求 ID 记录在任务日志中。
 
-应用已获 Apple 接受、票据下载却因网络失败时，可传入 `archive_run_id`、`archive_name` 与 `archive_request_id`，从保留的签名归档恢复。工作流核对 Apple 公证日志中的归档 SHA256 与版本，重新附加并校验票据，然后直接生成 DMG。此恢复步骤使用 Apple Silicon 构建机处理归档，两种应用架构均通过对应的安装包校验。
+应用已获 Apple 接受、票据下载却因网络失败时，可传入 `archive_run_id`、`archive_name` 与 `archive_request_id`，从保留的签名归档恢复。工作流核对 Apple 公证日志中的归档 SHA256 与版本，重新附加并校验票据，然后直接生成 DMG。此恢复步骤使用 Apple Silicon 构建机处理归档，两种应用架构均通过对应的安装包校验。归档恢复只安装打包工具并跳过依赖安装脚本，沿用归档内已签名的 Electron 与原生模块。
