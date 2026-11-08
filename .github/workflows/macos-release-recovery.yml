@@ -14,9 +14,19 @@ on:
         options:
           - x64
           - arm64
+      archive_run_id:
+        description: Optional recovery run containing the signed app archive
+        type: string
+      archive_name:
+        description: Pending artifact name from that recovery run
+        type: string
+      archive_request_id:
+        description: Accepted Apple request ID for that exact app archive
+        type: string
 
 permissions:
   contents: read
+  actions: read
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
@@ -24,7 +34,7 @@ env:
 
 jobs:
   recover-macos:
-    runs-on: ${{ inputs.arch == 'x64' && 'macos-15-intel' || 'macos-latest' }}
+    runs-on: ${{ inputs.archive_run_id != '' && 'macos-latest' || (inputs.arch == 'x64' && 'macos-15-intel' || 'macos-latest') }}
     timeout-minutes: 360
     env:
       APPLE_ID: ${{ secrets.APPLE_ID }}
@@ -37,6 +47,9 @@ jobs:
       BUILD_ARCH: ${{ inputs.arch }}
       RELEASE_TAG: ${{ inputs.release_tag }}
       RELEASE_HELPERS_SHA: ${{ github.sha }}
+      ARCHIVE_RUN_ID: ${{ inputs.archive_run_id }}
+      ARCHIVE_NAME: ${{ inputs.archive_name }}
+      ARCHIVE_REQUEST_ID: ${{ inputs.archive_request_id }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -49,6 +62,33 @@ jobs:
       - name: Validate release version
         id: metadata
         run: node scripts/release-metadata.cjs --tag "$RELEASE_TAG" >> "$GITHUB_OUTPUT"
+
+      - name: Validate archive recovery inputs
+        if: inputs.archive_run_id != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python3 - <<'PY'
+          import json
+          import os
+          import re
+          import subprocess
+          run_id = os.environ['ARCHIVE_RUN_ID']
+          if not run_id.isdigit() or not re.fullmatch(r'[a-fA-F0-9-]{36}', os.environ['ARCHIVE_REQUEST_ID']):
+              raise SystemExit('Archive recovery requires a run ID and an Apple request ID.')
+          source = json.loads(subprocess.check_output(['gh', 'api', f'repos/{os.environ["GITHUB_REPOSITORY"]}/actions/runs/{run_id}'], text=True))
+          expected_name = f'macos-{os.environ["BUILD_ARCH"]}-recovery-pending-{source["run_attempt"]}'
+          if source['path'] != '.github/workflows/macos-release-recovery.yml' or source['event'] != 'workflow_dispatch' or os.environ['ARCHIVE_NAME'] != expected_name:
+              raise SystemExit('The archive must come from this repository recovery workflow.')
+          PY
+
+      - uses: actions/download-artifact@v4
+        if: inputs.archive_run_id != ''
+        with:
+          name: ${{ inputs.archive_name }}
+          run-id: ${{ inputs.archive_run_id }}
+          github-token: ${{ github.token }}
+          path: .release-archive
 
       - uses: actions/checkout@v4
         with:
@@ -84,6 +124,7 @@ jobs:
       - run: npm install
 
       - name: Verify runner architecture
+        if: inputs.archive_run_id == ''
         run: |
           case "$BUILD_ARCH" in
             arm64) test "$(uname -m)" = arm64 ;;
@@ -93,10 +134,62 @@ jobs:
           node -e 'if (process.arch !== process.env.BUILD_ARCH) process.exit(1)'
 
       - name: Build and verify Mac installer
+        if: inputs.archive_run_id == ''
         env:
           WESIGHT_RELEASE_VERSION: ${{ steps.metadata.outputs.version }}
         run: |
           npm run "dist:mac:$BUILD_ARCH" -- --publish never -c.forceCodeSigning=true
+          npm run "verify:mac:$BUILD_ARCH-artifact"
+
+      - name: Restore an accepted signed app archive
+        if: inputs.archive_run_id != ''
+        env:
+          WESIGHT_RELEASE_VERSION: ${{ steps.metadata.outputs.version }}
+        run: |
+          python3 - <<'PY'
+          import hashlib
+          import json
+          import os
+          import plistlib
+          import subprocess
+          import time
+          from pathlib import Path
+          archives = list(Path('.release-archive').rglob('*.zip'))
+          if len(archives) != 1:
+              raise SystemExit('Expected exactly one signed application archive.')
+          archive = archives[0]
+          auth = ['--apple-id', os.environ['APPLE_ID'], '--team-id', os.environ['APPLE_TEAM_ID'], '--password', os.environ['APPLE_APP_SPECIFIC_PASSWORD']]
+          log_path = Path(os.environ['RUNNER_TEMP']) / 'accepted-notarization.json'
+          subprocess.run(['xcrun', 'notarytool', 'log', os.environ['ARCHIVE_REQUEST_ID'], *auth, str(log_path)], check=True)
+          accepted = json.loads(log_path.read_text())
+          digest = hashlib.sha256(archive.read_bytes()).hexdigest()
+          if accepted.get('status') != 'Accepted' or accepted.get('jobId') != os.environ['ARCHIVE_REQUEST_ID'] or accepted.get('sha256') != digest:
+              raise SystemExit('Apple has not accepted this exact archive.')
+          output = Path('release/mac' if os.environ['BUILD_ARCH'] == 'x64' else 'release/mac-arm64')
+          output.mkdir(parents=True, exist_ok=True)
+          subprocess.run(['ditto', '-x', '-k', str(archive), str(output)], check=True)
+          app = output / 'WeSight.app'
+          info = plistlib.loads((app / 'Contents/Info.plist').read_bytes())
+          if info['CFBundleShortVersionString'] != os.environ['WESIGHT_RELEASE_VERSION']:
+              raise SystemExit('The archived application has the wrong version.')
+          subprocess.run(['codesign', '--verify', '--deep', '--strict', str(app)], check=True)
+          for attempt in range(8):
+              staple = subprocess.run(['xcrun', 'stapler', 'staple', str(app)])
+              if staple.returncode == 0 and subprocess.run(['xcrun', 'stapler', 'validate', str(app)]).returncode == 0:
+                  break
+              if attempt == 7:
+                  raise SystemExit('Application ticket recovery failed.')
+              time.sleep(15)
+          Path('release/archive-provenance.json').write_text(json.dumps({'archiveRun': os.environ['ARCHIVE_RUN_ID'], 'archiveRequest': accepted['jobId'], 'archiveSha256': digest}) + '\n')
+          PY
+
+      - name: Package and verify the recovered app
+        if: inputs.archive_run_id != ''
+        env:
+          WESIGHT_RELEASE_VERSION: ${{ steps.metadata.outputs.version }}
+        run: |
+          if [[ "$BUILD_ARCH" == x64 ]]; then app_path=release/mac/WeSight.app; else app_path=release/mac-arm64/WeSight.app; fi
+          npx electron-builder --mac dmg "--$BUILD_ARCH" --prepackaged "$app_path" --publish never -c.forceCodeSigning=true
           npm run "verify:mac:$BUILD_ARCH-artifact"
 
       - name: Record build provenance
@@ -112,6 +205,9 @@ jobs:
               'helpersCommit': os.environ['RELEASE_HELPERS_SHA'],
               'arch': os.environ['BUILD_ARCH'],
           }
+          archive_record = Path('release/archive-provenance.json')
+          if archive_record.exists():
+              record.update(json.loads(archive_record.read_text()))
           Path('release/recovery-provenance.json').write_text(json.dumps(record, indent=2) + '\n')
           PY
 
