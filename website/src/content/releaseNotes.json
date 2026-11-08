@@ -3,6 +3,88 @@
   "windowsUnsignedNotice": "Windows x64 安装包当前尚未签名。安装时，Microsoft Defender SmartScreen 可能显示“Windows 已保护你的电脑”，请确认安装包来自 WeSight 官方 GitHub Release 后继续安装。",
   "releases": [
     {
+      "version": "1.0.11",
+      "date": "2026-11-08",
+      "title": "词元 API 接入与默认模型兼容修复",
+      "summary": "内置供应商接入词元 API，保留旧 OpenLux 账号，并修复中转模型的默认选择迁移。",
+      "compareUrl": "https://github.com/freestylefly/wesight/compare/v1.0.10...v1.0.11",
+      "releaseUrl": "https://github.com/freestylefly/wesight/releases/tag/v1.0.11",
+      "sections": [
+        {
+          "kind": "feature",
+          "title": "新增",
+          "items": [
+            {
+              "text": "新增词元 API 内置供应商，支持 API Key 配置、账号模型刷新、连接测试、模型原厂分类、搜索和默认模型选择。",
+              "areas": [
+                "desktop"
+              ]
+            }
+          ]
+        },
+        {
+          "kind": "improvement",
+          "title": "变更",
+          "items": [
+            {
+              "text": "词元 API 位于 TokenDance 后，默认使用 https://ciyuan.today/v1 和 OpenAI 兼容协议，提供令牌管理与接入文档入口。",
+              "areas": [
+                "desktop"
+              ]
+            },
+            {
+              "text": "已有 OpenLux 账号保留为可编辑的自定义供应商，继续沿用原有密钥、接口地址和会话模型身份。",
+              "areas": [
+                "desktop"
+              ]
+            },
+            {
+              "text": "设置与聊天模型选择器支持词元 API 中英文名称，并按供应商身份选择同名模型。",
+              "areas": [
+                "desktop"
+              ]
+            }
+          ]
+        },
+        {
+          "kind": "fix",
+          "title": "修复",
+          "items": [
+            {
+              "text": "默认模型迁移按供应商判断已移除模型，避免词元 API、OpenLux 和自定义供应商的同名模型被误替换。",
+              "areas": [
+                "desktop"
+              ]
+            }
+          ]
+        },
+        {
+          "kind": "improvement",
+          "title": "已知问题",
+          "items": [
+            {
+              "text": "词元 API 的真实账号模型调用尚未逐项自动验收，可在设置中填写 API Key 后测试连接。",
+              "areas": [
+                "desktop"
+              ]
+            },
+            {
+              "text": "部分本地开发环境的任务看板后台服务启动仍有 stdio 错误，可查看 taskboard.log 排查。",
+              "areas": [
+                "desktop"
+              ]
+            },
+            {
+              "text": "现有 ESLint 警告与主界面 bundle 体积问题仍待后续处理。",
+              "areas": [
+                "release"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
       "version": "1.0.10",
       "date": "2026-11-08",
       "title": "Kimi 双模式配置与运行稳定性改进",
