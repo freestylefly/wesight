@@ -3,12 +3,12 @@
   "windowsUnsignedNotice": "Windows x64 安装包当前尚未签名。安装时，Microsoft Defender SmartScreen 可能显示“Windows 已保护你的电脑”，请确认安装包来自 WeSight 官方 GitHub Release 后继续安装。",
   "releases": [
     {
-      "version": "1.0.11",
+      "version": "1.0.12",
       "date": "2026-11-08",
-      "title": "词元 API 接入与默认模型兼容修复",
-      "summary": "内置供应商接入词元 API，保留旧 OpenLux 账号，并修复中转模型的默认选择迁移。",
-      "compareUrl": "https://github.com/freestylefly/wesight/compare/v1.0.10...v1.0.11",
-      "releaseUrl": "https://github.com/freestylefly/wesight/releases/tag/v1.0.11",
+      "title": "词元 API 接入与发布稳定性修复",
+      "summary": "内置供应商接入词元 API，保留旧 OpenLux 账号，并修复中转模型迁移与 macOS 公证查询的重试处理。",
+      "compareUrl": "https://github.com/freestylefly/wesight/compare/v1.0.10...v1.0.12",
+      "releaseUrl": "https://github.com/freestylefly/wesight/releases/tag/v1.0.12",
       "sections": [
         {
           "kind": "feature",
@@ -54,6 +54,12 @@
               "text": "默认模型迁移按供应商判断已移除模型，避免词元 API、OpenLux 和自定义供应商的同名模型被误替换。",
               "areas": [
                 "desktop"
+              ]
+            },
+            {
+              "text": "macOS DMG 公证查询支持断网重试和超时续查，继续等待原提交的结果，构建失败时保留安装包以便恢复处理。",
+              "areas": [
+                "release"
               ]
             }
           ]
