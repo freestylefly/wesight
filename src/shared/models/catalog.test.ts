@@ -1,6 +1,6 @@
 import { expect, test } from 'vitest';
 
-import { getModelVendor, groupModelsByVendor, mergeCatalogModels, parseOpenLuxCatalog } from './catalog';
+import { getModelVendor, groupModelsByVendor, mergeCatalogModels, parseCiyuanCatalog } from './catalog';
 import { ModelVendor } from './constants';
 
 test('recognizes legacy and prefixed IDs without changing their routing identity', () => {
@@ -11,7 +11,7 @@ test('recognizes legacy and prefixed IDs without changing their routing identity
 });
 
 test('account catalogs tolerate malformed rows and generic relay owners', () => {
-  const models = parseOpenLuxCatalog({ data: [
+  const models = parseCiyuanCatalog({ data: [
     { id: 'gemini-2.5-pro', owned_by: ModelVendor.OpenAI },
     { id: 'private-model', owned_by: ModelVendor.Anthropic, supports_image: true },
     { id: 'gpt-4o' }, { id: 'gpt-4o' }, null, { id: 4 }, { id: '' },
@@ -22,7 +22,7 @@ test('account catalogs tolerate malformed rows and generic relay owners', () => 
   expect(models[1].modelVendor).toBe(ModelVendor.Anthropic);
   expect(models[1].supportsImage).toBe(true);
   expect(models[2].supportsImage).toBeUndefined();
-  expect(() => parseOpenLuxCatalog({ error: 'unauthorized' })).toThrow();
+  expect(() => parseCiyuanCatalog({ error: 'unauthorized' })).toThrow();
 });
 
 test('search matches names and IDs and retains manufacturer groups', () => {

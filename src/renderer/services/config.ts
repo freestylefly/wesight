@@ -10,7 +10,7 @@ import { localStore } from './store';
 
 const getFixedProviderApiFormat = (providerKey: string): 'anthropic' | 'openai' | 'gemini' | null => {
   if (providerKey === ProviderName.Moonshot) return ApiFormat.OpenAI;
-  if (providerKey === ProviderName.OpenLux) return ApiFormat.OpenAI;
+  if (providerKey === ProviderName.Ciyuan || providerKey === ProviderName.OpenLux) return ApiFormat.OpenAI;
   if (providerKey === TokenDance.Provider || providerKey === 'openai' || providerKey === 'stepfun' || providerKey === 'youdaozhiyun' || providerKey === 'github-copilot') {
     return 'openai';
   }
@@ -263,6 +263,9 @@ class ConfigService {
         // Migrate model.defaultModel if it was removed
         const allRemovedIds = Object.values(REMOVED_PROVIDER_MODELS).flat();
         const migratedModel = { ...defaultConfig.model, ...storedConfig.model };
+        const removedDefaultModelIds = migratedModel.defaultModelProvider
+          ? REMOVED_PROVIDER_MODELS[migratedModel.defaultModelProvider] ?? []
+          : allRemovedIds;
         const kimiDefinition = ProviderRegistry.get(ProviderName.Moonshot)!;
         const knownKimiModelIds = [
           ...kimiDefinition.defaultModels.map(model => model.id),
@@ -277,7 +280,7 @@ class ConfigService {
           && !kimiProvider.models?.some(model => model.id === migratedModel.defaultModel)) {
           migratedModel.defaultModel = kimiProvider.defaultModel;
           migratedModel.defaultModelProvider = ProviderName.Moonshot;
-        } else if (allRemovedIds.includes(migratedModel.defaultModel)) {
+        } else if (removedDefaultModelIds.includes(migratedModel.defaultModel)) {
           migratedModel.defaultModel = defaultConfig.model.defaultModel;
         }
         if (migratedModel.availableModels) {

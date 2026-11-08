@@ -18,7 +18,7 @@ export function groupModelsByProvider(models: readonly Model[], serverLabel: str
     group.models.push(model);
     groups.set(key, group);
   }
-  const priority = [ProviderName.TokenDance, ProviderName.OpenLux, ServerModelGroupKey];
+  const priority = [ProviderName.TokenDance, ProviderName.Ciyuan, ServerModelGroupKey];
   return [
     ...priority.flatMap(key => groups.get(key) ? [groups.get(key)!] : []),
     ...[...groups.values()].filter(group => !priority.includes(group.key)),

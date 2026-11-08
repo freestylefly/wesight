@@ -140,7 +140,7 @@ type MatchedProvider = {
 };
 
 function getEffectiveProviderApiFormat(providerName: string, apiFormat: unknown): AnthropicApiFormat {
-  if (providerName === ProviderName.OpenLux) return ApiFormat.OpenAI;
+  if (providerName === ProviderName.Ciyuan || providerName === ProviderName.OpenLux) return ApiFormat.OpenAI;
   if (providerName === ProviderName.OpenAI || providerName === ProviderName.Gemini || providerName === ProviderName.StepFun || providerName === ProviderName.Youdaozhiyun || providerName === ProviderName.Copilot) {
     return 'openai';
   }

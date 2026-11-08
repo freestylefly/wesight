@@ -294,7 +294,8 @@ class ApiService {
       const providerConfig = appConfig.providers[provider];
       if (providerConfig.enabled && (providerConfig.apiKey || !this.providerRequiresApiKey(provider))) {
         let baseUrl = providerConfig.baseUrl;
-        let apiFormat = provider === ProviderName.OpenLux ? ApiFormat.OpenAI : this.normalizeApiFormat(providerConfig.apiFormat);
+        let apiFormat = provider === ProviderName.Ciyuan || provider === ProviderName.OpenLux
+          ? ApiFormat.OpenAI : this.normalizeApiFormat(providerConfig.apiFormat);
 
         if (providerConfig.codingPlanEnabled && (apiFormat === 'anthropic' || apiFormat === 'openai')) {
           const resolved = resolveCodingPlanBaseUrl(provider, true, apiFormat, baseUrl);

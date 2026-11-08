@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, test, vi } from 'vitest';
 
+import { Ciyuan } from '../../shared/ciyuan/constants';
 import { OpenLux } from '../../shared/openlux/constants';
 import { ApiFormat, ProviderName } from '../../shared/providers';
 import { resolveCodexWesightApiConfig, resolveCurrentApiConfig, resolveRawApiConfig, setStoreGetter } from './claudeSettings';
@@ -11,7 +12,10 @@ describe('resolveCurrentApiConfig', () => {
     vi.restoreAllMocks();
   });
 
-  test('routes same-name relay models through OpenLux for raw, Claude and Codex engines', () => {
+  test.each([
+    { providerName: ProviderName.Ciyuan, baseUrl: Ciyuan.BaseUrl },
+    { providerName: ProviderName.OpenLux, baseUrl: OpenLux.BaseUrl },
+  ])('routes same-name relay models through $providerName for raw, Claude and Codex engines', ({ providerName, baseUrl }) => {
     const configureProxy = vi.spyOn(coworkOpenAICompatProxy, 'configureCoworkOpenAICompatProxy').mockImplementation(() => {});
     vi.spyOn(coworkOpenAICompatProxy, 'getCoworkOpenAICompatProxyStatus').mockReturnValue({
       running: true, baseURL: 'http://127.0.0.1:12345/v1', hasUpstream: false,
@@ -22,16 +26,16 @@ describe('resolveCurrentApiConfig', () => {
       model: { defaultModel: 'gpt-4o', defaultModelProvider: ProviderName.OpenAI },
       providers: {
         [ProviderName.OpenAI]: { enabled: true, apiKey: 'direct-key', baseUrl: 'https://api.openai.com/v1', apiFormat: ApiFormat.OpenAI, models: [{ id: 'gpt-4o' }] },
-        [ProviderName.OpenLux]: { enabled: true, apiKey: 'relay-key', baseUrl: OpenLux.BaseUrl, apiFormat: ApiFormat.Anthropic, models: [{ id: 'gpt-4o', name: 'GPT-4o', supportsImage: true }] },
+        [providerName]: { enabled: true, apiKey: 'relay-key', baseUrl, apiFormat: ApiFormat.Anthropic, models: [{ id: 'gpt-4o', name: 'GPT-4o', supportsImage: true }] },
       },
     }) }) as never);
-    const override = { providerName: ProviderName.OpenLux, modelId: 'gpt-4o' };
-    expect(resolveRawApiConfig(override).config).toMatchObject({ baseURL: OpenLux.BaseUrl, apiKey: 'relay-key', apiType: ApiFormat.OpenAI });
+    const override = { providerName, modelId: 'gpt-4o' };
+    expect(resolveRawApiConfig(override).config).toMatchObject({ baseURL: baseUrl, apiKey: 'relay-key', apiType: ApiFormat.OpenAI });
     for (const resolve of [resolveCurrentApiConfig, resolveCodexWesightApiConfig]) {
       const result = resolve('local', override);
       expect(result.error).toBeUndefined();
       expect(result.config).toMatchObject({ baseURL: 'http://127.0.0.1:12345/v1', model: 'gpt-4o' });
-      expect(configureProxy).toHaveBeenLastCalledWith({ baseURL: OpenLux.BaseUrl, apiKey: 'relay-key', model: 'gpt-4o', provider: ProviderName.OpenLux });
+      expect(configureProxy).toHaveBeenLastCalledWith({ baseURL: baseUrl, apiKey: 'relay-key', model: 'gpt-4o', provider: providerName });
     }
   });
 

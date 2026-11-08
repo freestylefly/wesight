@@ -148,7 +148,7 @@ const App: React.FC = () => {
                 providerModels.push({
                   id: model.id,
                   name: model.name,
-                  provider: getProviderDisplayName(providerName, providerConfig),
+                  provider: getProviderDisplayName(providerName, providerConfig, i18nService.getLanguage()),
                   providerKey: providerName,
                   supportsImage: model.supportsImage ?? false,
                   modelVendor: model.modelVendor,
@@ -500,7 +500,7 @@ const App: React.FC = () => {
             allModels.push({
               id: model.id,
               name: model.name,
-              provider: getProviderDisplayName(providerName, providerConfig),
+              provider: getProviderDisplayName(providerName, providerConfig, i18nService.getLanguage()),
               providerKey: providerName,
               supportsImage: model.supportsImage ?? false,
               modelVendor: model.modelVendor,

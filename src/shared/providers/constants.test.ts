@@ -70,7 +70,7 @@ describe('ProviderRegistry', () => {
   test('idsForEnLocale starts with EN_PRIORITY providers in order', () => {
     const en = ProviderRegistry.idsForEnLocale();
     expect(en[0]).toBe(ProviderName.TokenDance);
-    expect(en[1]).toBe(ProviderName.OpenLux);
+    expect(en[1]).toBe(ProviderName.Ciyuan);
     expect(en[2]).toBe(ProviderName.OpenAI);
     expect(en[3]).toBe(ProviderName.Anthropic);
     expect(en[4]).toBe(ProviderName.Gemini);

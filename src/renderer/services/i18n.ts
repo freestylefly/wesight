@@ -1,3 +1,4 @@
+import { CIYUAN_TRANSLATIONS } from '../../shared/ciyuan/translations';
 import { TOKEN_DANCE_TRANSLATIONS } from '../../shared/tokendance/translations';
 import { configService } from './config';
 
@@ -8,9 +9,7 @@ export type LanguageType = 'zh' | 'en';
 const translations: Record<LanguageType, Record<string, string>> = {
   zh: {
     ...TOKEN_DANCE_TRANSLATIONS.zh,
-    openluxDescription: '一个 API Key，连接多家模型平台',
-    openluxCatalogHint: '填写 API Key 后获取账号可用的对话模型，也可以手动添加模型。',
-    openluxDocs: '接入文档',
+    ...CIYUAN_TRANSLATIONS.zh,
     modelCatalogSearch: '搜索模型名称或 ID',
     modelCatalogGrouped: '按模型原厂分类',
     modelCatalogOther: '其他',
@@ -2182,9 +2181,7 @@ const translations: Record<LanguageType, Record<string, string>> = {
   },
   en: {
     ...TOKEN_DANCE_TRANSLATIONS.en,
-    openluxDescription: 'One API key, multiple model platforms',
-    openluxCatalogHint: 'Enter your API key to fetch chat models available to your account, or add a model manually.',
-    openluxDocs: 'Integration guide',
+    ...CIYUAN_TRANSLATIONS.en,
     modelCatalogSearch: 'Search model name or ID',
     modelCatalogGrouped: 'Grouped by model manufacturer',
     modelCatalogOther: 'Other',
