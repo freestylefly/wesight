@@ -11,6 +11,7 @@ concurrency:
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+  ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
 
 jobs:
   # ========== Stage 1: 变更检测 ==========

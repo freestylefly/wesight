@@ -121,7 +121,14 @@ jobs:
           key: npm-${{ runner.os }}-${{ inputs.arch }}-${{ hashFiles('package.json') }}
           restore-keys: npm-${{ runner.os }}-${{ inputs.arch }}-
 
-      - run: npm install
+      - name: Install build tools
+        run: |
+          if [[ -n "$ARCHIVE_RUN_ID" ]]; then
+            npm install --ignore-scripts
+            npx patch-package
+          else
+            npm install
+          fi
 
       - name: Verify runner architecture
         if: inputs.archive_run_id == ''
