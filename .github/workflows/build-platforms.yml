@@ -2,225 +2,36 @@ name: Build Platforms
 
 on:
   workflow_dispatch:
-  push:
-    tags:
-      - 'v*'
-
-concurrency:
-  group: build-platforms-${{ github.ref }}
-  cancel-in-progress: false
-
-env:
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
-  NODE_OPTIONS: --max-old-space-size=6144
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
-  prepare:
-    runs-on: ubuntu-latest
-    outputs:
-      prerelease: ${{ steps.metadata.outputs.prerelease }}
-      tag: ${{ steps.metadata.outputs.tag }}
-      version: ${{ steps.metadata.outputs.version }}
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Resolve release version
-        id: metadata
-        shell: bash
-        run: |
-          set -euo pipefail
-          if [[ "$GITHUB_EVENT_NAME" == "push" ]]; then
-            node scripts/release-metadata.cjs --tag "$GITHUB_REF_NAME" >> "$GITHUB_OUTPUT"
-          else
-            node scripts/release-metadata.cjs >> "$GITHUB_OUTPUT"
-          fi
-
-      - name: Show build metadata
-        env:
-          RELEASE_TAG: ${{ steps.metadata.outputs.tag }}
-          RELEASE_VERSION: ${{ steps.metadata.outputs.version }}
-        run: |
-          echo "Release version: $RELEASE_VERSION"
-          echo "Release tag: $RELEASE_TAG"
-
-  build-macos:
-    needs: prepare
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - arch: arm64
-            artifact: macos-arm64-build
-            runner: macos-latest
-            runner_arch: arm64
-          - arch: x64
-            artifact: macos-x64-build
-            runner: macos-15-intel
-            runner_arch: x86_64
-    runs-on: ${{ matrix.runner }}
+  notarization-status:
+    runs-on: macos-latest
+    timeout-minutes: 10
     env:
-      APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_PWD }}
       APPLE_ID: ${{ secrets.APPLE_ID }}
+      APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_PWD }}
       APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
-      CSC_IDENTITY_AUTO_DISCOVERY: true
-      CSC_KEY_PASSWORD: ${{ secrets.MACOS_CERTIFICATE_PWD }}
-      CSC_LINK: ${{ secrets.MACOS_CERTIFICATE }}
-      WESIGHT_RELEASE_VERSION: ${{ needs.prepare.outputs.version }}
-      WESIGHT_REQUIRE_APPLE_NOTARIZATION: true
     steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '24.x'
-
-      - uses: actions/cache@v4
-        with:
-          path: ~/.npm
-          key: npm-${{ runner.os }}-${{ matrix.arch }}-${{ hashFiles('package.json') }}
-          restore-keys: npm-${{ runner.os }}-${{ matrix.arch }}-
-
-      - name: Install dependencies
-        run: npm install
-
-      - name: Verify runner architecture
-        env:
-          EXPECTED_NODE_ARCH: ${{ matrix.arch }}
-          EXPECTED_RUNNER_ARCH: ${{ matrix.runner_arch }}
-        run: |
-          test "$(uname -m)" = "$EXPECTED_RUNNER_ARCH"
-          node -e "if (process.arch !== process.env.EXPECTED_NODE_ARCH) process.exit(1)"
-
-      - name: Build macOS ${{ matrix.arch }}
-        run: npm run dist:mac:${{ matrix.arch }} -- --publish never -c.forceCodeSigning=true
-
-      - name: Verify macOS ${{ matrix.arch }} artifact
-        run: npm run verify:mac:${{ matrix.arch }}-artifact
-
-      - uses: actions/upload-artifact@v4
-        with:
-          name: ${{ matrix.artifact }}
-          path: release/WeSight.${{ needs.prepare.outputs.version }}.mac.${{ matrix.arch }}.dmg
-          if-no-files-found: error
-          retention-days: 7
-
-  build-windows:
-    needs: prepare
-    runs-on: windows-latest
-    env:
-      CSC_IDENTITY_AUTO_DISCOVERY: false
-      WESIGHT_RELEASE_VERSION: ${{ needs.prepare.outputs.version }}
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '24.x'
-
-      - uses: actions/cache@v4
-        with:
-          path: ~/.npm
-          key: npm-${{ runner.os }}-x64-${{ hashFiles('package.json') }}
-          restore-keys: npm-${{ runner.os }}-x64-
-
-      - name: Install dependencies
-        run: npm install
-
-      - name: Build Windows x64 installer
-        run: npm run dist:win -- --publish never
-
-      - name: Verify Windows x64 artifact
-        run: npm run verify:win:x64-artifact
-
-      - uses: actions/upload-artifact@v4
-        with:
-          name: windows-x64-build
-          path: |
-            release/WeSight.Setup.${{ needs.prepare.outputs.version }}.exe
-            release/WeSight.Setup.${{ needs.prepare.outputs.version }}.exe.blockmap
-            release/latest.yml
-          if-no-files-found: error
-          retention-days: 7
-
-  create-release:
-    needs:
-      - prepare
-      - build-macos
-      - build-windows
-    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/download-artifact@v4
-        with:
-          path: artifacts
-
-      - name: Collect release assets and checksums
+      - name: Inspect current release notarization requests
         shell: bash
         run: |
           set -euo pipefail
-          mkdir -p release-assets
-          cp artifacts/macos-arm64-build/*.dmg release-assets/
-          cp artifacts/macos-x64-build/*.dmg release-assets/
-          cp artifacts/windows-x64-build/*.exe release-assets/
-          cp artifacts/windows-x64-build/*.blockmap release-assets/
-          cp artifacts/windows-x64-build/latest.yml release-assets/
-
-          (
-            cd release-assets
-            find . -maxdepth 1 -type f -print0 \
-              | sort -z \
-              | xargs -0 sha256sum \
-              | sed 's#  \\./#  #' > ../SHASUMS256.txt
-            mv ../SHASUMS256.txt SHASUMS256.txt
-          )
-
-      - name: Publish GitHub Release
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          IS_PRERELEASE: ${{ needs.prepare.outputs.prerelease }}
-          TAG_NAME: ${{ needs.prepare.outputs.tag }}
-        shell: bash
-        run: |
-          set -euo pipefail
-
-          node scripts/render-release-notes.cjs "$TAG_NAME" release-notes.md
-
-          release_args=(
-            --repo "$GITHUB_REPOSITORY"
-            --title "$TAG_NAME"
-            --verify-tag
-          )
-
-          if [[ "$IS_PRERELEASE" == "true" ]]; then
-            release_args+=(--prerelease)
-          else
-            release_args+=(--latest)
-          fi
-
-          if gh release view "$TAG_NAME" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
-            gh release upload \
-              "$TAG_NAME" \
-              release-assets/* \
-              --clobber \
-              --repo "$GITHUB_REPOSITORY"
-            gh release edit \
-              "$TAG_NAME" \
-              "${release_args[@]}" \
-              --draft=false \
-              --prerelease="$IS_PRERELEASE" \
-              --notes-file release-notes.md
-          else
-            if [[ "$IS_PRERELEASE" == "true" ]]; then
-              release_args+=(--latest=false)
-            fi
-            gh release create \
-              "$TAG_NAME" \
-              release-assets/* \
-              "${release_args[@]}" \
-              --notes-file release-notes.md
-          fi
+          xcrun notarytool history \
+            --apple-id "$APPLE_ID" \
+            --team-id "$APPLE_TEAM_ID" \
+            --password "$APPLE_APP_SPECIFIC_PASSWORD" \
+            --output-format json > "$RUNNER_TEMP/notary-history.json"
+          python3 - <<'PYTHON'
+          import json
+          import os
+          from pathlib import Path
+          history = json.loads((Path(os.environ['RUNNER_TEMP']) / 'notary-history.json').read_text())
+          requests = [item for item in history.get('history', []) if item.get('createdDate', '') >= '2026-11-08T05:34:00Z']
+          summary = '\n'.join(json.dumps({key: item.get(key) for key in ('id', 'name', 'status', 'createdDate')}) for item in requests)
+          print(summary or 'No notarization requests found for the current release.')
+          with open(os.environ['GITHUB_STEP_SUMMARY'], 'a') as output:
+              output.write('## Current release notarization requests\n\n```json\n' + summary + '\n```\n')
+          PYTHON
