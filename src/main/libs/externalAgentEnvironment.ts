@@ -24,6 +24,7 @@ import {
   parseHermesDotenvText,
 } from './hermesConfig';
 import { readOpenClawGlobalConfig, summarizeOpenClawConfig } from './openclawSystemRuntime';
+import { openCodeAuthEntryLoggedIn } from './openCodeConfig';
 import { getWesightLarkCliBinDir } from './wesightSharedRuntime';
 
 export type CliAppType = 'claude' | 'codex' | 'hermes' | 'openclaw' | 'opencode' | 'grok' | 'qwen' | 'deepseek_tui' | 'opensquilla' | 'kimi';
@@ -193,6 +194,17 @@ const fileContainsCredential = (filePath: string): boolean => {
   } catch {
     return false;
   }
+};
+
+// The OpenCode auth.json schema check lives in openCodeConfig.ts so that the
+// credential reader here and the model lister used by the provider store cannot
+// drift apart. Re-exported to keep the existing import path stable.
+export { openCodeAuthEntryLoggedIn };
+
+const openCodeAuthJsonLoggedIn = (filePath: string): boolean => {
+  const parsed = readJsonObject(filePath);
+  if (!parsed) return false;
+  return Object.values(parsed).some((entry) => openCodeAuthEntryLoggedIn(entry));
 };
 
 const envContainsCredential = (keys: string[]): string | null => {
@@ -546,7 +558,9 @@ const localEnvKeysByAppType: Record<CliAppType, string[]> = {
   codex: ['OPENAI_API_KEY'],
   hermes: ['HERMES_INFERENCE_API_KEY', 'ANTHROPIC_AUTH_TOKEN', 'ANTHROPIC_API_KEY', 'OPENAI_API_KEY', 'GLM_API_KEY', 'ZAI_API_KEY', 'Z_AI_API_KEY'],
   openclaw: ['OPENCLAW_GATEWAY_TOKEN', 'OPENAI_API_KEY', 'ANTHROPIC_AUTH_TOKEN', 'ANTHROPIC_API_KEY'],
-  opencode: ['OPENAI_API_KEY', 'ANTHROPIC_API_KEY', 'ANTHROPIC_AUTH_TOKEN'],
+  // OpenCode resolves credentials for any Models.dev provider, so accept the
+  // common provider env keys rather than just the OpenAI/Anthropic pair.
+  opencode: ['OPENAI_API_KEY', 'ANTHROPIC_API_KEY', 'ANTHROPIC_AUTH_TOKEN', 'DEEPSEEK_API_KEY', 'GEMINI_API_KEY', 'GOOGLE_API_KEY', 'OPENROUTER_API_KEY', 'DASHSCOPE_API_KEY', 'QWEN_API_KEY', 'MOONSHOT_API_KEY', 'ZAI_API_KEY', 'Z_AI_API_KEY', 'GROQ_API_KEY', 'XAI_API_KEY'],
   grok: ['GROK_API_KEY', 'XAI_API_KEY', 'X_AI_API_KEY'],
   qwen: ['DASHSCOPE_API_KEY', 'QWEN_API_KEY'],
   deepseek_tui: ['DEEPSEEK_API_KEY', 'OPENAI_API_KEY'],
@@ -636,6 +650,23 @@ export const summarizeCliAuthStatus = (
       authSource: formatAuthSource(credentialPath),
       authMessage: 'file',
     };
+  }
+
+  // OpenCode's auth.json uses a provider-keyed discriminated union that
+  // fileContainsCredential cannot recognise, so check it with a schema-aware pass.
+  // Scan every candidate ending in auth.json, since the data-dir location can be
+  // overridden and is not guaranteed to be the secondaryConfigPaths entry.
+  if (appType === 'opencode') {
+    const openCodeAuthPath = candidates.find(
+      (filePath) => filePath.endsWith('auth.json') && openCodeAuthJsonLoggedIn(filePath),
+    );
+    if (openCodeAuthPath) {
+      return {
+        authStatus: 'logged_in',
+        authSource: formatAuthSource(openCodeAuthPath),
+        authMessage: 'file',
+      };
+    }
   }
 
   const anyConfigFileExists = config.configExists || config.secondaryConfigPaths.some((filePath) => fs.existsSync(filePath));
