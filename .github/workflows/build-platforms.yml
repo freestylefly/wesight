@@ -35,3 +35,12 @@ jobs:
           with open(os.environ['GITHUB_STEP_SUMMARY'], 'a') as output:
               output.write('## Current release notarization requests\n\n```json\n' + summary + '\n```\n')
           PYTHON
+      - name: Verify an accepted notarization wait response
+        shell: bash
+        run: |
+          xcrun notarytool wait 8c908012-01c2-4838-b291-e83db984a82b \
+            --apple-id "$APPLE_ID" \
+            --team-id "$APPLE_TEAM_ID" \
+            --password "$APPLE_APP_SPECIFIC_PASSWORD" \
+            --output-format json \
+            --timeout 1m
