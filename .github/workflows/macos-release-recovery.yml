@@ -125,6 +125,7 @@ jobs:
         run: |
           if [[ -n "$ARCHIVE_RUN_ID" ]]; then
             npm install --ignore-scripts
+            npx patch-package
           else
             npm install
           fi
