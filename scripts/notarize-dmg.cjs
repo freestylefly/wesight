@@ -3,6 +3,60 @@
 const { spawnSync } = require('child_process');
 const path = require('path');
 
+const NotarizationStatus = {
+  Accepted: 'Accepted',
+  Invalid: 'Invalid',
+};
+exports.NotarizationStatus = NotarizationStatus;
+
+async function submitAndWait(dmgPath, authentication, password) {
+  const submission = spawnSync('xcrun', [
+    'notarytool', 'submit', dmgPath, ...authentication, '--output-format', 'json',
+  ], {
+    env: process.env,
+    encoding: 'utf8',
+    timeout: 15 * 60 * 1000,
+  });
+  if (submission.error || submission.status !== 0) {
+    const details = (submission.stderr || submission.error?.message || '').split(password).join('[redacted]');
+    throw new Error(`[MacDmgNotarize] Submission failed for ${path.basename(dmgPath)}. ${details}`);
+  }
+
+  const { id } = JSON.parse(submission.stdout);
+  if (typeof id !== 'string' || !/^[a-f\d-]{36}$/i.test(id)) {
+    throw new Error('[MacDmgNotarize] Apple returned an invalid submission ID.');
+  }
+  console.log(`[MacDmgNotarize] Submitted ${path.basename(dmgPath)} with request ${id}.`);
+
+  const maxAttempts = 6;
+  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+    const result = spawnSync('xcrun', [
+      'notarytool', 'wait', id, ...authentication,
+      '--output-format', 'json', '--timeout', '30m',
+    ], {
+      env: process.env,
+      encoding: 'utf8',
+      timeout: 31 * 60 * 1000,
+    });
+    if (!result.error && result.status === 0) {
+      const response = JSON.parse(result.stdout);
+      if (response.status !== NotarizationStatus.Accepted) {
+        throw new Error(`[MacDmgNotarize] Request ${id} completed with status ${response.status}.`);
+      }
+      return;
+    }
+
+    const details = `${result.stderr || ''} ${result.error?.message || ''}`;
+    const retryable = result.status === 124 || result.error?.code === 'ETIMEDOUT'
+      || /NSURLErrorDomain|network|timed out|timeout|HTTP.*(?:429|5\d\d)/i.test(details);
+    if (!retryable || attempt === maxAttempts) {
+      throw new Error(`[MacDmgNotarize] Waiting for request ${id} failed with code ${result.status}. ${details.split(password).join('[redacted]')}`);
+    }
+    console.warn(`[MacDmgNotarize] Query failed or timed out for request ${id}. Resuming attempt ${attempt + 1} of ${maxAttempts}.`);
+    await new Promise(resolve => setTimeout(resolve, 15000));
+  }
+}
+
 function run(command, args, operation) {
   const result = spawnSync(command, args, {
     env: process.env,
@@ -55,24 +109,9 @@ exports.default = async function notarizeDmg(context) {
     );
 
     console.log(`[MacDmgNotarize] Submitting ${dmgName} for notarization.`);
-    run(
-      'xcrun',
-      [
-        'notarytool',
-        'submit',
-        dmgPath,
-        '--apple-id',
-        appleId,
-        '--team-id',
-        teamId,
-        '--password',
-        appleIdPassword,
-        '--wait',
-        '--timeout',
-        '30m',
-      ],
-      `Notarization for ${dmgName}`,
-    );
+    await submitAndWait(dmgPath, [
+      '--apple-id', appleId, '--team-id', teamId, '--password', appleIdPassword,
+    ], appleIdPassword);
 
     run(
       'xcrun',
