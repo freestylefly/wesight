@@ -8,6 +8,8 @@ import {
   type ThemeSkinState,
 } from '@shared/theme/constants';
 
+import { CIYUAN_TRANSLATIONS } from '../shared/ciyuan/translations';
+
 // 配置类型定义
 export interface AppConfig {
   // API 配置
@@ -396,7 +398,6 @@ export const OFFICIAL_GLOBAL_PROVIDERS = [
 
 const BUILTIN_PROVIDER_DISPLAY_NAMES: Partial<Record<string, string>> = {
   [ProviderName.TokenDance]: 'TokenDance · 词元跳动',
-  [ProviderName.OpenLux]: 'OpenLux',
   [ProviderName.OpenAI]: 'OpenAI',
   [ProviderName.Anthropic]: 'Claude',
   [ProviderName.Gemini]: 'Google',
@@ -404,20 +405,21 @@ const BUILTIN_PROVIDER_DISPLAY_NAMES: Partial<Record<string, string>> = {
 
 export const getVisibleProviders = (language: 'zh' | 'en'): readonly string[] => {
   if (language === 'zh') {
-    return [ProviderName.TokenDance, ProviderName.OpenLux, ...OFFICIAL_GLOBAL_PROVIDERS, ...CHINA_PROVIDERS.filter(id => id !== ProviderName.TokenDance)];
+    return [ProviderName.TokenDance, ProviderName.Ciyuan, ...OFFICIAL_GLOBAL_PROVIDERS, ...CHINA_PROVIDERS.filter(id => id !== ProviderName.TokenDance)];
   }
   return ProviderRegistry.idsForEnLocale();
 };
 
 /**
- * 判断 provider key 是否为自定义提供商（custom_0, custom_1, ...）
+ * 判断 provider key 是否为自定义提供商，包括保留的旧 OpenLux 账号。
  */
-export const isCustomProvider = (key: string): boolean => key.startsWith('custom_');
+export const isCustomProvider = (key: string): boolean => key.startsWith('custom_') || key === ProviderName.OpenLux;
 
 /**
  * 从 custom_N key 中提取默认显示名称（如 custom_0 → "Custom0"）
  */
 export const getCustomProviderDefaultName = (key: string): string => {
+  if (key === ProviderName.OpenLux) return 'OpenLux';
   const suffix = key.replace('custom_', '');
   return `Custom${suffix}`;
 };
@@ -429,7 +431,9 @@ export const getCustomProviderDefaultName = (key: string): string => {
 export const getProviderDisplayName = (
   providerKey: string,
   providerConfig?: Record<string, unknown>,
+  language: AppConfig['language'] = 'zh',
 ): string => {
+  if (providerKey === ProviderName.Ciyuan) return CIYUAN_TRANSLATIONS[language].ciyuanName;
   if (isCustomProvider(providerKey)) {
     const name = providerConfig && typeof providerConfig.displayName === 'string'
       ? providerConfig.displayName

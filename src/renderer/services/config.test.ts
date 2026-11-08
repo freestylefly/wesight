@@ -1,10 +1,12 @@
 import { expect, test, vi } from 'vitest';
 
+import { Ciyuan } from '../../shared/ciyuan/constants';
 import { ModelVendor } from '../../shared/models/constants';
 import { OpenLux } from '../../shared/openlux/constants';
 import { ApiFormat, ProviderName, ProviderRegistry } from '../../shared/providers';
 import { KimiModelMode } from '../../shared/providers/kimi/constants';
-import { defaultConfig, getVisibleProviders } from '../config';
+import { defaultConfig, getProviderDisplayName, getVisibleProviders, isCustomProvider } from '../config';
+import { i18nService } from './i18n';
 import { switchKimiModelMode } from './kimiProvider';
 
 const storage = vi.hoisted(() => ({ getItem: vi.fn(), setItem: vi.fn() }));
@@ -12,9 +14,9 @@ vi.mock('./store', () => ({ localStore: storage }));
 
 import { configService } from './config';
 
-test('old configurations gain a disabled OpenLux provider while preserving existing credentials and selection', async () => {
+test('old configurations gain a disabled Ciyuan provider while preserving existing credentials and selection', async () => {
   const old = structuredClone(defaultConfig);
-  delete old.providers![ProviderName.OpenLux];
+  delete old.providers![ProviderName.Ciyuan];
   old.providers![ProviderName.OpenAI].enabled = true;
   old.providers![ProviderName.OpenAI].apiKey = 'existing-test-key';
   old.model.defaultModelProvider = ProviderName.OpenAI;
@@ -22,27 +24,91 @@ test('old configurations gain a disabled OpenLux provider while preserving exist
   storage.getItem.mockResolvedValue(old);
   await configService.init();
   const config = configService.getConfig();
-  expect(config.providers![ProviderName.OpenLux]).toMatchObject({ enabled: false, apiKey: '', baseUrl: OpenLux.BaseUrl, apiFormat: ApiFormat.OpenAI, models: [] });
+  expect(config.providers![ProviderName.Ciyuan]).toMatchObject({ enabled: false, apiKey: '', baseUrl: Ciyuan.BaseUrl, apiFormat: ApiFormat.OpenAI, models: [] });
   expect(config.providers![ProviderName.OpenAI].apiKey).toBe('existing-test-key');
   expect(config.model.defaultModelProvider).toBe(ProviderName.OpenAI);
   for (const language of ['zh', 'en'] as const) {
-    expect(getVisibleProviders(language).slice(0, 2)).toEqual([ProviderName.TokenDance, ProviderName.OpenLux]);
+    expect(getVisibleProviders(language).slice(0, 2)).toEqual([ProviderName.TokenDance, ProviderName.Ciyuan]);
   }
 });
 
-test('saving and reloading OpenLux preserves grouping and selection and normalizes its protocol', async () => {
+test('legacy OpenLux accounts retain their endpoint, credentials and default selection independently of Ciyuan', async () => {
+  const old = structuredClone(defaultConfig);
+  delete old.providers![ProviderName.Ciyuan];
+  old.providers![ProviderName.OpenLux] = {
+    enabled: true,
+    apiKey: 'existing-openlux-key',
+    baseUrl: OpenLux.BaseUrl,
+    apiFormat: ApiFormat.OpenAI,
+    defaultModel: 'gpt-4o',
+    models: [{ id: 'gpt-4o', name: 'My GPT', supportsImage: true }],
+  };
+  old.model.defaultModelProvider = ProviderName.OpenLux;
+  old.model.defaultModel = 'gpt-4o';
+  storage.getItem.mockResolvedValue(old);
+  await configService.init();
+  const config = configService.getConfig();
+  expect(config.providers![ProviderName.OpenLux]).toEqual(old.providers![ProviderName.OpenLux]);
+  expect(config.model).toEqual(old.model);
+  expect(config.providers![ProviderName.Ciyuan]).toMatchObject({
+    enabled: false, apiKey: '', baseUrl: Ciyuan.BaseUrl, models: [],
+  });
+  expect(isCustomProvider(ProviderName.OpenLux)).toBe(true);
+  expect(getProviderDisplayName(ProviderName.OpenLux)).toBe('OpenLux');
+  for (const language of ['zh', 'en'] as const) {
+    expect(getVisibleProviders(language)).not.toContain(ProviderName.OpenLux);
+  }
+  await configService.updateConfig(config);
+  const saved = storage.setItem.mock.calls[storage.setItem.mock.calls.length - 1][1];
+  expect(saved.providers[ProviderName.OpenLux].apiKey).toBe('existing-openlux-key');
+  expect(saved.providers[ProviderName.Ciyuan].apiKey).toBe('');
+});
+
+test('Ciyuan provider names follow the application language', () => {
+  const language = i18nService.getLanguage();
+  try {
+    i18nService.setLanguage('zh', { persist: false });
+    expect(getProviderDisplayName(ProviderName.Ciyuan, undefined, i18nService.getLanguage())).toBe(i18nService.t('ciyuanName'));
+    i18nService.setLanguage('en', { persist: false });
+    expect(getProviderDisplayName(ProviderName.Ciyuan, undefined, i18nService.getLanguage())).toBe(i18nService.t('ciyuanName'));
+  } finally {
+    i18nService.setLanguage(language, { persist: false });
+  }
+});
+
+test('loading Ciyuan preserves model IDs removed from unrelated official providers', async () => {
   const config = structuredClone(defaultConfig);
-  config.providers![ProviderName.OpenLux] = {
-    enabled: true, apiKey: 'test-key', baseUrl: `${OpenLux.BaseUrl}/`, apiFormat: ApiFormat.Anthropic,
+  config.providers![ProviderName.Ciyuan] = {
+    enabled: true,
+    apiKey: 'ciyuan-test-key',
+    baseUrl: Ciyuan.BaseUrl,
+    apiFormat: ApiFormat.OpenAI,
+    defaultModel: 'gpt-4o',
+    models: [{ id: 'gpt-4o', name: 'GPT-4o' }],
+  };
+  config.model.defaultModelProvider = ProviderName.Ciyuan;
+  config.model.defaultModel = 'gpt-4o';
+  storage.getItem.mockResolvedValue(config);
+  await configService.init();
+  expect(configService.getConfig().model).toMatchObject({
+    defaultModelProvider: ProviderName.Ciyuan,
+    defaultModel: 'gpt-4o',
+  });
+});
+
+test('saving and reloading Ciyuan preserves grouping and selection and normalizes its protocol', async () => {
+  const config = structuredClone(defaultConfig);
+  config.providers![ProviderName.Ciyuan] = {
+    enabled: true, apiKey: 'test-key', baseUrl: `${Ciyuan.BaseUrl}/`, apiFormat: ApiFormat.Anthropic,
     defaultModel: 'gemini-2.5-pro', models: [{ id: 'gemini-2.5-pro', name: 'Gemini', modelVendor: ModelVendor.Google, supportsImage: true }],
   };
   await configService.updateConfig(config);
   const saved = structuredClone(storage.setItem.mock.calls[storage.setItem.mock.calls.length - 1][1]);
-  expect(saved.providers[ProviderName.OpenLux].apiFormat).toBe(ApiFormat.OpenAI);
+  expect(saved.providers[ProviderName.Ciyuan].apiFormat).toBe(ApiFormat.OpenAI);
   storage.getItem.mockResolvedValue(saved);
   await configService.init();
-  expect(configService.getConfig().providers![ProviderName.OpenLux]).toMatchObject({
-    baseUrl: OpenLux.BaseUrl, apiFormat: ApiFormat.OpenAI, defaultModel: 'gemini-2.5-pro',
+  expect(configService.getConfig().providers![ProviderName.Ciyuan]).toMatchObject({
+    baseUrl: Ciyuan.BaseUrl, apiFormat: ApiFormat.OpenAI, defaultModel: 'gemini-2.5-pro',
     models: [{ id: 'gemini-2.5-pro', modelVendor: ModelVendor.Google, supportsImage: true }],
   });
 });

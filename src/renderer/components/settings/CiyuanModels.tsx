@@ -22,7 +22,7 @@ interface Props {
   onDelete: (id: string) => void;
 }
 
-export function OpenLuxModels({ models, selected, enabled, isDefault, refreshing, onSelect, onMakeDefault, onRefresh, onAdd, onEdit, onDelete }: Props) {
+export function CiyuanModels({ models, selected, enabled, isDefault, refreshing, onSelect, onMakeDefault, onRefresh, onAdd, onEdit, onDelete }: Props) {
   const t = (key: string) => i18nService.t(key);
   return <div className="space-y-4">
     <div>
@@ -45,7 +45,7 @@ export function OpenLuxModels({ models, selected, enabled, isDefault, refreshing
           <button type="button" onClick={onAdd} className="inline-flex items-center gap-1 text-xs text-primary"><PlusCircleIcon className="h-3.5 w-3.5" />{t('addModel')}</button>
         </div>
       </div>
-      <p className="mb-2 text-[11px] text-secondary">{t(models.length ? 'modelCatalogGrouped' : 'openluxCatalogHint')}</p>
+      <p className="mb-2 text-[11px] text-secondary">{t(models.length ? 'modelCatalogGrouped' : 'ciyuanCatalogHint')}</p>
       <ModelCatalogList models={models} className="max-h-80" renderModel={model => <div key={model.id} className="group flex items-center justify-between gap-2 px-2.5 py-2">
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-1.5 text-[11px] font-medium text-foreground"><span className="truncate">{model.name}</span>

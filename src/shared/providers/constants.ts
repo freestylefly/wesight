@@ -1,4 +1,4 @@
-import { OpenLux } from '../openlux/constants';
+import { Ciyuan } from '../ciyuan/constants';
 import { TOKEN_DANCE_MODELS, TokenDance } from '../tokendance/constants';
 
 /**
@@ -27,6 +27,8 @@ import { TOKEN_DANCE_MODELS, TokenDance } from '../tokendance/constants';
 // providerName identifies the WeSight internal provider (config key).
 export const ProviderName = {
   TokenDance: TokenDance.Provider,
+  Ciyuan: 'ciyuan',
+  // Retain the stored identity for existing OpenLux sessions and credentials.
   OpenLux: 'openlux',
   OpenAI: 'openai',
   Gemini: 'gemini',
@@ -52,7 +54,7 @@ export type ProviderName = typeof ProviderName[keyof typeof ProviderName];
 // OpenClaw gateway provider identifiers. May differ from ProviderName.
 export const OpenClawProviderId = {
   TokenDance: TokenDance.Provider,
-  OpenLux: ProviderName.OpenLux,
+  Ciyuan: ProviderName.Ciyuan,
   WesightServer: 'wesight-server',
   Moonshot: 'moonshot',
   Google: 'google',
@@ -183,9 +185,9 @@ const PROVIDER_DEFINITIONS = [
     defaultModels: TOKEN_DANCE_MODELS,
   },
   {
-    id: ProviderName.OpenLux,
-    openClawProviderId: OpenClawProviderId.OpenLux,
-    defaultBaseUrl: OpenLux.BaseUrl,
+    id: ProviderName.Ciyuan,
+    openClawProviderId: OpenClawProviderId.Ciyuan,
+    defaultBaseUrl: Ciyuan.BaseUrl,
     defaultApiFormat: ApiFormat.OpenAI,
     codingPlanSupported: false,
     region: 'global',
@@ -594,8 +596,8 @@ class ProviderRegistryImpl {
       unique.splice(ollamaIdx, 1);
     }
     unique.push(ProviderName.Ollama);
-    return [ProviderName.TokenDance, ProviderName.OpenLux,
-      ...unique.filter(id => id !== ProviderName.TokenDance && id !== ProviderName.OpenLux)];
+    return [ProviderName.TokenDance, ProviderName.Ciyuan,
+      ...unique.filter(id => id !== ProviderName.TokenDance && id !== ProviderName.Ciyuan)];
   }
 }
 

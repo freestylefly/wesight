@@ -33,8 +33,8 @@ import {
 import React, { useCallback,useEffect, useMemo, useRef, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 
-import { mergeCatalogModels, parseOpenLuxCatalog } from '../../shared/models/catalog';
-import { OpenLux } from '../../shared/openlux/constants';
+import { Ciyuan } from '../../shared/ciyuan/constants';
+import { mergeCatalogModels, parseCiyuanCatalog } from '../../shared/models/catalog';
 import { ApiFormat, ProviderName, ProviderRegistry, resolveCodingPlanBaseUrl } from '../../shared/providers';
 import { KimiModelMode } from '../../shared/providers/kimi/constants';
 import { TokenDance } from '../../shared/tokendance/constants';
@@ -100,15 +100,15 @@ import {
   YouDaoZhiYunIcon,
   ZhipuIcon,
 } from './icons/providers';
-import OpenLuxIcon from './icons/providers/OpenLuxIcon';
+import CiyuanIcon from './icons/providers/CiyuanIcon';
 import TrashIcon from './icons/TrashIcon';
 import IMSettings from './im/IMSettings';
 import McpManager from './mcp/McpManager';
 import PetSprite, { PetMood } from './pet/PetSprite';
 import { ScheduledTasksView } from './scheduledTasks';
+import { CiyuanModels } from './settings/CiyuanModels';
 import { SettingsTab, type SettingsTab as SettingsTabType } from './settings/constants';
 import { KimiModeTabs } from './settings/KimiModeTabs';
-import { OpenLuxModels } from './settings/OpenLuxModels';
 import ThemeSkinSettings from './settings/ThemeSkinSettings';
 import { TokenDanceSettings } from './settings/TokenDanceSettings';
 import EmailSkillConfig from './skills/EmailSkillConfig';
@@ -263,9 +263,11 @@ const CUSTOM_PROVIDER_KEYS = [
   'custom_5', 'custom_6', 'custom_7', 'custom_8', 'custom_9',
 ] as const;
 
+const LEGACY_CUSTOM_PROVIDER_KEYS = [ProviderName.OpenLux] as const;
+
 const providerKeys = [
   TokenDance.Provider,
-  ProviderName.OpenLux,
+  ProviderName.Ciyuan,
   'openai',
   'gemini',
   'anthropic',
@@ -282,6 +284,7 @@ const providerKeys = [
   'github-copilot',
   'ollama',
   ...CUSTOM_PROVIDER_KEYS,
+  ...LEGACY_CUSTOM_PROVIDER_KEYS,
 ] as const;
 
 type ProviderType = (typeof providerKeys)[number];
@@ -351,7 +354,11 @@ interface ProvidersImportPayload {
 
 const providerMeta: Record<ProviderType, { label: string; icon: React.ReactNode }> = {
   [TokenDance.Provider]: { label: 'TokenDance', icon: <span aria-hidden className="text-lg font-bold text-primary">T</span> },
-  [ProviderName.OpenLux]: { label: 'OpenLux', icon: <OpenLuxIcon /> },
+  [ProviderName.Ciyuan]: {
+    get label() { return i18nService.t('ciyuanName'); },
+    icon: <CiyuanIcon />,
+  },
+  [ProviderName.OpenLux]: { label: 'OpenLux', icon: <CustomProviderIcon /> },
   openai: { label: 'OpenAI', icon: <OpenAIIcon /> },
   deepseek: { label: 'DeepSeek', icon: <DeepSeekIcon /> },
   gemini: { label: 'Google', icon: <GeminiIcon /> },
@@ -374,7 +381,7 @@ const providerMeta: Record<ProviderType, { label: string; icon: React.ReactNode 
 
 const providerLinks: Partial<Record<ProviderType, { website: string; apiKey?: string }>> = {
   [TokenDance.Provider]: { website: TokenDance.Origin },
-  [ProviderName.OpenLux]: { website: OpenLux.Website, apiKey: OpenLux.ConsoleUrl },
+  [ProviderName.Ciyuan]: { website: Ciyuan.Website, apiKey: Ciyuan.ConsoleUrl },
   openai:       { website: 'https://platform.openai.com',              apiKey: 'https://platform.openai.com/api-keys' },
   gemini:       { website: 'https://aistudio.google.com',              apiKey: 'https://aistudio.google.com/apikey' },
   anthropic:    { website: 'https://console.anthropic.com',            apiKey: 'https://console.anthropic.com/settings/keys' },
@@ -471,7 +478,7 @@ const copyTextToClipboard = async (text: string): Promise<boolean> => {
 };
 
 const getFixedApiFormatForProvider = (provider: string): 'anthropic' | 'openai' | 'gemini' | null => {
-  if (provider === TokenDance.Provider || provider === ProviderName.OpenLux) return ApiFormat.OpenAI;
+  if (provider === TokenDance.Provider || provider === ProviderName.Ciyuan || provider === ProviderName.OpenLux) return ApiFormat.OpenAI;
   if (provider === 'openai' || provider === 'stepfun') {
     return 'openai';
   }
@@ -1771,8 +1778,8 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, notice
         filtered[key as keyof ProvidersConfig] = providers[key as keyof ProvidersConfig];
       }
     }
-    // Append custom_N providers that exist in state, sorted by numeric suffix
-    for (const key of CUSTOM_PROVIDER_KEYS) {
+    // Keep saved OpenLux accounts editable alongside custom providers.
+    for (const key of [...CUSTOM_PROVIDER_KEYS, ...LEGACY_CUSTOM_PROVIDER_KEYS]) {
       if (providers[key]) {
         filtered[key] = providers[key];
       }
@@ -2536,7 +2543,7 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, notice
             allModels.push({
               id: model.id,
               name: model.name,
-              provider: getProviderDisplayName(providerName, config),
+              provider: getProviderDisplayName(providerName, config, i18nService.getLanguage()),
               providerKey: providerName,
               supportsImage: model.supportsImage ?? false,
               modelVendor: model.modelVendor,
@@ -2780,8 +2787,8 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, notice
         return;
       }
 
-      if (providerKey === ProviderName.OpenLux) {
-        const fetched = parseOpenLuxCatalog(response.data);
+      if (providerKey === ProviderName.Ciyuan) {
+        const fetched = parseCiyuanCatalog(response.data);
         if (fetched.length === 0) {
           alert(i18nService.t('getModelListNoModels'));
           return;
@@ -4304,7 +4311,7 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, notice
     const providerConfig = providers[providerKey as ProviderType];
     const modelId = config.model?.defaultModel || providerConfig?.models?.[0]?.id || '';
     const providerName = providerConfig
-      ? getProviderDisplayName(providerKey, providerConfig)
+      ? getProviderDisplayName(providerKey, providerConfig, i18nService.getLanguage())
       : providerKey;
     const apiFormat = providerConfig
       ? getEffectiveApiFormat(providerKey, providerConfig.apiFormat)
@@ -6271,9 +6278,9 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, notice
                 aria-labelledby={activeProvider === ProviderName.Moonshot ? `kimi-model-mode-panel-tab-${kimiMode}` : undefined}
                 className="space-y-4"
               >
-              {activeProvider === ProviderName.OpenLux && <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-secondary">
-                <span>{i18nService.t('openluxDescription')}</span>
-                <button type="button" onClick={() => void window.electron.shell.openExternal(OpenLux.DocsUrl)} className="text-primary hover:text-primary-hover">{i18nService.t('openluxDocs')} ↗</button>
+              {activeProvider === ProviderName.Ciyuan && <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-secondary">
+                <span>{i18nService.t('ciyuanDescription')}</span>
+                <button type="button" onClick={() => void window.electron.shell.openExternal(Ciyuan.DocsUrl)} className="text-primary hover:text-primary-hover">{i18nService.t('ciyuanDocs')} ↗</button>
               </div>}
               {/* MiniMax OAuth auth section */}
               {activeProvider === 'minimax' && (
@@ -6817,7 +6824,7 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, notice
               </div>
               )}
 
-              {activeProvider === ProviderName.OpenLux && <div>
+              {activeProvider === ProviderName.Ciyuan && <div>
                 <div className="mb-1.5 text-xs font-medium text-foreground">{i18nService.t('apiFormat')}</div>
                 <span className="inline-flex rounded-lg border border-border bg-surface px-3 py-1.5 text-xs text-foreground">{i18nService.t('apiFormatOpenAI')}</span>
               </div>}
@@ -6960,19 +6967,19 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, notice
               </div>
               )}
 
-              {activeProvider === ProviderName.OpenLux ? (() => {
-                const config = providers[ProviderName.OpenLux];
+              {activeProvider === ProviderName.Ciyuan ? (() => {
+                const config = providers[ProviderName.Ciyuan];
                 const models = config.models ?? [];
                 const selected = config.defaultModel && models.some(model => model.id === config.defaultModel)
                   ? config.defaultModel : models[0]?.id ?? '';
                 const saved = configService.getConfig().model;
                 const defaultSelection = pendingDefaultModel ?? { providerKey: saved.defaultModelProvider, id: saved.defaultModel };
-                return <OpenLuxModels models={models} selected={selected} enabled={config.enabled} refreshing={isFetchingModels}
-                  isDefault={defaultSelection.providerKey === ProviderName.OpenLux && defaultSelection.id === selected}
-                  onSelect={id => handleProviderConfigChange(ProviderName.OpenLux, 'defaultModel', id)}
+                return <CiyuanModels models={models} selected={selected} enabled={config.enabled} refreshing={isFetchingModels}
+                  isDefault={defaultSelection.providerKey === ProviderName.Ciyuan && defaultSelection.id === selected}
+                  onSelect={id => handleProviderConfigChange(ProviderName.Ciyuan, 'defaultModel', id)}
                   onMakeDefault={() => {
-                    handleProviderConfigChange(ProviderName.OpenLux, 'defaultModel', selected);
-                    setPendingDefaultModel({ providerKey: ProviderName.OpenLux, id: selected });
+                    handleProviderConfigChange(ProviderName.Ciyuan, 'defaultModel', selected);
+                    setPendingDefaultModel({ providerKey: ProviderName.Ciyuan, id: selected });
                   }}
                   onRefresh={() => void handleFetchModels()} onAdd={handleAddModel}
                   onEdit={model => handleEditModel(model.id, model.name, model.supportsImage)} onDelete={handleDeleteModel} />;

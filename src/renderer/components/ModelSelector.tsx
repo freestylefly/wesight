@@ -99,7 +99,7 @@ const ModelSelector: React.FC<ModelSelectorProps> = ({ dropdownDirection = 'down
 
   const fullLabel = (model: Model | null) => {
     if (!model) return defaultLabel ?? '';
-    const vendor = model.providerKey === ProviderName.OpenLux ? getModelVendor(model) : null;
+    const vendor = model.providerKey === ProviderName.Ciyuan ? getModelVendor(model) : null;
     return [model.provider, vendor && vendor !== ModelVendor.Other ? MODEL_VENDOR_LABELS[vendor] : null, model.name].filter(Boolean).join(' · ');
   };
   const compactLabel = selectedModel
@@ -122,7 +122,7 @@ const ModelSelector: React.FC<ModelSelectorProps> = ({ dropdownDirection = 'down
       className={`flex min-w-0 max-w-[150px] items-center gap-2 rounded-xl px-3 py-1.5 text-foreground transition-colors hover:bg-surface-raised sm:max-w-[180px] ${isOpen ? 'bg-surface-raised' : ''}`}>
       <span className="min-w-0 text-left">
         <span className="block truncate text-sm font-medium">{compactLabel}</span>
-        {selectedModel?.providerKey === ProviderName.OpenLux && <span className="block truncate text-[10px] text-secondary">
+        {selectedModel?.providerKey === ProviderName.Ciyuan && <span className="block truncate text-[10px] text-secondary">
           {selectedModel.provider} · {getModelVendor(selectedModel) === ModelVendor.Other ? i18nService.t('modelCatalogOther') : MODEL_VENDOR_LABELS[getModelVendor(selectedModel)]}
         </span>}
       </span>
@@ -168,7 +168,7 @@ const ModelSelector: React.FC<ModelSelectorProps> = ({ dropdownDirection = 'down
             <span className="truncate">{activeGroup.label}</span>
             <span className="shrink-0 text-[10px] font-normal text-secondary">{i18nService.t('modelCatalogModelsCount').replace('{count}', String(activeGroup.models.length))}</span>
           </div>
-          <ModelCatalogList key={activeGroup.key} models={activeGroup.models} groupByVendor={activeGroup.key === ProviderName.OpenLux}
+          <ModelCatalogList key={activeGroup.key} models={activeGroup.models} groupByVendor={activeGroup.key === ProviderName.Ciyuan}
             className="max-h-[280px]" renderModel={model => {
               const selected = !!selectedModel && isSameModelIdentity(model, selectedModel);
               return <button key={getModelIdentityKey(model)} type="button" data-model-option aria-pressed={selected} title={fullLabel(model)} onClick={() => select(model)}
