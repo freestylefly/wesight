@@ -1,5 +1,4 @@
 import { readFileSync } from 'node:fs';
-import { createRequire } from 'node:module';
 import path from 'node:path';
 import { runInNewContext } from 'node:vm';
 
@@ -12,14 +11,13 @@ interface CommandResult {
 }
 
 function loadHook(waitResults: CommandResult[]) {
-  const require = createRequire(import.meta.url);
   const calls: Array<{ command: string; args: string[] }> = [];
   const exports = {} as {
     default: (context: { artifactPaths: string[] }) => Promise<unknown>;
     NotarizationStatus: { Accepted: string; Invalid: string };
   };
   const submissionId = 'b9e9e435-b395-42ad-9068-d9978cd5c15a';
-  runInNewContext(readFileSync(new URL('./notarize-dmg.cjs', import.meta.url), 'utf8'), {
+  const context = {
     exports,
     console: { log: () => {}, warn: () => {} },
     process: {
@@ -32,8 +30,17 @@ function loadHook(waitResults: CommandResult[]) {
       },
     },
     setTimeout: (callback: () => void) => callback(),
-    require: (name: string) => {
-      if (name !== 'child_process') return require(name);
+  };
+  const requireMock = (name: string): unknown => {
+    if (name === 'path') return path;
+    if (name === './mac-notarization.cjs') {
+      const helperExports = {};
+      runInNewContext(readFileSync(new URL('./mac-notarization.cjs', import.meta.url), 'utf8'), {
+        ...context, exports: helperExports, require: requireMock,
+      });
+      return helperExports;
+    }
+    if (name === 'child_process') {
       return {
         spawnSync: (command: string, args: string[]) => {
           calls.push({ command, args });
@@ -49,7 +56,11 @@ function loadHook(waitResults: CommandResult[]) {
           return { status: 0 };
         },
       };
-    },
+    }
+    throw new Error(`Unexpected dependency ${name}`);
+  };
+  runInNewContext(readFileSync(new URL('./notarize-dmg.cjs', import.meta.url), 'utf8'), {
+    ...context, require: requireMock,
   });
   return {
     calls,
@@ -71,6 +82,13 @@ test('resumes the original notarization request after a transient network error'
 
 test('continues waiting for a slow request after the Apple CLI timeout', async () => {
   const hook = loadHook([{ status: 124, stderr: 'Timeout of 1800 seconds was reached' }]);
+  await hook.run();
+  expect(hook.calls.filter(call => call.args[1] === 'submit')).toHaveLength(1);
+  expect(hook.calls.filter(call => call.args[1] === 'wait')).toHaveLength(2);
+});
+
+test('recognizes network failures returned through stdout in JSON mode', async () => {
+  const hook = loadHook([{ status: 1, stdout: JSON.stringify({ message: 'NSURLErrorDomain network timeout' }) }]);
   await hook.run();
   expect(hook.calls.filter(call => call.args[1] === 'submit')).toHaveLength(1);
   expect(hook.calls.filter(call => call.args[1] === 'wait')).toHaveLength(2);

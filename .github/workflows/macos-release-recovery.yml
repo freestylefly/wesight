@@ -1,0 +1,138 @@
+name: macOS Release Recovery
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: Existing release tag to build
+        required: true
+        type: string
+      arch:
+        description: Mac architecture to recover
+        required: true
+        type: choice
+        options:
+          - x64
+          - arm64
+
+permissions:
+  contents: read
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+  NODE_OPTIONS: --max-old-space-size=6144
+
+jobs:
+  recover-macos:
+    runs-on: ${{ inputs.arch == 'x64' && 'macos-15-intel' || 'macos-latest' }}
+    timeout-minutes: 360
+    env:
+      APPLE_ID: ${{ secrets.APPLE_ID }}
+      APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_PWD }}
+      APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+      CSC_LINK: ${{ secrets.MACOS_CERTIFICATE }}
+      CSC_KEY_PASSWORD: ${{ secrets.MACOS_CERTIFICATE_PWD }}
+      CSC_IDENTITY_AUTO_DISCOVERY: true
+      WESIGHT_REQUIRE_APPLE_NOTARIZATION: true
+      BUILD_ARCH: ${{ inputs.arch }}
+      RELEASE_TAG: ${{ inputs.release_tag }}
+      RELEASE_HELPERS_SHA: ${{ github.sha }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.release_tag }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24.x'
+
+      - name: Validate release version
+        id: metadata
+        run: node scripts/release-metadata.cjs --tag "$RELEASE_TAG" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          path: .release-tools
+          persist-credentials: false
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            scripts/notarize.js
+            scripts/notarize-dmg.cjs
+            scripts/mac-notarization.cjs
+
+      - name: Apply current notarization helpers
+        run: |
+          cp .release-tools/scripts/notarize.js scripts/notarize.js
+          cp .release-tools/scripts/notarize-dmg.cjs scripts/notarize-dmg.cjs
+          cp .release-tools/scripts/mac-notarization.cjs scripts/mac-notarization.cjs
+          git add -N scripts/mac-notarization.cjs
+          python3 - <<'PY'
+          import subprocess
+          allowed = {'scripts/notarize.js', 'scripts/notarize-dmg.cjs', 'scripts/mac-notarization.cjs'}
+          changed = set(subprocess.check_output(['git', 'diff', '--name-only'], text=True).splitlines())
+          if changed - allowed:
+              raise SystemExit('Recovery modified files outside the notarization helpers.')
+          PY
+
+      - uses: actions/cache@v4
+        with:
+          path: ~/.npm
+          key: npm-${{ runner.os }}-${{ inputs.arch }}-${{ hashFiles('package.json') }}
+          restore-keys: npm-${{ runner.os }}-${{ inputs.arch }}-
+
+      - run: npm install
+
+      - name: Verify runner architecture
+        run: |
+          case "$BUILD_ARCH" in
+            arm64) test "$(uname -m)" = arm64 ;;
+            x64) test "$(uname -m)" = x86_64 ;;
+            *) exit 1 ;;
+          esac
+          node -e 'if (process.arch !== process.env.BUILD_ARCH) process.exit(1)'
+
+      - name: Build and verify Mac installer
+        env:
+          WESIGHT_RELEASE_VERSION: ${{ steps.metadata.outputs.version }}
+        run: |
+          npm run "dist:mac:$BUILD_ARCH" -- --publish never -c.forceCodeSigning=true
+          npm run "verify:mac:$BUILD_ARCH-artifact"
+
+      - name: Record build provenance
+        run: |
+          python3 - <<'PY'
+          import json
+          import os
+          import subprocess
+          from pathlib import Path
+          record = {
+              'releaseTag': os.environ['RELEASE_TAG'],
+              'sourceCommit': subprocess.check_output(['git', 'rev-parse', 'HEAD'], text=True).strip(),
+              'helpersCommit': os.environ['RELEASE_HELPERS_SHA'],
+              'arch': os.environ['BUILD_ARCH'],
+          }
+          Path('release/recovery-provenance.json').write_text(json.dumps(record, indent=2) + '\n')
+          PY
+
+      - name: Preserve pending notarization files
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-${{ inputs.arch }}-recovery-pending-${{ github.run_attempt }}
+          path: |
+            release/*.dmg
+            release/pending-notarization/**
+          if-no-files-found: ignore
+          compression-level: 0
+          retention-days: 7
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: macos-${{ inputs.arch }}-recovery-${{ inputs.release_tag }}
+          path: |
+            release/*.dmg
+            release/recovery-provenance.json
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 7

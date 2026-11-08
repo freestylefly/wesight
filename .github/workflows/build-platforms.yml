@@ -104,8 +104,10 @@ jobs:
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: macos-${{ matrix.arch }}-pending-notarization
-          path: release/WeSight.${{ needs.prepare.outputs.version }}.mac.${{ matrix.arch }}.dmg
+          name: macos-${{ matrix.arch }}-pending-notarization-${{ github.run_attempt }}
+          path: |
+            release/WeSight.${{ needs.prepare.outputs.version }}.mac.${{ matrix.arch }}.dmg
+            release/pending-notarization/**
           if-no-files-found: ignore
           retention-days: 7
 
