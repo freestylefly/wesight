@@ -1,5 +1,6 @@
 import { exec, spawn } from 'child_process';
 import { app, session } from 'electron';
+import { isSystemProxyEnabled } from './systemProxy';
 import fs from 'fs';
 import path from 'path';
 import { Readable } from 'stream';
@@ -97,6 +98,27 @@ export async function downloadUpdate(
       controller.abort('timeout');
     }, DOWNLOAD_INACTIVITY_TIMEOUT_MS);
   };
+
+  // If WeSight has system-proxy mode disabled (direct mode), check whether the
+  // OS actually has a proxy configured and temporarily apply it for this download.
+  // This ensures updates work in environments where a system proxy (e.g. Clash,
+  // Surge, or corporate proxies) is active but the user hasn't enabled the
+  // WeSight system-proxy setting (issue #73).
+  let proxyRestoreNeeded = false;
+  if (!isSystemProxyEnabled()) {
+    try {
+      const currentProxy = await session.defaultSession.resolveProxy(url);
+      const isDirectMode = !currentProxy || currentProxy.trim().toUpperCase() === 'DIRECT';
+      if (!isDirectMode) {
+        // A proxy is available; temporarily switch the session to system mode.
+        await session.defaultSession.setProxy({ mode: 'system' });
+        proxyRestoreNeeded = true;
+        console.log('[AppUpdate] System proxy detected for update download:', currentProxy);
+      }
+    } catch (proxyErr) {
+      console.warn('[AppUpdate] Could not resolve proxy, proceeding without proxy change:', proxyErr);
+    }
+  }
 
   try {
     const response = await session.defaultSession.fetch(url, {
@@ -216,6 +238,13 @@ export async function downloadUpdate(
     throw error;
   } finally {
     activeDownloadController = null;
+    clearInactivityTimer();
+    // Restore direct mode if we temporarily switched to system proxy for this download
+    if (proxyRestoreNeeded) {
+      try {
+        await session.defaultSession.setProxy({ mode: 'direct' });
+      } catch { /* ignore restore failure */ }
+    }
   }
 }
 
